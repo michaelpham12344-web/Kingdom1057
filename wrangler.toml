@@ -1,0 +1,10 @@
+name = "svs-planner-sync"
+main = "worker.js"
+compatibility_date = "2026-06-01"
+
+# After creating your KV namespace (see DEPLOY.md), put its ID below.
+# Run: npx wrangler kv namespace create SVS_KV
+# Then paste the returned id into the line below.
+[[kv_namespaces]]
+binding = "SVS_KV"
+id = "PASTE_YOUR_KV_NAMESPACE_ID_HERE"
