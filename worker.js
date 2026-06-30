@@ -569,13 +569,17 @@ async function syncPull() {
   if (!syncEnabled()) return;
   try {
     const res = await fetch(SYNC_API_URL.replace(/\\/$/, '') + '/state', { cache: 'no-store' });
-    if (!res.ok) return;
+    if (!res.ok) { updateSyncStatus('error'); return; }
     const data = await res.json();
     const json = JSON.stringify(data);
+    // A successful response means we ARE connected and synced, even if the
+    // shared state is still empty (e.g. first-ever load, nobody has saved
+    // anything yet). Only the "apply remote data" step should be skipped
+    // when there's nothing to apply.
+    updateSyncStatus('synced');
     if (json !== syncLastPushedJSON && Object.keys(data).length) {
       syncApplyRemote(data);
       syncLastPushedJSON = json;
-      updateSyncStatus('synced');
     }
   } catch (e) {
     updateSyncStatus('offline');
