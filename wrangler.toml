@@ -1,4 +1,4 @@
-name = "svs-planner-sync"
+name = "kingdom1057"
 main = "worker.js"
 compatibility_date = "2026-06-01"
 
@@ -7,4 +7,4 @@ compatibility_date = "2026-06-01"
 # Then paste the returned id into the line below.
 [[kv_namespaces]]
 binding = "SVS_KV"
-id = "PASTE_YOUR_KV_NAMESPACE_ID_HERE"
+id = "885986c8129340b18a86126582ad5def"
