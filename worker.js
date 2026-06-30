@@ -41,7 +41,7 @@ const SITE_HTML = `<!DOCTYPE html>
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14px;min-height:100vh;}
-.nav{display:flex;align-items:center;gap:0;border-bottom:1px solid var(--border);background:var(--bg2);padding:0 24px;position:sticky;top:0;z-index:100;}
+.nav{display:flex;align-items:center;gap:0;border-bottom:1px solid var(--border);background:var(--bg2);padding:0 24px;position:sticky;top:0;z-index:100;overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .nav-logo{font-family:var(--head);font-size:20px;font-weight:700;color:var(--accent2);letter-spacing:.08em;margin-right:32px;padding:14px 0;white-space:nowrap;}
 .nav-logo span{color:var(--gold);}
 .tab{font-family:var(--head);font-size:15px;font-weight:600;letter-spacing:.06em;padding:16px 20px;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;}
@@ -223,8 +223,11 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .ms-rank-num{font-family:var(--mono);width:32px;color:var(--text3);}
 .ms-rank-row.winner{background:rgba(46,204,113,.06);}
 .ms-rank-row.rejected{background:rgba(224,58,58,.05);opacity:.7;}
+.phase-tabs{display:flex;flex-wrap:wrap;gap:6px;}
+.phase-tabs .tab{border:1px solid var(--border);border-radius:6px;padding:8px 14px;}
+.phase-tabs .tab.active{background:rgba(61,142,240,.12);}
 
-@media(max-width:900px){.sim-layout{grid-template-columns:1fr;}.page{padding:14px 12px;}.grid2,.grid3{grid-template-columns:1fr;}#msSlotGrid{grid-template-columns:repeat(4,1fr)!important;}#msVerifyGrid{grid-template-columns:1fr!important;}}
+@media(max-width:900px){.sim-layout{grid-template-columns:1fr;}.page{padding:14px 12px;}.grid2,.grid3{grid-template-columns:1fr;}#msSlotGrid{grid-template-columns:repeat(4,1fr)!important;}#msVerifyGrid{grid-template-columns:1fr!important;}.nav{padding:0 10px;}.nav-logo{margin-right:14px;font-size:16px;}.tab{padding:14px 12px;font-size:13px;}#syncStatus{margin-right:8px;font-size:10px!important;}.utc-clock{font-size:13px!important;}.phase-tabs .tab{padding:7px 10px;font-size:12px;}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js';document.head.appendChild(s);"></script>
 </head>
@@ -235,8 +238,8 @@ tr:hover td{background:rgba(255,255,255,.02);}
   <div class="tab" onclick="showPage('strategy')">Battle Strategy</div>
   <div class="tab" onclick="showPage('setup')">Team Setup</div>
   <div class="tab" onclick="showPage('minister')">Minister Spots</div>
-  <div id="syncStatus" style="font-family:var(--head);font-size:11px;font-weight:600;letter-spacing:.04em;margin-right:14px;color:var(--text3)">Sync not configured</div>
-  <div class="utc-clock" id="utcClock">00:00:00</div>
+  <div id="syncStatus" style="font-family:var(--head);font-size:11px;font-weight:600;letter-spacing:.04em;margin-right:14px;color:var(--text3);white-space:nowrap;flex-shrink:0">Sync not configured</div>
+  <div class="utc-clock" id="utcClock" style="flex-shrink:0">00:00:00</div>
 </nav>
 <div id="toast">Copied!</div>
 
@@ -256,8 +259,10 @@ tr:hover td{background:rgba(255,255,255,.02);}
       <div class="field"><label>Team</label><select id="rlTeam" style="width:110px"><option value="">No team</option></select></div>
       <button class="btn btn-primary" onclick="addLeader()">+ Add Leader</button>
     </div>
-    <table><thead><tr><th>Name</th><th>March</th><th>Tier</th><th>Team</th><th>Status</th><th>Duration</th><th>Launch Time</th><th>Timer</th><th>Cooldown</th><th></th></tr></thead>
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+    <table style="min-width:680px"><thead><tr><th>Name</th><th>March</th><th>Tier</th><th>Team</th><th>Status</th><th>Duration</th><th>Launch Time</th><th>Timer</th><th>Cooldown</th><th></th></tr></thead>
     <tbody id="leaderBody"></tbody></table>
+    </div>
   </div>
 
   <div class="card">
