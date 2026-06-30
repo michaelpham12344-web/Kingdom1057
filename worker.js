@@ -413,7 +413,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
       <div id="msIdentityError" style="display:none;color:#ff7070;font-size:12px;margin-bottom:10px;background:rgba(224,58,58,.1);border:1px solid rgba(224,58,58,.3);border-radius:5px;padding:8px 12px">⚠ Please enter both your Alliance name and in-game name before continuing.</div>
       <div class="sec-title">Upload your inventory screenshot</div>
       <p style="color:var(--text2);font-size:12px;margin-bottom:10px">Take a screenshot of your speedup items in the in-game inventory (Construction, Research, Training, General). Works from phone or desktop.</p>
-      <input type="file" id="msFileInput" accept="image/*" capture="environment" style="margin-bottom:10px">
+      <input type="file" id="msFileInput" accept="image/*" style="margin-bottom:10px">
       <div id="msImgPreviewWrap" style="display:none;margin:12px 0">
         <img id="msImgPreview" style="max-width:280px;border-radius:8px;border:1px solid var(--border)">
       </div>
