@@ -1296,6 +1296,10 @@ function bsTickClock(){
   document.getElementById('bsClockHH').textContent=String(n.getUTCHours()).padStart(2,'0');
   document.getElementById('bsClockMM').textContent=String(n.getUTCMinutes()).padStart(2,'0');
   document.getElementById('bsClockSS').textContent=String(n.getUTCSeconds()).padStart(2,'0');
+  // Live-recalculate launch times every second so they never show a past time
+  if(BS_CALC.offsetSec!==null && BS_CALC.selectedTeamId!==null){
+    bsCalcTeam(BS_CALC.selectedTeamId, BS_CALC.offsetSec, false);
+  }
 }
 setInterval(bsTickClock,1000); bsTickClock();
 
@@ -1349,12 +1353,20 @@ function bsCalcTeam(teamId, offsetSec, logToast){
     document.getElementById('bsFinalResult').innerHTML='<div style="color:var(--text3);font-size:13px">This team has no leaders dropped into it yet — drag leaders into the team box above.</div>';
     return;
   }
-  // The offset defines the shared LAND time. Each leader's launch time = land time - rally duration - march time.
-  // Leaders with a longer march must launch earlier so everyone lands together.
-  const landSec=nowUTCSec()+offsetSec;
-  const results=leaders.map(l=>({name:l.name,march:l.march,launchSec:landSec-dur-l.march,landSec})).sort((a,b)=>a.launchSec-b.launchSec);
+  // offsetSec = how far in the future the first (longest march) leader launches.
+  // The leader with the LONGEST march launches at baseLaunch = now + offset.
+  // Leaders with shorter marches launch LATER so they all arrive together.
+  const baseLaunch=nowUTCSec()+offsetSec;
+  const maxMarch=Math.max(...leaders.map(l=>l.march));
+  const results=leaders.map(l=>({
+    name:l.name,
+    march:l.march,
+    launchSec:baseLaunch+(maxMarch-l.march),
+    landSec:baseLaunch+maxMarch
+  })).sort((a,b)=>a.launchSec-b.launchSec);
+  const landSec=baseLaunch+maxMarch;
 
-  const header=\`Rally Arrival Time: \${dur===300?'5 min':'10 min'} | Land Time (UTC): \${s2hms(landSec)}\`;
+  const header=\`\${t.name} — Land Time (UTC): \${s2hms(landSec)}\`;
   const resultEl=document.getElementById('bsFinalResult');
   resultEl.innerHTML=\`<div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:14px 16px">
     <div style="font-weight:600;font-size:13px;color:var(--text);margin-bottom:10px">\${header}</div>
@@ -1390,7 +1402,7 @@ function bsCopyTeamResult(teamId){
   const {results}=t._bsLastCalc;
   const lines=[t.name, ...results.map(r=>\`\${r.name} | Time: \${s2hms(r.launchSec)}\`)];
   copyText(lines.join('\\n'));
-  toast('Copied in-game format!');
+  toast('Copied!');
 }
 
 // ════════════ MINISTER SPOTS ════════════
