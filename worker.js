@@ -2257,20 +2257,28 @@ function renderAttendance(prefix) {
 const _origSyncSerialize = syncSerialize;
 syncSerialize = function() {
   const base = JSON.parse(_origSyncSerialize());
-  base.att_sw = ATT.sw;
-  base.att_ta = ATT.ta;
-  if (loadedPasswords.coord) base.pw_coord = loadedPasswords.coord;
-  if (loadedPasswords.admin) base.pw_admin = loadedPasswords.admin;
+  if (typeof ATT !== 'undefined') {
+    base.att_sw = ATT.sw;
+    base.att_ta = ATT.ta;
+  }
+  if (typeof loadedPasswords !== 'undefined') {
+    if (loadedPasswords.coord) base.pw_coord = loadedPasswords.coord;
+    if (loadedPasswords.admin) base.pw_admin = loadedPasswords.admin;
+  }
   return JSON.stringify(base);
 };
 
 const _origSyncApplyRemote = syncApplyRemote;
 syncApplyRemote = function(data) {
   _origSyncApplyRemote(data);
-  if (data.att_sw) ATT.sw = data.att_sw;
-  if (data.att_ta) ATT.ta = data.att_ta;
-  if (data.pw_coord) loadedPasswords.coord = data.pw_coord;
-  if (data.pw_admin) loadedPasswords.admin = data.pw_admin;
+  if (typeof ATT !== 'undefined') {
+    if (data.att_sw) ATT.sw = data.att_sw;
+    if (data.att_ta) ATT.ta = data.att_ta;
+  }
+  if (typeof loadedPasswords !== 'undefined') {
+    if (data.pw_coord) loadedPasswords.coord = data.pw_coord;
+    if (data.pw_admin) loadedPasswords.admin = data.pw_admin;
+  }
   const active = document.querySelector('.page.active');
   if (active && active.id === 'page-swordland') renderAttendance('sw');
   if (active && active.id === 'page-trialliance') renderAttendance('ta');
