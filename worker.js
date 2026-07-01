@@ -269,14 +269,16 @@ document.addEventListener('touchend',function(e){
     </div>
     <div id="landingPasswordSection" style="text-align:left">
       <div style="text-align:center;margin-bottom:12px">
-        <div style="background:rgba(61,142,240,.07);border:1px solid var(--border);border-radius:7px;padding:12px 14px;margin-bottom:10px;text-align:left">
-          <div style="font-size:12px;color:var(--text2);line-height:1.7">
-            <strong style="color:var(--text)">🔒 Password access</strong> is for <strong style="color:var(--accent2)">R4 and R5 members</strong> of participating alliances.<br>
-            It unlocks Rally Leaders, Battle Strategy, Team Setup, Swordland and Tri Alliance coordination features.<br>
-            Contact your R5 for the password.
+        <div style="position:relative;display:inline-block">
+          <span style="font-size:12px;color:var(--text3);cursor:pointer;text-decoration:underline" 
+            onclick="toggleLandingPassword()" 
+            onmouseenter="document.getElementById('pwTooltip').style.display='block'"
+            onmouseleave="document.getElementById('pwTooltip').style.display='none'">Have a password? Click here</span>
+          <div id="pwTooltip" style="display:none;position:absolute;bottom:130%;left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:10px 14px;width:260px;font-size:12px;color:var(--text2);line-height:1.7;z-index:999;white-space:normal;text-align:left;pointer-events:none">
+            Password access is for <strong style="color:var(--accent2)">R4 and R5 members</strong>
+            <div style="position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);width:10px;height:10px;background:var(--bg3);border-right:1px solid var(--border2);border-bottom:1px solid var(--border2);transform:translateX(-50%) rotate(45deg)"></div>
           </div>
         </div>
-        <span style="font-size:11px;color:var(--text3);cursor:pointer;text-decoration:underline" onclick="toggleLandingPassword()">Have a password? Click here</span>
       </div>
       <div id="landingPasswordForm" style="display:none">
         <div class="card">
