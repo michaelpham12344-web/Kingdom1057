@@ -1,27 +1,9 @@
 /**
- * Kingdom 1057 Worker
- * Serves the planner website AND provides the shared sync API, all from
- * a single Cloudflare Worker (no separate Pages project needed).
- *
- * Routes:
- *   GET  /             -> serves the website (index.html content)
- *   GET  /state        -> returns the saved shared JSON blob (or {} if none saved yet)
- *   PUT  /state        -> body is JSON, saves it as the new shared state
- *
- * Bind a KV namespace called SVS_KV to this Worker (see wrangler.toml).
+ * Kingdom 1057 Worker — see worker.js header for route docs
  */
-
 const ALLOWED_ORIGIN = "*";
 const STATE_KEY = "svs_state";
-
-function corsHeaders() {
-  return {
-    "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-    "Access-Control-Allow-Methods": "GET,PUT,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-  };
-}
-
+function corsHeaders(){return{"Access-Control-Allow-Origin":ALLOWED_ORIGIN,"Access-Control-Allow-Methods":"GET,PUT,OPTIONS","Access-Control-Allow-Headers":"Content-Type"};}
 const SITE_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1485,63 +1467,109 @@ function msSkipToManual(){
 }
 
 function msParseOCRText(text){
-  // The in-game "Overview: Resources & Speedups" screen is a 2-column table.
-  // OCR (even with PSM 6) sometimes wraps a category name across 2-3 short lines
-  // before the duration appears, e.g.:
-  //   "Construction"
-  //   "62 day(s) hr(s)58 min(s)"   <- note: "1" before hr(s) sometimes gets dropped by OCR
-  //   "peedup"
-  // So instead of only checking the same/next line, we scan a small window of
-  // nearby lines for the first one that contains a parseable duration.
+  // Robust two-strategy parser that handles both OCR layout styles seen in the wild:
+  //   Style A (interleaved): "General Speedup 134 day(s)17 hr(s)13 / min(s) / Soldier Training 88 day(s)..."
+  //   Style B (two blocks): all labels in one cluster, all durations in a separate cluster below, same order
+  // Strategy A: nearest-neighbor — each duration block claims the closest label line (<=2 lines away)
+  // Strategy B (fallback): ordinal — leftover blocks matched to remaining unassigned labels in top-down order
+
   const lines=text.split(/\\n+/).map(l=>l.trim()).filter(Boolean);
+
   const keywordMap={
     construction:['construction'],
     research:['research'],
     training:['training','soldier training','troop'],
     general:['general speedup','general']
   };
-  const WINDOW=3; // how many lines forward (and the line itself) to search for a duration
+  const boundaryKeywords=['learning speedup','soldier healing','healing speedup'];
 
-  function parseDurationToHours(str){
-    // Matches "<num> d(ay/s)", "<num> h(r/s)", "<num> m(in/s)", "<num> s(ec/s)" chunks.
-    // The number is OPTIONAL before the unit word — OCR sometimes drops a single-digit
-    // count (commonly "1") right before "hr(s)"/"min(s)". A bare unit with no number
-    // is simply skipped (contributes 0), rather than killing the whole match.
+  function normalizeOCRDigits(s){
+    // Common OCR digit-letter confusions: I→1 and l→1 when adjacent to digits
+    s=s.replace(/(\\d)[Il](?=\\d|\\b)/g,'$11');
+    s=s.replace(/\\bI(\\d)/g,'1$1');
+    return s;
+  }
+
+  function parseDurationToHours(s){
+    s=normalizeOCRDigits(s);
     let totalHours=0, matchedAny=false;
     const re=/(\\d+(?:[.,]\\d+)?)?\\s*(day\\(s\\)|days|day|d\\b|hr\\(s\\)|hrs|hour|hours|h\\b|min\\(s\\)|mins|minute|minutes|m\\b|sec\\(s\\)|secs|second|seconds|s\\b)/gi;
     let m;
-    while((m=re.exec(str))!==null){
-      const hasNum=m[1]!==undefined && m[1]!=='';
+    while((m=re.exec(s))!==null){
+      const hasNum=m[1]!==undefined&&m[1]!=='';
       const num=hasNum?parseFloat(m[1].replace(',','.')):0;
-      const unitRaw=m[2].toLowerCase();
-      let hours=0;
-      if(unitRaw.startsWith('d')) hours=num*24;
-      else if(unitRaw.startsWith('h')) hours=num;
-      else if(unitRaw.startsWith('m')) hours=num/60;
-      else if(unitRaw.startsWith('s')) hours=num/3600;
-      totalHours+=hours;
-      if(hasNum) matchedAny=true; // only count as a real match if at least one chunk had a number
+      const u=m[2].toLowerCase();
+      let h=0;
+      if(u.startsWith('d')) h=num*24;
+      else if(u.startsWith('h')) h=num;
+      else if(u.startsWith('m')) h=num/60;
+      else if(u.startsWith('s')) h=num/3600;
+      totalHours+=h;
+      if(hasNum) matchedAny=true;
     }
     return matchedAny?totalHours:null;
   }
 
+  // Find each category's label line (first match, top-down)
+  const allLabels={};
   MS_CATEGORIES.forEach(cat=>{
-    let foundHours=null, foundRaw=null;
     for(let i=0;i<lines.length;i++){
       const lower=lines[i].toLowerCase();
-      if(keywordMap[cat].some(k=>lower.includes(k))){
-        for(let j=i;j<Math.min(i+1+WINDOW,lines.length);j++){
-          const candidate=lines[j];
-          const hours=parseDurationToHours(candidate);
-          if(hours!==null && hours>0){ foundHours=hours; foundRaw=candidate; break; }
-        }
-        if(foundHours!==null) break;
-      }
+      if(keywordMap[cat].some(k=>lower.includes(k))){ allLabels[i]=cat; break; }
     }
-    if(foundHours!==null){
-      // Store the OCR result directly in hours (since the source string can mix days/hrs/min,
-      // a single "amount+unit" pair doesn't represent it well — hours is the converted truth value).
-      MS.draft.verify[cat]={amount:Math.round(foundHours*100)/100,unit:'hours',hours:foundHours,ocrAmount:Math.round(foundHours*100)/100,ocrRaw:foundRaw};
+  });
+  for(let i=0;i<lines.length;i++){
+    const lower=lines[i].toLowerCase();
+    if(boundaryKeywords.some(k=>lower.includes(k)) && !(i in allLabels)) allLabels[i]='boundary';
+  }
+  const sortedLabelLines=Object.keys(allLabels).map(Number).sort((a,b)=>a-b);
+
+  // Build duration-bearing line index
+  const durationForLine={};
+  lines.forEach((line,i)=>{ const h=parseDurationToHours(line); if(h!==null) durationForLine[i]=h; });
+
+  // Merge adjacent lines where the FOLLOWING line has no digit (bare unit continuation like "min(s)")
+  const blocks=[]; // [{start, end, total}]
+  const sortedDurIdxs=Object.keys(durationForLine).map(Number).sort((a,b)=>a-b);
+  let i=0;
+  while(i<sortedDurIdxs.length){
+    const start=sortedDurIdxs[i];
+    let total=durationForLine[start], end=start, j=i+1;
+    while(j<sortedDurIdxs.length && sortedDurIdxs[j]===end+1 && !/\\d/.test(lines[sortedDurIdxs[j]])){
+      end=sortedDurIdxs[j]; total+=durationForLine[end]; j++;
+    }
+    blocks.push({start,end,total}); i=j;
+  }
+
+  // Strategy A: nearest-neighbor (<=2 lines)
+  const assigned={};
+  const unassignedBlocks=[];
+  blocks.forEach(({start,end,total})=>{
+    let bestLabel=null, bestDist=null;
+    sortedLabelLines.forEach(ll=>{ const d=Math.abs(start-ll); if(bestDist===null||d<bestDist){bestDist=d;bestLabel=ll;} });
+    if(bestDist!==null && bestDist<=2 && allLabels[bestLabel]!=='boundary'){
+      const cat=allLabels[bestLabel];
+      if(!(cat in assigned)) assigned[cat]={hours:total,raw:lines.slice(start,end+1).join(' / ')};
+      else unassignedBlocks.push({start,end,total});
+    } else {
+      unassignedBlocks.push({start,end,total});
+    }
+  });
+
+  // Strategy B: ordinal fallback for leftover blocks
+  const missingCats=sortedLabelLines.filter(ll=>allLabels[ll]!=='boundary' && !(allLabels[ll] in assigned)).map(ll=>allLabels[ll]);
+  missingCats.forEach((cat,idx)=>{
+    if(idx<unassignedBlocks.length){
+      const {start,end,total}=unassignedBlocks[idx];
+      assigned[cat]={hours:total,raw:lines.slice(start,end+1).join(' / ')};
+    }
+  });
+
+  // Write results
+  MS_CATEGORIES.forEach(cat=>{
+    if(cat in assigned){
+      const {hours,raw}=assigned[cat];
+      MS.draft.verify[cat]={amount:Math.round(hours*100)/100,unit:'hours',hours,ocrAmount:Math.round(hours*100)/100,ocrRaw:raw};
     } else {
       MS.draft.verify[cat]={amount:0,unit:'hours',hours:0,ocrAmount:null,ocrRaw:null};
     }
@@ -1767,44 +1795,21 @@ function msClearAllSubs(){
 </body>
 </html>
 `;
-
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-
-    if (request.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders() });
-    }
-
+    if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders() });
     if (url.pathname === "/state" && request.method === "GET") {
       const raw = await env.SVS_KV.get(STATE_KEY);
-      return new Response(raw || "{}", {
-        headers: { "Content-Type": "application/json", ...corsHeaders() },
-      });
+      return new Response(raw || "{}", { headers: { "Content-Type": "application/json", ...corsHeaders() } });
     }
-
     if (url.pathname === "/state" && request.method === "PUT") {
       const body = await request.text();
-      try {
-        JSON.parse(body);
-      } catch (e) {
-        return new Response(JSON.stringify({ error: "Invalid JSON" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders() },
-        });
-      }
+      try { JSON.parse(body); } catch(e) { return new Response(JSON.stringify({error:"Invalid JSON"}),{status:400,headers:{"Content-Type":"application/json",...corsHeaders()}}); }
       await env.SVS_KV.put(STATE_KEY, body);
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { "Content-Type": "application/json", ...corsHeaders() },
-      });
+      return new Response(JSON.stringify({ok:true}), { headers: { "Content-Type": "application/json", ...corsHeaders() } });
     }
-
-    if (request.method === "GET") {
-      return new Response(SITE_HTML, {
-        headers: { "Content-Type": "text/html;charset=UTF-8", ...corsHeaders() },
-      });
-    }
-
+    if (request.method === "GET") return new Response(SITE_HTML, { headers: { "Content-Type": "text/html;charset=UTF-8", ...corsHeaders() } });
     return new Response("Not found", { status: 404, headers: corsHeaders() });
   },
 };
