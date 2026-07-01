@@ -1,19 +1,219 @@
 /**
- * Kingdom 1057 Worker — serves site + sync API + KingShot player proxy
+ * Kingdom 1057 Worker
+ * Routes:
+ *   GET  /                    → serve website
+ *   GET  /state               → read shared KV state
+ *   PUT  /state               → write shared KV state
+ *   GET  /kingshot-player?id= → proxy to kingshot.net/api/player-info
+ *   POST /register-player     → store a verified player ID in KV
+ *   POST /admin-redeem        → manually trigger gift code redemption (admin)
+ *   GET  /gift-log            → return redemption log from KV
+ *   Cron every 30 min         → batched auto-redeem (5 players per run)
  */
-const ALLOWED_ORIGIN = "*";
-const STATE_KEY = "svs_state";
-const KINGSHOT_API = "https://kingshot.net/api";
 
-function corsHeaders(){
+const KINGSHOT_API  = "https://kingshot.net/api";
+const GIFTCODE_API  = "https://ks-giftcode.centurygame.com/api";
+const SALT          = "tB87#kPtkxqOS2";
+const BATCH_SIZE    = 5;   // players per cron run — keeps well under 30s CPU limit
+
+const STATE_KEY     = "svs_state";
+const PLAYERS_KEY   = "registered_players";  // { [id]: {id, name, kingdom} }
+const REDEEMED_KEY  = "redeemed_codes";       // ["playerId:code", ...]
+const GIFT_LOG_KEY  = "gift_log";             // last 30 run entries
+const QUEUE_KEY     = "redeem_queue";         // { codes: [...], playerIds: [...], pos: N, date: "YYYY-MM-DD" }
+
+// ── Pure-JS MD5 (no crypto API needed in CF Workers) ──
+function md5(str) {
+  function safeAdd(x,y){const l=(x&0xffff)+(y&0xffff);return(((x>>16)+(y>>16)+(l>>16))<<16)|(l&0xffff);}
+  function rol(n,c){return(n<<c)|(n>>>(32-c));}
+  function cmn(q,a,b,x,s,t){return safeAdd(rol(safeAdd(safeAdd(a,q),safeAdd(x,t)),s),b);}
+  function ff(a,b,c,d,x,s,t){return cmn((b&c)|((~b)&d),a,b,x,s,t);}
+  function gg(a,b,c,d,x,s,t){return cmn((b&d)|(c&(~d)),a,b,x,s,t);}
+  function hh(a,b,c,d,x,s,t){return cmn(b^c^d,a,b,x,s,t);}
+  function ii(a,b,c,d,x,s,t){return cmn(c^(b|(~d)),a,b,x,s,t);}
+  const enc=new TextEncoder(),bytes=enc.encode(str),len8=bytes.length;
+  const len32=(((len8+8)>>6)+1)*16,x=new Int32Array(len32);
+  for(let i=0;i<len8;i++)x[i>>2]|=bytes[i]<<((i%4)*8);
+  x[len8>>2]|=0x80<<((len8%4)*8);x[len32-2]=len8*8;
+  let a=1732584193,b=-271733879,c=-1732584194,d=271733878;
+  for(let i=0;i<len32;i+=16){
+    const[oa,ob,oc,od]=[a,b,c,d];
+    a=ff(a,b,c,d,x[i],7,-680876936);d=ff(d,a,b,c,x[i+1],12,-389564586);c=ff(c,d,a,b,x[i+2],17,606105819);b=ff(b,c,d,a,x[i+3],22,-1044525330);
+    a=ff(a,b,c,d,x[i+4],7,-176418897);d=ff(d,a,b,c,x[i+5],12,1200080426);c=ff(c,d,a,b,x[i+6],17,-1473231341);b=ff(b,c,d,a,x[i+7],22,-45705983);
+    a=ff(a,b,c,d,x[i+8],7,1770035416);d=ff(d,a,b,c,x[i+9],12,-1958414417);c=ff(c,d,a,b,x[i+10],17,-42063);b=ff(b,c,d,a,x[i+11],22,-1990404162);
+    a=ff(a,b,c,d,x[i+12],7,1804603682);d=ff(d,a,b,c,x[i+13],12,-40341101);c=ff(c,d,a,b,x[i+14],17,-1502002290);b=ff(b,c,d,a,x[i+15],22,1236535329);
+    a=gg(a,b,c,d,x[i+1],5,-165796510);d=gg(d,a,b,c,x[i+6],9,-1069501632);c=gg(c,d,a,b,x[i+11],14,643717713);b=gg(b,c,d,a,x[i],20,-373897302);
+    a=gg(a,b,c,d,x[i+5],5,-701558691);d=gg(d,a,b,c,x[i+10],9,38016083);c=gg(c,d,a,b,x[i+15],14,-660478335);b=gg(b,c,d,a,x[i+4],20,-405537848);
+    a=gg(a,b,c,d,x[i+9],5,568446438);d=gg(d,a,b,c,x[i+14],9,-1019803690);c=gg(c,d,a,b,x[i+3],14,-187363961);b=gg(b,c,d,a,x[i+8],20,1163531501);
+    a=gg(a,b,c,d,x[i+13],5,-1444681467);d=gg(d,a,b,c,x[i+2],9,-51403784);c=gg(c,d,a,b,x[i+7],14,1735328473);b=gg(b,c,d,a,x[i+12],20,-1926607734);
+    a=hh(a,b,c,d,x[i+5],4,-378558);d=hh(d,a,b,c,x[i+8],11,-2022574463);c=hh(c,d,a,b,x[i+11],16,1839030562);b=hh(b,c,d,a,x[i+14],23,-35309556);
+    a=hh(a,b,c,d,x[i+1],4,-1530992060);d=hh(d,a,b,c,x[i+4],11,1272893353);c=hh(c,d,a,b,x[i+7],16,-155497632);b=hh(b,c,d,a,x[i+10],23,-1094730640);
+    a=hh(a,b,c,d,x[i+13],4,681279174);d=hh(d,a,b,c,x[i],11,-358537222);c=hh(c,d,a,b,x[i+3],16,-722521979);b=hh(b,c,d,a,x[i+6],23,76029189);
+    a=hh(a,b,c,d,x[i+9],4,-640364487);d=hh(d,a,b,c,x[i+12],11,-421815835);c=hh(c,d,a,b,x[i+15],16,530742520);b=hh(b,c,d,a,x[i+2],23,-995338651);
+    a=ii(a,b,c,d,x[i],6,-198630844);d=ii(d,a,b,c,x[i+7],10,1126891415);c=ii(c,d,a,b,x[i+14],15,-1416354905);b=ii(b,c,d,a,x[i+5],21,-57434055);
+    a=ii(a,b,c,d,x[i+12],6,1700485571);d=ii(d,a,b,c,x[i+3],10,-1894986606);c=ii(c,d,a,b,x[i+10],15,-1051523);b=ii(b,c,d,a,x[i+1],21,-2054922799);
+    a=ii(a,b,c,d,x[i+8],6,1873313359);d=ii(d,a,b,c,x[i+15],10,-30611744);c=ii(c,d,a,b,x[i+6],15,-1560198380);b=ii(b,c,d,a,x[i+13],21,1309151649);
+    a=ii(a,b,c,d,x[i+4],6,-145523070);d=ii(d,a,b,c,x[i+11],10,-1120210379);c=ii(c,d,a,b,x[i+2],15,718787259);b=ii(b,c,d,a,x[i+9],21,-343485551);
+    a=safeAdd(a,oa);b=safeAdd(b,ob);c=safeAdd(c,oc);d=safeAdd(d,od);
+  }
+  return[a,b,c,d].map(n=>{let s='';for(let j=0;j<4;j++)s+=('0'+((n>>(j*8))&0xff).toString(16)).slice(-2);return s;}).join('');
+}
+
+function signRequest(fid, time) {
+  return md5(`fid=${fid}&time=${time}${SALT}`);
+}
+
+async function redeemOne(fid, code, attempt=1) {
+  const MAX_ATTEMPTS = 3;
+  const time = Date.now();
+  const sign = signRequest(fid, time);
+  const body = new URLSearchParams({ fid: String(fid), code: code, time: String(time), sign });
+  try {
+    const res = await fetch(GIFTCODE_API + '/redeem_code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString()
+    });
+    const data = await res.json();
+    if (data.err_code === 0)     return { ok: true };
+    if (data.err_code === 40014) return { ok: false, err: 'already used' };
+    if (data.err_code === 40008) return { ok: false, err: 'expired' };
+    // Temporary server error — retry with backoff
+    if ((data.msg || '').toUpperCase().includes('TIMEOUT') && attempt < MAX_ATTEMPTS) {
+      await new Promise(r => setTimeout(r, 2000 * attempt));
+      return redeemOne(fid, code, attempt + 1);
+    }
+    return { ok: false, err: data.msg || String(data.err_code) };
+  } catch(e) {
+    if (attempt < MAX_ATTEMPTS) {
+      await new Promise(r => setTimeout(r, 2000 * attempt));
+      return redeemOne(fid, code, attempt + 1);
+    }
+    return { ok: false, err: 'network error' };
+  }
+}
+
+// ── BATCHED redemption — processes BATCH_SIZE players per call ──
+// Queue stored in KV: { codes, playerIds, pos, date }
+// Each cron run advances pos by BATCH_SIZE until all players done for current codes.
+async function runBatch(env) {
+  // 1. Fetch current active codes
+  let codes = [];
+  try {
+    const res = await fetch(KINGSHOT_API + '/gift-codes');
+    const data = await res.json();
+    if (data.status === 'success' && data.data && data.data.giftCodes) {
+      codes = data.data.giftCodes
+        .filter(c => !c.expiresAt || new Date(c.expiresAt) > new Date())
+        .map(c => c.code);
+    }
+  } catch(e) {
+    return { ok: false, message: 'Failed to fetch gift codes: ' + e.message };
+  }
+  if (!codes.length) return { ok: true, message: 'No active codes.' };
+
+  // 2. Load players
+  const playersRaw = await env.SVS_KV.get(PLAYERS_KEY);
+  const players = playersRaw ? Object.values(JSON.parse(playersRaw)) : [];
+  if (!players.length) return { ok: true, message: 'No registered players.' };
+
+  // 3. Load or reset queue
+  // Reset queue if: codes changed since last queue, or new day, or queue exhausted
+  const today = new Date().toISOString().slice(0, 10);
+  const queueRaw = await env.SVS_KV.get(QUEUE_KEY);
+  let queue = queueRaw ? JSON.parse(queueRaw) : null;
+  const codesKey = codes.slice().sort().join(',');
+  const needsReset = !queue
+    || queue.date !== today
+    || queue.codesKey !== codesKey
+    || queue.pos >= queue.playerIds.length;
+
+  if (needsReset) {
+    // Fresh queue for today — only include players who haven't gotten all codes yet
+    const redeemedRaw = await env.SVS_KV.get(REDEEMED_KEY);
+    const redeemed = new Set(redeemedRaw ? JSON.parse(redeemedRaw) : []);
+    // Find players that still need at least one code
+    const pending = players.filter(p =>
+      codes.some(c => !redeemed.has(`${p.id}:${c}`))
+    );
+    if (!pending.length) return { ok: true, message: 'All players already have all active codes.' };
+    queue = { codesKey, codes, playerIds: pending.map(p => p.id), pos: 0, date: today };
+  }
+
+  // 4. Process this batch
+  const redeemedRaw = await env.SVS_KV.get(REDEEMED_KEY);
+  const redeemed = new Set(redeemedRaw ? JSON.parse(redeemedRaw) : []);
+
+  const batchIds = queue.playerIds.slice(queue.pos, queue.pos + BATCH_SIZE);
+  const batchPlayers = batchIds.map(id => players.find(p => p.id === id)).filter(Boolean);
+
+  const results = [];
+  for (const player of batchPlayers) {
+    for (const code of queue.codes) {
+      const key = `${player.id}:${code}`;
+      if (redeemed.has(key)) continue;
+      const result = await redeemOne(player.id, code);
+      results.push({ name: player.name, id: player.id, code, ok: result.ok, err: result.err || null });
+      if (result.ok || result.err === 'already used') redeemed.add(key);
+      await new Promise(r => setTimeout(r, 3000));
+    }
+  }
+
+  // 5. Advance queue position
+  queue.pos += BATCH_SIZE;
+  await env.SVS_KV.put(QUEUE_KEY, JSON.stringify(queue));
+  await env.SVS_KV.put(REDEEMED_KEY, JSON.stringify([...redeemed]));
+
+  // 6. Append to log
+  if (results.length) {
+    const logRaw = await env.SVS_KV.get(GIFT_LOG_KEY);
+    const log = logRaw ? JSON.parse(logRaw) : [];
+    log.push({
+      time: new Date().toISOString().slice(0,16).replace('T',' ') + ' UTC',
+      codes: queue.codes,
+      results
+    });
+    if (log.length > 30) log.splice(0, log.length - 30);
+    await env.SVS_KV.put(GIFT_LOG_KEY, JSON.stringify(log));
+  }
+
+  const remaining = Math.max(0, queue.playerIds.length - queue.pos);
+  const ok = results.filter(r => r.ok).length;
+  const skip = results.filter(r => r.err === 'already used').length;
+  const fail = results.filter(r => !r.ok && r.err !== 'already used').length;
   return {
-    "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-    "Access-Control-Allow-Methods": "GET,PUT,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type"
+    ok: true,
+    message: `Batch done: ${ok} redeemed, ${skip} skip, ${fail} failed. ${remaining} players still queued.`
   };
 }
 
-const SITE_HTML=`<!DOCTYPE html>
+// Manual "redeem all now" — runs batches sequentially until queue empty (admin only, no cron limit)
+async function runFull(env) {
+  let total = { ok: 0, skip: 0, fail: 0 };
+  let runs = 0;
+  const MAX_RUNS = 20; // safety cap: 20 × 5 = 100 players max per manual trigger
+  while (runs++ < MAX_RUNS) {
+    const result = await runBatch(env);
+    if (!result.ok) return result;
+    // Parse counts from message
+    const m = result.message.match(/(\d+) redeemed, (\d+) skip, (\d+) failed/);
+    if (m) { total.ok += +m[1]; total.skip += +m[2]; total.fail += +m[3]; }
+    if (result.message.includes('0 players still queued') ||
+        result.message.includes('already have all') ||
+        result.message.includes('No active') ||
+        result.message.includes('No registered')) break;
+  }
+  return { ok: true, message: `Full run complete: ${total.ok} redeemed, ${total.skip} already used, ${total.fail} failed.` };
+}
+
+function cors() {
+  return { 'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,PUT,POST,OPTIONS','Access-Control-Allow-Headers':'Content-Type' };
+}
+function json(data, status=200) {
+  return new Response(JSON.stringify(data), { status, headers:{'Content-Type':'application/json',...cors()} });
+}
+
+const SITE_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2042,6 +2242,12 @@ function landingEnterMember() {
   // Store verified player in session so attendance forms can use it
   if (verifiedPlayer) {
     try { sessionStorage.setItem('verifiedPlayer', JSON.stringify(verifiedPlayer)); } catch(e) {}
+    // Register Player ID in KV so cron can auto-redeem gift codes for them
+    fetch('/register-player', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: verifiedPlayer.id, name: verifiedPlayer.name, kingdom: verifiedPlayer.kingdom })
+    }).catch(() => {});
   }
   enterApp('member');
 }
@@ -2102,6 +2308,7 @@ function showPageDirect(p) {
     const adminEl = document.getElementById('currentAdminPw');
     if (coordEl) coordEl.textContent = getPassword('coord');
     if (adminEl) adminEl.textContent = getPassword('admin');
+    adminLoadGiftLog();
   }
 }
 
@@ -2140,6 +2347,37 @@ async function adminChangePassword(type) {
   const displayEl = document.getElementById(displayId);
   if (displayEl) displayEl.textContent = newPw;
   toast(type === 'coord' ? 'Coordinator password updated.' : 'Admin password updated.');
+}
+
+async function adminRedeemNow() {
+  const statusEl = document.getElementById('giftRedeemStatus');
+  const logEl = document.getElementById('giftRedeemLog');
+  if (statusEl) statusEl.textContent = '⏳ Redeeming… this may take a minute.';
+  try {
+    const res = await fetch('/admin-redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminKey: getPassword('admin') }) });
+    const data = await res.json();
+    if (statusEl) statusEl.textContent = data.message || 'Done.';
+    adminLoadGiftLog();
+  } catch(e) {
+    if (statusEl) statusEl.textContent = '⚠ Error: ' + e.message;
+  }
+}
+
+async function adminLoadGiftLog() {
+  const logEl = document.getElementById('giftRedeemLog');
+  if (!logEl) return;
+  try {
+    const res = await fetch('/gift-log');
+    const data = await res.json();
+    if (!data.log || !data.log.length) { logEl.innerHTML = '<div style="color:var(--text3)">No redemptions yet.</div>'; return; }
+    logEl.innerHTML = data.log.slice().reverse().map(entry =>
+      '<div style="border-bottom:1px solid var(--border);padding:6px 0">' +
+      '<span style="color:var(--text3)">' + entry.time + '</span> ' +
+      '<strong>' + (entry.code || '?') + '</strong> — ' +
+      (entry.results || []).map(r => '<span style="color:' + (r.ok ? 'var(--green)' : 'var(--enemy)') + '">' + r.name + ' (' + (r.ok ? '✓' : r.err) + ')</span>').join(', ') +
+      '</div>'
+    ).join('');
+  } catch(e) { logEl.innerHTML = '<div style="color:var(--enemy)">Could not load log.</div>'; }
 }
 
 async function adminReset(what) {
@@ -2428,6 +2666,16 @@ document.addEventListener('DOMContentLoaded', initApp);
       <button class="btn btn-primary" onclick="adminChangePassword('admin')">Save Admin Password</button>
     </div>
   </div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">🎁 Gift Code Auto-Redemption</div>
+    <p style="color:var(--text2);font-size:12px;margin-bottom:14px">Redeems all active gift codes daily at 08:00 UTC for every registered member. Members register by verifying their Player ID on the landing page.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <button class="btn btn-primary" onclick="adminRedeemNow()">🎁 Redeem Now for All Members</button>
+      <button class="btn btn-ghost" onclick="adminLoadGiftLog()">📋 Refresh Log</button>
+    </div>
+    <div id="giftRedeemStatus" style="font-size:12px;color:var(--text3);margin-bottom:10px"></div>
+    <div id="giftRedeemLog" style="font-size:12px;max-height:300px;overflow-y:auto"></div>
+  </div>
   <div class="card">
     <div class="card-title">🗑 Reset Data</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -2511,68 +2759,73 @@ document.addEventListener('DOMContentLoaded', initApp);
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (request.method==='OPTIONS') return new Response(null,{headers:cors()});
 
-    if (request.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders() });
-    }
-
-    // ── KingShot player proxy ──
-    // Proxies /kingshot-player?id=XXXX → https://kingshot.net/api/player-info?playerId=XXXX
-    // Needed to avoid CORS issues when calling the API from the browser
-    if (url.pathname === "/kingshot-player" && request.method === "GET") {
-      const playerId = url.searchParams.get("id");
-      if (!playerId) {
-        return new Response(JSON.stringify({ status: "fail", message: "Player ID required" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders() }
-        });
-      }
+    // KingShot player lookup proxy
+    if (url.pathname==='/kingshot-player' && request.method==='GET') {
+      const playerId = url.searchParams.get('id');
+      if (!playerId) return json({status:'fail',message:'Player ID required'},400);
       try {
-        const apiRes = await fetch(KINGSHOT_API + "/player-info?playerId=" + encodeURIComponent(playerId), {
-          headers: { "Accept": "application/json" }
-        });
-        const data = await apiRes.json();
-        return new Response(JSON.stringify(data), {
-          status: apiRes.status,
-          headers: { "Content-Type": "application/json", ...corsHeaders() }
-        });
-      } catch (e) {
-        return new Response(JSON.stringify({ status: "error", message: "API unreachable" }), {
-          status: 502,
-          headers: { "Content-Type": "application/json", ...corsHeaders() }
-        });
-      }
+        const res = await fetch(KINGSHOT_API+'/player-info?playerId='+encodeURIComponent(playerId),{headers:{Accept:'application/json'}});
+        return json(await res.json(), res.status);
+      } catch(e) { return json({status:'error',message:'API unreachable'},502); }
     }
 
-    // ── Shared state sync ──
-    if (url.pathname === "/state" && request.method === "GET") {
+    // Register verified player
+    if (url.pathname==='/register-player' && request.method==='POST') {
+      try {
+        const {id,name,kingdom} = await request.json();
+        if (!id || kingdom!==1057) return json({ok:false},400);
+        const raw = await env.SVS_KV.get(PLAYERS_KEY);
+        const players = raw ? JSON.parse(raw) : {};
+        players[String(id)] = {id:String(id),name,kingdom};
+        await env.SVS_KV.put(PLAYERS_KEY, JSON.stringify(players));
+        return json({ok:true});
+      } catch(e) { return json({ok:false,error:e.message},400); }
+    }
+
+    // Manual admin redeem (runs full queue)
+    if (url.pathname==='/admin-redeem' && request.method==='POST') {
+      try {
+        const {adminKey} = await request.json();
+        const state = await env.SVS_KV.get(STATE_KEY);
+        const stateData = state ? JSON.parse(state) : {};
+        if (adminKey !== (stateData.pw_admin||'kvk1057admin')) return json({ok:false,message:'Unauthorized'},401);
+        const result = await runFull(env);
+        return json(result);
+      } catch(e) { return json({ok:false,message:e.message},500); }
+    }
+
+    // Gift redemption log
+    if (url.pathname==='/gift-log' && request.method==='GET') {
+      const raw = await env.SVS_KV.get(GIFT_LOG_KEY);
+      const log = raw ? JSON.parse(raw) : [];
+      const display = log.map(e=>({
+        time: e.time,
+        code: (e.codes||[]).join(', '),
+        results: (e.results||[]).map(r=>({name:r.name,ok:r.ok,err:r.err}))
+      }));
+      return json({log:display});
+    }
+
+    // Shared state
+    if (url.pathname==='/state' && request.method==='GET') {
       const raw = await env.SVS_KV.get(STATE_KEY);
-      return new Response(raw || "{}", {
-        headers: { "Content-Type": "application/json", ...corsHeaders() }
-      });
+      return new Response(raw||'{}',{headers:{'Content-Type':'application/json',...cors()}});
     }
-
-    if (url.pathname === "/state" && request.method === "PUT") {
+    if (url.pathname==='/state' && request.method==='PUT') {
       const body = await request.text();
-      try { JSON.parse(body); } catch(e) {
-        return new Response(JSON.stringify({ error: "Invalid JSON" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders() }
-        });
-      }
+      try { JSON.parse(body); } catch(e) { return json({error:'Invalid JSON'},400); }
       await env.SVS_KV.put(STATE_KEY, body);
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { "Content-Type": "application/json", ...corsHeaders() }
-      });
+      return json({ok:true});
     }
 
-    // ── Serve website ──
-    if (request.method === "GET") {
-      return new Response(SITE_HTML, {
-        headers: { "Content-Type": "text/html;charset=UTF-8", ...corsHeaders() }
-      });
-    }
+    if (request.method==='GET') return new Response(SITE_HTML,{headers:{'Content-Type':'text/html;charset=UTF-8',...cors()}});
+    return new Response('Not found',{status:404,headers:cors()});
+  },
 
-    return new Response("Not found", { status: 404, headers: corsHeaders() });
+  // Cron: every 30 min — process next batch of 5 players
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runBatch(env));
   }
 };
