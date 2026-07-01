@@ -2432,6 +2432,12 @@ function msCanAccessResults() { return typeof AUTH !== 'undefined' && AUTH.admin
 
 // ════════════ ATTENDANCE — REWRITTEN ════════════
 
+// ════════════ ATTENDANCE DATA ════════════
+const ATT = {
+  sw: { members: [], events: [] },
+  ta: { members: [], events: [] }
+};
+
 function attSwitchTab(prefix, tab) {
   ['register','summary'].forEach(t => {
     const panel = document.getElementById(prefix + 'Panel-' + t);
