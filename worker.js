@@ -1,9 +1,18 @@
 /**
- * Kingdom 1057 Worker — serves site + sync API
+ * Kingdom 1057 Worker — serves site + sync API + KingShot player proxy
  */
 const ALLOWED_ORIGIN = "*";
 const STATE_KEY = "svs_state";
-function corsHeaders(){return{"Access-Control-Allow-Origin":ALLOWED_ORIGIN,"Access-Control-Allow-Methods":"GET,PUT,OPTIONS","Access-Control-Allow-Headers":"Content-Type"};}
+const KINGSHOT_API = "https://kingshot.net/api";
+
+function corsHeaders(){
+  return {
+    "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+    "Access-Control-Allow-Methods": "GET,PUT,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type"
+  };
+}
+
 const SITE_HTML=`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -263,9 +272,15 @@ document.addEventListener('touchend',function(e){
       </div>
     </div>
     <div class="card" style="text-align:left;margin-bottom:20px">
-      <div class="card-title" style="font-size:14px">🚀 Enter as member</div>
-      <p style="color:var(--text2);font-size:12px;margin-bottom:12px">Submit your minister spot information — no password required.</p>
-      <button class="btn btn-primary" style="width:100%" onclick="landingEnterMember()">Enter as Member</button>
+      <div class="card-title" style="font-size:14px">🚀 Enter as Member</div>
+      <p style="color:var(--text2);font-size:12px;margin-bottom:12px">Enter your in-game Player ID to verify you're part of Kingdom 1057.</p>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input type="text" id="landingPlayerId" placeholder="e.g. 8767319" style="flex:1" onkeydown="if(event.key==='Enter')lookupPlayer()">
+        <button class="btn btn-primary" id="lookupBtn" onclick="lookupPlayer()">🔍 Lookup</button>
+      </div>
+      <div id="playerLookupResult" style="display:none;margin-bottom:10px"></div>
+      <button id="enterMemberBtn" class="btn btn-primary" style="width:100%;display:none" onclick="landingEnterMember()">✅ Enter as Member</button>
+      <p style="color:var(--text3);font-size:11px;margin-top:8px">Find your Player ID in-game: tap your avatar → your ID is shown below your name.</p>
     </div>
     <div id="landingPasswordSection" style="text-align:left">
       <div style="text-align:center;margin-bottom:12px">
@@ -1970,7 +1985,66 @@ function toggleLandingPassword() {
   const f = document.getElementById('landingPasswordForm');
   f.style.display = f.style.display === 'none' ? 'block' : 'none';
 }
-function landingEnterMember() { enterApp('member'); }
+// Verified player from KingShot API
+let verifiedPlayer = null;
+
+async function lookupPlayer() {
+  const id = document.getElementById('landingPlayerId').value.trim();
+  if (!id) { toast('Enter your Player ID.'); return; }
+
+  const btn = document.getElementById('lookupBtn');
+  const resultEl = document.getElementById('playerLookupResult');
+  const enterBtn = document.getElementById('enterMemberBtn');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Looking up…';
+  resultEl.style.display = 'none';
+  enterBtn.style.display = 'none';
+
+  try {
+    const res = await fetch('/kingshot-player?id=' + encodeURIComponent(id));
+    const data = await res.json();
+
+    if (data.status === 'success' && data.data) {
+      const p = data.data;
+      const inKingdom = p.kingdom === 1057;
+      const kingdomColor = inKingdom ? 'var(--green)' : 'var(--enemy)';
+      const kingdomMsg = inKingdom ? '✅ Kingdom 1057' : '❌ Kingdom ' + p.kingdom + ' — not Kingdom 1057';
+
+      resultEl.innerHTML =
+        '<div style="display:flex;align-items:center;gap:12px;background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:12px 14px">' +
+        (p.profilePhoto ? '<img src="' + p.profilePhoto + '" style="width:48px;height:48px;border-radius:50%;border:2px solid var(--border2)">' : '') +
+        '<div style="flex:1">' +
+        '<div style="font-weight:700;font-size:16px">' + p.name + '</div>' +
+        '<div style="font-size:12px;color:var(--text3)">Level ' + p.level + ' · ID: ' + p.playerId + '</div>' +
+        '<div style="font-size:13px;font-weight:600;color:' + kingdomColor + ';margin-top:4px">' + kingdomMsg + '</div>' +
+        '</div></div>';
+      resultEl.style.display = 'block';
+
+      if (inKingdom) {
+        verifiedPlayer = { id: p.playerId, name: p.name, kingdom: p.kingdom, level: p.level, avatar: p.profilePhoto };
+        enterBtn.style.display = 'block';
+      }
+    } else {
+      resultEl.innerHTML = '<div style="color:var(--enemy);font-size:13px;padding:8px 0">⚠ ' + (data.message || 'Player not found.') + '</div>';
+      resultEl.style.display = 'block';
+    }
+  } catch (e) {
+    resultEl.innerHTML = '<div style="color:var(--enemy);font-size:13px;padding:8px 0">⚠ Could not reach KingShot API. Try again or use a password to enter.</div>';
+    resultEl.style.display = 'block';
+  }
+
+  btn.disabled = false;
+  btn.textContent = '🔍 Lookup';
+}
+
+function landingEnterMember() {
+  // Store verified player in session so attendance forms can use it
+  if (verifiedPlayer) {
+    try { sessionStorage.setItem('verifiedPlayer', JSON.stringify(verifiedPlayer)); } catch(e) {}
+  }
+  enterApp('member');
+}
 
 async function landingCheckPassword() {
   const input = document.getElementById('landingPwInput').value;
@@ -2433,21 +2507,72 @@ document.addEventListener('DOMContentLoaded', initApp);
 </body>
 </html>
 `;
+
 export default {
-  async fetch(request,env){
-    const url=new URL(request.url);
-    if(request.method==="OPTIONS") return new Response(null,{headers:corsHeaders()});
-    if(url.pathname==="/state"&&request.method==="GET"){
-      const raw=await env.SVS_KV.get(STATE_KEY);
-      return new Response(raw||"{}",{headers:{"Content-Type":"application/json",...corsHeaders()}});
+  async fetch(request, env) {
+    const url = new URL(request.url);
+
+    if (request.method === "OPTIONS") {
+      return new Response(null, { headers: corsHeaders() });
     }
-    if(url.pathname==="/state"&&request.method==="PUT"){
-      const body=await request.text();
-      try{JSON.parse(body);}catch(e){return new Response(JSON.stringify({error:"Invalid JSON"}),{status:400,headers:{"Content-Type":"application/json",...corsHeaders()}});}
-      await env.SVS_KV.put(STATE_KEY,body);
-      return new Response(JSON.stringify({ok:true}),{headers:{"Content-Type":"application/json",...corsHeaders()}});
+
+    // ── KingShot player proxy ──
+    // Proxies /kingshot-player?id=XXXX → https://kingshot.net/api/player-info?playerId=XXXX
+    // Needed to avoid CORS issues when calling the API from the browser
+    if (url.pathname === "/kingshot-player" && request.method === "GET") {
+      const playerId = url.searchParams.get("id");
+      if (!playerId) {
+        return new Response(JSON.stringify({ status: "fail", message: "Player ID required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders() }
+        });
+      }
+      try {
+        const apiRes = await fetch(KINGSHOT_API + "/player-info?playerId=" + encodeURIComponent(playerId), {
+          headers: { "Accept": "application/json" }
+        });
+        const data = await apiRes.json();
+        return new Response(JSON.stringify(data), {
+          status: apiRes.status,
+          headers: { "Content-Type": "application/json", ...corsHeaders() }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ status: "error", message: "API unreachable" }), {
+          status: 502,
+          headers: { "Content-Type": "application/json", ...corsHeaders() }
+        });
+      }
     }
-    if(request.method==="GET") return new Response(SITE_HTML,{headers:{"Content-Type":"text/html;charset=UTF-8",...corsHeaders()}});
-    return new Response("Not found",{status:404,headers:corsHeaders()});
+
+    // ── Shared state sync ──
+    if (url.pathname === "/state" && request.method === "GET") {
+      const raw = await env.SVS_KV.get(STATE_KEY);
+      return new Response(raw || "{}", {
+        headers: { "Content-Type": "application/json", ...corsHeaders() }
+      });
+    }
+
+    if (url.pathname === "/state" && request.method === "PUT") {
+      const body = await request.text();
+      try { JSON.parse(body); } catch(e) {
+        return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders() }
+        });
+      }
+      await env.SVS_KV.put(STATE_KEY, body);
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { "Content-Type": "application/json", ...corsHeaders() }
+      });
+    }
+
+    // ── Serve website ──
+    if (request.method === "GET") {
+      return new Response(SITE_HTML, {
+        headers: { "Content-Type": "text/html;charset=UTF-8", ...corsHeaders() }
+      });
+    }
+
+    return new Response("Not found", { status: 404, headers: corsHeaders() });
   }
 };
