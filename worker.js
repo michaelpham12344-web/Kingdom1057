@@ -459,43 +459,52 @@ document.addEventListener('touchend',function(e){
 </head>
 <body>
 <!-- LANDING PAGE -->
-<div id="page-landing" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:24px">
+<div id="page-landing" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:24px 16px">
   <div style="max-width:860px;width:100%">
-    <div style="text-align:center;margin-bottom:32px">
-      <div style="font-family:var(--head);font-size:42px;font-weight:700;color:var(--accent2);letter-spacing:.1em;margin-bottom:6px">KINGDOM<span style="color:var(--gold)">·</span>1057</div>
-      <div style="font-family:var(--head);font-size:15px;color:var(--text3);letter-spacing:.1em">KINGSHOT — ALLIANCE COMMAND</div>
-    </div>
-    <!-- Info card -->
-    <div class="card" style="margin-bottom:20px">
-      <div class="card-title" style="font-size:14px">What is this?</div>
-      <div style="color:var(--text2);font-size:13px;line-height:1.9">
-        The Kingdom 1057 coordination tool for KvK (Kingdom vs Kingdom) events.<br>
-        • <strong style="color:var(--text)">Minister Spots</strong> — submit your speedup inventory and pick timeslots to compete for minister positions<br>
-        • <strong style="color:var(--text)">Attendance</strong> — track Swordland and Tri Alliance participation<br>
-        • <strong style="color:var(--text)">Battle Strategy</strong> — coordinate rally leaders, teams and turrets (R4/R5 only)
+
+    <!-- Hero header -->
+    <div style="text-align:center;margin-bottom:40px">
+      <div style="font-family:var(--head);font-size:11px;font-weight:600;letter-spacing:.3em;color:var(--text3);margin-bottom:12px;text-transform:uppercase">⚔️ KvK Alliance Command</div>
+      <div style="font-family:var(--head);font-size:18px;font-weight:400;color:var(--text3);letter-spacing:.15em;margin-bottom:4px">WELCOME TO</div>
+      <div style="font-family:var(--head);font-size:58px;font-weight:700;color:var(--accent2);letter-spacing:.06em;line-height:1;margin-bottom:8px">KINGDOM <span style="color:var(--gold)">1057</span></div>
+      <div style="font-family:var(--head);font-size:13px;color:var(--text3);letter-spacing:.2em;margin-bottom:28px">✦ &nbsp; THE GREATEST KINGDOM OF ALL TIME &nbsp; ✦</div>
+
+      <!-- Story card -->
+      <div class="card" style="text-align:left;max-width:640px;margin:0 auto 32px;border:1px solid rgba(61,142,240,.25);background:rgba(61,142,240,.04)">
+        <div style="font-size:14px;color:var(--text);line-height:2;font-family:var(--body)">
+          This site is your <strong style="color:var(--accent2)">KvK coordination hub</strong> — built to give Kingdom 1057 the edge it deserves.<br><br>
+          Minister Spots are <strong style="color:var(--gold)">scarce and powerful</strong>. The wrong person in the wrong slot costs us dearly. That's why we need <em>your</em> speedup numbers — so we can put the right leaders in the right positions and crush it.<br><br>
+          <strong style="color:var(--text)">What we need from you:</strong><br>
+          📸 A screenshot of your speedup inventory<br>
+          🕐 Your preferred timeslots so we can schedule you in<br><br>
+          <strong style="color:var(--gold)">Bonus perk:</strong> Register your Player ID and you'll get <strong style="color:var(--accent2)">automatic gift code redemption</strong> throughout the KvK — free rewards, zero effort. 🎁<br><br>
+          <span style="color:var(--text3);font-size:12px">Let's go. Kingdom 1057 doesn't lose.</span>
+        </div>
       </div>
     </div>
+
     <!-- Two-column entry -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="landing-grid">
-      <!-- LEFT: Member login via Player ID -->
-      <div class="card" style="text-align:left">
-        <div class="card-title" style="font-size:15px">🎮 Enter as Member</div>
-        <p style="color:var(--text2);font-size:12px;margin-bottom:14px">Verify your Player ID to access Minister Spots and Attendance tracking.</p>
+
+      <!-- LEFT: Member -->
+      <div class="card" style="text-align:left;border:1px solid rgba(46,204,113,.2)">
+        <div style="font-family:var(--head);font-size:16px;font-weight:700;color:var(--green);margin-bottom:4px">🎮 Enter as Member of 1057</div>
+        <p style="color:var(--text2);font-size:12px;margin-bottom:14px;line-height:1.6">Verify your Player ID to submit your minister spot inventory.</p>
         <div style="display:flex;gap:8px;margin-bottom:10px">
-          <input type="text" id="landingPlayerId" placeholder="e.g. 8767319" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')lookupPlayer()">
-          <button class="btn btn-primary" id="lookupBtn" onclick="lookupPlayer()">🔍 Lookup</button>
+          <input type="text" id="landingPlayerId" placeholder="Your Player ID — e.g. 8767319" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')lookupPlayer()">
+          <button class="btn btn-primary" id="lookupBtn" onclick="lookupPlayer()">🔍</button>
         </div>
         <div id="playerLookupResult" style="display:none;margin-bottom:10px"></div>
-        <button id="enterMemberBtn" class="btn btn-primary" style="width:100%;display:none" onclick="landingEnterMember()">✅ Enter as Member</button>
-        <p style="color:var(--text3);font-size:11px;margin-top:10px">📍 Find your Player ID: tap your avatar in-game → ID shown below your name.</p>
+        <button id="enterMemberBtn" class="btn btn-primary" style="width:100%;display:none" onclick="landingEnterMember()">✅ Enter as Member of 1057</button>
+        <p style="color:var(--text3);font-size:11px;margin-top:10px">📍 In-game: tap your avatar → your Player ID is shown below your name.</p>
       </div>
-      <!-- RIGHT: R4/R5 password login -->
-      <div class="card" style="text-align:left">
-        <div class="card-title" style="font-size:15px">🔑 R4 / R5 Access</div>
-        <p style="color:var(--text2);font-size:12px;margin-bottom:14px">Enter your password to access all coordination features including Battle Strategy and admin tools.</p>
-        <!-- Optional Player ID for R4/R5 too -->
-        <div style="display:flex;gap:8px;margin-bottom:10px">
-          <input type="text" id="r5PlayerId" placeholder="Player ID (optional)" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')document.getElementById('landingPwInput').focus()">
+
+      <!-- RIGHT: R4/R5 -->
+      <div class="card" style="text-align:left;border:1px solid rgba(61,142,240,.2)">
+        <div style="font-family:var(--head);font-size:16px;font-weight:700;color:var(--accent2);margin-bottom:4px">🔑 R4 / R5 Access</div>
+        <p style="color:var(--text2);font-size:12px;margin-bottom:14px;line-height:1.6">Alliance leadership access — unlocks all coordination and strategy tools.</p>
+        <div style="margin-bottom:8px">
+          <input type="text" id="r5PlayerId" placeholder="Player ID of 1057 (same as above)" style="width:100%;box-sizing:border-box" onkeydown="if(event.key==='Enter')document.getElementById('landingPwInput').focus()">
         </div>
         <div style="display:flex;gap:8px;margin-bottom:10px">
           <input type="password" id="landingPwInput" placeholder="Password" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')landingCheckPassword()">
@@ -503,15 +512,16 @@ document.addEventListener('touchend',function(e){
         </div>
         <div id="landingPwError" style="display:none;color:#ff7070;font-size:12px;margin-bottom:8px">Incorrect password.</div>
         <div style="position:relative;display:inline-block">
-          <span style="font-size:11px;color:var(--text3)"
+          <span style="font-size:11px;color:var(--text3);cursor:default"
             onmouseenter="document.getElementById('pwTooltip').style.display='block'"
-            onmouseleave="document.getElementById('pwTooltip').style.display='none'">ℹ️ Password access is for R4 and R5 members only</span>
-          <div id="pwTooltip" style="display:none;position:absolute;bottom:130%;left:0;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:10px 14px;width:240px;font-size:12px;color:var(--text2);line-height:1.7;z-index:999;pointer-events:none">
-            Contact your R5 for the coordinator or admin password.
+            onmouseleave="document.getElementById('pwTooltip').style.display='none'">ℹ️ Password access is exclusive to R4 and R5 members</span>
+          <div id="pwTooltip" style="display:none;position:absolute;bottom:130%;left:0;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:10px 14px;width:250px;font-size:12px;color:var(--text2);line-height:1.7;z-index:999;pointer-events:none">
+            R4 and R5 rights are exclusive to alliance leadership. Contact your R5 to receive your access code.
           </div>
         </div>
       </div>
     </div>
+
   </div>
 </div>
 
