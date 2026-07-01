@@ -814,6 +814,12 @@ function removeLeader(id){
   renderLeaderTable(); renderSetup(); if(typeof renderBattleStrategy==='function') renderBattleStrategy();
   syncQueuePush();
 }
+function updateLeaderMarch(id, value){
+  const march=parseInt(value);
+  if(isNaN(march)||march<1||march>300) return;
+  const l=S.leaders.find(x=>x.id===id);
+  if(l){ l.march=march; renderSetup(); if(typeof renderBattleStrategy==='function') renderBattleStrategy(); syncQueuePush(); }
+}
 function startRallyTimer(id){
   const l=S.leaders.find(x=>x.id===id); if(!l) return;
   l.status='locked';
@@ -855,7 +861,9 @@ function renderLeaderTable(){
       ?\`<button class="btn btn-primary btn-sm" onclick="startRallyTimer('\${l.id}')">▶ \${l.dur===300?'5':'10'}m</button>\`
       :\`<button class="btn btn-danger btn-sm" onclick="stopTimer('\${l.id}')">■ Stop</button>\`;
     return \`<tr class="\${l.status==='locked'?'locked-row':''}">
-      <td><strong>\${l.name}</strong></td><td class="mono">\${l.march}s</td><td>\${tb}</td><td>\${teamTxt}</td>
+      <td><strong>\${l.name}</strong></td>
+      <td><input type="number" min="1" max="300" value="\${l.march}" style="width:58px;font-family:var(--mono);font-size:13px;background:var(--bg4);border:1px solid var(--border2);border-radius:4px;padding:4px 6px;color:var(--text);text-align:center" onchange="updateLeaderMarch('\${l.id}',this.value)">s</td>
+      <td>\${tb}</td><td>\${teamTxt}</td>
       <td><span class="dot \${dot}"></span>\${stxt}</td>
       <td class="mono" style="font-size:12px">\${l.dur===300?'5 min':'10 min'}</td>
       <td>\${lt}</td><td>\${ti}</td><td>\${cdTxt}</td>
