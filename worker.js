@@ -1299,6 +1299,16 @@ function bsTickClock(){
 }
 setInterval(bsTickClock,1000); bsTickClock();
 
+function nowUTCSec(){
+  return Math.floor(Date.now()/1000);
+}
+function s2hms(totalSec){
+  // Convert absolute UTC seconds to HH:MM:SS string
+  const s=((totalSec%86400)+86400)%86400; // normalise to 0–86399
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60;
+  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(ss).padStart(2,'0');
+}
+
 function bsSetOffset(sec){
   BS_CALC.offsetSec=sec;
   // highlight selected offset button
