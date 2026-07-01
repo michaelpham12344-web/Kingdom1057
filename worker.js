@@ -418,7 +418,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .phase-tabs .tab{border:1px solid var(--border);border-radius:6px;padding:8px 14px;}
 .phase-tabs .tab.active{background:rgba(61,142,240,.12);}
 
-@media(max-width:900px){.sim-layout{grid-template-columns:1fr;}.page{padding:14px 12px;}.grid2,.grid3{grid-template-columns:1fr;}#msSlotGrid{grid-template-columns:repeat(4,1fr)!important;}#msVerifyGrid{grid-template-columns:1fr!important;}.nav{padding:0 10px;}.nav-logo{margin-right:14px;font-size:16px;}.tab{padding:14px 12px;font-size:13px;}#syncStatus{margin-right:8px;font-size:10px!important;}.utc-clock{font-size:13px!important;}.phase-tabs .tab{padding:7px 10px;font-size:12px;}}
+@media(max-width:900px){.sim-layout{grid-template-columns:1fr;}.page{padding:14px 12px;}.grid2,.grid3{grid-template-columns:1fr;}#msSlotGrid{grid-template-columns:repeat(4,1fr)!important;}#msVerifyGrid{grid-template-columns:1fr!important;}.nav{padding:0 10px;}.nav-logo{margin-right:14px;font-size:16px;}.tab{padding:14px 12px;font-size:13px;}#syncStatus{margin-right:8px;font-size:10px!important;}.utc-clock{font-size:13px!important;}.phase-tabs .tab{padding:7px 10px;font-size:12px;}.landing-grid{grid-template-columns:1fr!important;}}
 </style>
 <script>
 // DragDropTouch polyfill — enables HTML5 drag-and-drop on iOS and Android
@@ -460,55 +460,69 @@ document.addEventListener('touchend',function(e){
 <body>
 <!-- LANDING PAGE -->
 <div id="page-landing" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:24px">
-  <div style="max-width:480px;width:100%;text-align:center">
-    <div style="font-family:var(--head);font-size:42px;font-weight:700;color:var(--accent2);letter-spacing:.1em;margin-bottom:6px">KINGDOM<span style="color:var(--gold)">·</span>1057</div>
-    <div style="font-family:var(--head);font-size:15px;color:var(--text3);letter-spacing:.1em;margin-bottom:32px">KINGSHOT — ALLIANCE COMMAND</div>
-    <div class="card" style="text-align:left;margin-bottom:20px">
+  <div style="max-width:860px;width:100%">
+    <div style="text-align:center;margin-bottom:32px">
+      <div style="font-family:var(--head);font-size:42px;font-weight:700;color:var(--accent2);letter-spacing:.1em;margin-bottom:6px">KINGDOM<span style="color:var(--gold)">·</span>1057</div>
+      <div style="font-family:var(--head);font-size:15px;color:var(--text3);letter-spacing:.1em">KINGSHOT — ALLIANCE COMMAND</div>
+    </div>
+    <!-- Info card -->
+    <div class="card" style="margin-bottom:20px">
       <div class="card-title" style="font-size:14px">What is this?</div>
       <div style="color:var(--text2);font-size:13px;line-height:1.9">
-        This is the Kingdom 1057 coordination tool for KvK (Kingdom vs Kingdom) events.<br><br>
+        The Kingdom 1057 coordination tool for KvK (Kingdom vs Kingdom) events.<br>
         • <strong style="color:var(--text)">Minister Spots</strong> — submit your speedup inventory and pick timeslots to compete for minister positions<br>
-        • <strong style="color:var(--text)">Attendance</strong> — track Swordland and Tri Alliance participation
+        • <strong style="color:var(--text)">Attendance</strong> — track Swordland and Tri Alliance participation<br>
+        • <strong style="color:var(--text)">Battle Strategy</strong> — coordinate rally leaders, teams and turrets (R4/R5 only)
       </div>
     </div>
-    <div class="card" style="text-align:left;margin-bottom:20px">
-      <div class="card-title" style="font-size:14px">🚀 Enter as Member</div>
-      <p style="color:var(--text2);font-size:12px;margin-bottom:12px">Enter your in-game Player ID to verify you're part of Kingdom 1057.</p>
-      <div style="display:flex;gap:8px;margin-bottom:10px">
-        <input type="text" id="landingPlayerId" placeholder="e.g. 8767319" style="flex:1" onkeydown="if(event.key==='Enter')lookupPlayer()">
-        <button class="btn btn-primary" id="lookupBtn" onclick="lookupPlayer()">🔍 Lookup</button>
-      </div>
-      <div id="playerLookupResult" style="display:none;margin-bottom:10px"></div>
-      <button id="enterMemberBtn" class="btn btn-primary" style="width:100%;display:none" onclick="landingEnterMember()">✅ Enter as Member</button>
-      <p style="color:var(--text3);font-size:11px;margin-top:8px">Find your Player ID in-game: tap your avatar → your ID is shown below your name.</p>
-    </div>
-    <div id="landingPasswordSection" style="text-align:left">
-      <div style="text-align:center;margin-bottom:12px">
-        <div style="position:relative;display:inline-block">
-          <span style="font-size:12px;color:var(--text3);cursor:pointer;text-decoration:underline" 
-            onclick="toggleLandingPassword()" 
-            onmouseenter="document.getElementById('pwTooltip').style.display='block'"
-            onmouseleave="document.getElementById('pwTooltip').style.display='none'">Have a password? Click here</span>
-          <div id="pwTooltip" style="display:none;position:absolute;bottom:130%;left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:10px 14px;width:260px;font-size:12px;color:var(--text2);line-height:1.7;z-index:999;white-space:normal;text-align:left;pointer-events:none">
-            Password access is for <strong style="color:var(--accent2)">R4 and R5 members</strong>
-            <div style="position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);width:10px;height:10px;background:var(--bg3);border-right:1px solid var(--border2);border-bottom:1px solid var(--border2);transform:translateX(-50%) rotate(45deg)"></div>
-          </div>
+    <!-- Two-column entry -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="landing-grid">
+      <!-- LEFT: Member login via Player ID -->
+      <div class="card" style="text-align:left">
+        <div class="card-title" style="font-size:15px">🎮 Enter as Member</div>
+        <p style="color:var(--text2);font-size:12px;margin-bottom:14px">Verify your Player ID to access Minister Spots and Attendance tracking.</p>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input type="text" id="landingPlayerId" placeholder="e.g. 8767319" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')lookupPlayer()">
+          <button class="btn btn-primary" id="lookupBtn" onclick="lookupPlayer()">🔍 Lookup</button>
         </div>
+        <div id="playerLookupResult" style="display:none;margin-bottom:10px"></div>
+        <button id="enterMemberBtn" class="btn btn-primary" style="width:100%;display:none" onclick="landingEnterMember()">✅ Enter as Member</button>
+        <p style="color:var(--text3);font-size:11px;margin-top:10px">📍 Find your Player ID: tap your avatar in-game → ID shown below your name.</p>
       </div>
-      <div id="landingPasswordForm" style="display:none">
-        <div class="card">
-          <div class="card-title" style="font-size:14px">🔑 Password access</div>
-          <div class="row" style="margin-bottom:0">
-            <div class="field" style="flex:1"><label>Enter password</label>
-              <input type="password" id="landingPwInput" placeholder="••••••••" style="width:100%" onkeydown="if(event.key==='Enter')landingCheckPassword()">
-            </div>
-            <button class="btn btn-primary" style="align-self:flex-end" onclick="landingCheckPassword()">Enter</button>
+      <!-- RIGHT: R4/R5 password login -->
+      <div class="card" style="text-align:left">
+        <div class="card-title" style="font-size:15px">🔑 R4 / R5 Access</div>
+        <p style="color:var(--text2);font-size:12px;margin-bottom:14px">Enter your password to access all coordination features including Battle Strategy and admin tools.</p>
+        <!-- Optional Player ID for R4/R5 too -->
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input type="text" id="r5PlayerId" placeholder="Player ID (optional)" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')document.getElementById('landingPwInput').focus()">
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input type="password" id="landingPwInput" placeholder="Password" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')landingCheckPassword()">
+          <button class="btn btn-primary" onclick="landingCheckPassword()">Enter</button>
+        </div>
+        <div id="landingPwError" style="display:none;color:#ff7070;font-size:12px;margin-bottom:8px">Incorrect password.</div>
+        <div style="position:relative;display:inline-block">
+          <span style="font-size:11px;color:var(--text3)"
+            onmouseenter="document.getElementById('pwTooltip').style.display='block'"
+            onmouseleave="document.getElementById('pwTooltip').style.display='none'">ℹ️ Password access is for R4 and R5 members only</span>
+          <div id="pwTooltip" style="display:none;position:absolute;bottom:130%;left:0;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:10px 14px;width:240px;font-size:12px;color:var(--text2);line-height:1.7;z-index:999;pointer-events:none">
+            Contact your R5 for the coordinator or admin password.
           </div>
-          <div id="landingPwError" style="display:none;color:#ff7070;font-size:12px;margin-top:8px">Incorrect password.</div>
         </div>
       </div>
     </div>
   </div>
+</div>
+
+<!-- USER BAR — shown after login -->
+<div id="userBar" style="display:none;background:var(--bg3);border-bottom:1px solid var(--border);padding:6px 16px;display:none;align-items:center;gap:10px;font-size:13px">
+  <img id="userBarAvatar" src="" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--border2);display:none">
+  <span id="userBarName" style="font-weight:600;color:var(--text)"></span>
+  <span id="userBarKingdom" style="color:var(--text3);font-size:11px"></span>
+  <span id="userBarRole" style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(61,142,240,.15);color:var(--accent2);margin-left:4px"></span>
+  <span style="flex:1"></span>
+  <span id="syncStatus" style="font-size:11px;color:var(--text3)"></span>
 </div>
 
 <nav class="nav" id="mainNav" style="display:none">
@@ -520,7 +534,7 @@ document.addEventListener('touchend',function(e){
   <div class="tab" id="tabSwordland" onclick="showPage('swordland')" style="display:none">Swordland</div>
   <div class="tab" id="tabTrialliance" onclick="showPage('trialliance')" style="display:none">Tri Alliance</div>
   <div class="tab" id="tabAdmin" onclick="showPage('admin')" style="display:none">⚙️ Admin</div>
-  <div id="syncStatus" style="font-family:var(--head);font-size:11px;font-weight:600;letter-spacing:.04em;margin-right:14px;color:var(--text3);white-space:nowrap;flex-shrink:0">Sync not configured</div>
+  <div id="syncStatusNav" style="font-family:var(--head);font-size:11px;font-weight:600;letter-spacing:.04em;margin-right:14px;color:var(--text3);white-space:nowrap;flex-shrink:0"></div>
   <div class="utc-clock" id="utcClock" style="flex-shrink:0">00:00:00</div>
 </nav>
 <div id="toast">Copied!</div>
@@ -915,18 +929,18 @@ function syncQueuePush() {
 }
 
 function updateSyncStatus(state) {
-  const el = document.getElementById('syncStatus');
-  if (!el) return;
   const map = {
     synced: ['● Synced', 'var(--green)'],
     saving: ['● Saving…', 'var(--gold)'],
     offline: ['● Offline — changes saved locally only', '#ff7070'],
     error: ['● Sync error', '#ff7070'],
-    off: ['Sync not configured', 'var(--text3)']
+    off: ['', 'var(--text3)']
   };
   const [txt, color] = map[state] || map.off;
-  el.textContent = txt;
-  el.style.color = color;
+  ['syncStatus', 'syncStatusNav'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = txt; el.style.color = color; }
+  });
 }
 
 if (syncEnabled()) {
@@ -2188,66 +2202,68 @@ function toggleLandingPassword() {
 // Verified player from KingShot API
 let verifiedPlayer = null;
 
+function showUserBar(player, role) {
+  const bar = document.getElementById('userBar');
+  if (!bar) return;
+  bar.style.display = 'flex';
+  if (player) {
+    const av = document.getElementById('userBarAvatar');
+    if (av && player.avatar) { av.src = player.avatar; av.style.display = 'block'; }
+    const nm = document.getElementById('userBarName');
+    if (nm) nm.textContent = player.name || '';
+    const kg = document.getElementById('userBarKingdom');
+    if (kg) kg.textContent = 'Kingdom ' + (player.kingdom || '1057');
+  }
+  const rl = document.getElementById('userBarRole');
+  if (rl) {
+    if (role === 'admin')  { rl.textContent = '⚙️ Admin';  rl.style.background = 'rgba(255,200,0,.15)'; rl.style.color = 'var(--gold)'; }
+    else if (role === 'coord') { rl.textContent = '🛡 R4/R5'; rl.style.background = 'rgba(61,142,240,.15)'; rl.style.color = 'var(--accent2)'; }
+    else { rl.textContent = '👤 Member'; rl.style.background = 'rgba(46,204,113,.1)'; rl.style.color = 'var(--green)'; }
+  }
+}
+
+async function doPlayerLookup(playerId) {
+  try {
+    const res = await fetch('/kingshot-player?id=' + encodeURIComponent(playerId));
+    const data = await res.json();
+    if (data.status === 'success' && data.data) return data.data;
+  } catch(e) {}
+  return null;
+}
+
 async function lookupPlayer() {
   const id = document.getElementById('landingPlayerId').value.trim();
   if (!id) { toast('Enter your Player ID.'); return; }
-
   const btn = document.getElementById('lookupBtn');
   const resultEl = document.getElementById('playerLookupResult');
   const enterBtn = document.getElementById('enterMemberBtn');
-
-  btn.disabled = true;
-  btn.textContent = '⏳ Looking up…';
-  resultEl.style.display = 'none';
-  enterBtn.style.display = 'none';
-
-  try {
-    const res = await fetch('/kingshot-player?id=' + encodeURIComponent(id));
-    const data = await res.json();
-
-    if (data.status === 'success' && data.data) {
-      const p = data.data;
-      const inKingdom = p.kingdom === 1057;
-      const kingdomColor = inKingdom ? 'var(--green)' : 'var(--enemy)';
-      const kingdomMsg = inKingdom ? '✅ Kingdom 1057' : '❌ Kingdom ' + p.kingdom + ' — not Kingdom 1057';
-
-      resultEl.innerHTML =
-        '<div style="display:flex;align-items:center;gap:12px;background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:12px 14px">' +
-        (p.profilePhoto ? '<img src="' + p.profilePhoto + '" style="width:48px;height:48px;border-radius:50%;border:2px solid var(--border2)">' : '') +
-        '<div style="flex:1">' +
-        '<div style="font-weight:700;font-size:16px">' + p.name + '</div>' +
-        '<div style="font-size:12px;color:var(--text3)">Level ' + p.level + ' · ID: ' + p.playerId + '</div>' +
-        '<div style="font-size:13px;font-weight:600;color:' + kingdomColor + ';margin-top:4px">' + kingdomMsg + '</div>' +
-        '</div></div>';
-      resultEl.style.display = 'block';
-
-      if (inKingdom) {
-        verifiedPlayer = { id: p.playerId, name: p.name, kingdom: p.kingdom, level: p.level, avatar: p.profilePhoto };
-        enterBtn.style.display = 'block';
-      }
-    } else {
-      resultEl.innerHTML = '<div style="color:var(--enemy);font-size:13px;padding:8px 0">⚠ ' + (data.message || 'Player not found.') + '</div>';
-      resultEl.style.display = 'block';
+  btn.disabled = true; btn.textContent = '⏳';
+  resultEl.style.display = 'none'; if (enterBtn) enterBtn.style.display = 'none';
+  const p = await doPlayerLookup(id);
+  if (p) {
+    const inKingdom = p.kingdom === 1057;
+    const col = inKingdom ? 'var(--green)' : 'var(--enemy)';
+    const msg = inKingdom ? '✅ Kingdom 1057' : '❌ Kingdom ' + p.kingdom + ' — not Kingdom 1057';
+    resultEl.innerHTML = '<div style="display:flex;align-items:center;gap:10px;background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:10px 12px">' +
+      (p.profilePhoto ? '<img src="' + p.profilePhoto + '" style="width:40px;height:40px;border-radius:50%;border:2px solid var(--border2)">' : '') +
+      '<div><div style="font-weight:700">' + p.name + '</div><div style="font-size:11px;color:var(--text3)">Lvl ' + p.level + ' · ID: ' + p.playerId + '</div>' +
+      '<div style="font-size:12px;font-weight:600;color:' + col + '">' + msg + '</div></div></div>';
+    resultEl.style.display = 'block';
+    if (inKingdom) {
+      verifiedPlayer = { id: p.playerId, name: p.name, kingdom: p.kingdom, level: p.level, avatar: p.profilePhoto };
+      if (enterBtn) enterBtn.style.display = 'block';
     }
-  } catch (e) {
-    resultEl.innerHTML = '<div style="color:var(--enemy);font-size:13px;padding:8px 0">⚠ Could not reach KingShot API. Try again or use a password to enter.</div>';
+  } else {
+    resultEl.innerHTML = '<div style="color:var(--enemy);font-size:13px;padding:6px 0">⚠ Player not found or API unavailable. Try the password instead.</div>';
     resultEl.style.display = 'block';
   }
-
-  btn.disabled = false;
-  btn.textContent = '🔍 Lookup';
+  btn.disabled = false; btn.textContent = '🔍 Lookup';
 }
 
 function landingEnterMember() {
-  // Store verified player in session so attendance forms can use it
   if (verifiedPlayer) {
     try { sessionStorage.setItem('verifiedPlayer', JSON.stringify(verifiedPlayer)); } catch(e) {}
-    // Register Player ID in KV so cron can auto-redeem gift codes for them
-    fetch('/register-player', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: verifiedPlayer.id, name: verifiedPlayer.name, kingdom: verifiedPlayer.kingdom })
-    }).catch(() => {});
+    fetch('/register-player', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: verifiedPlayer.id, name: verifiedPlayer.name, kingdom: verifiedPlayer.kingdom }) }).catch(() => {});
   }
   enterApp('member');
 }
@@ -2259,10 +2275,15 @@ async function landingCheckPassword() {
   if (checkPassword('admin', input)) {
     AUTH.adminUnlocked = true; AUTH.coordUnlocked = true;
     sessionSetAuth('admin'); sessionSetAuth('coord');
+    // Also try to look up R4/R5 Player ID if provided
+    const r5id = document.getElementById('r5PlayerId') ? document.getElementById('r5PlayerId').value.trim() : '';
+    if (r5id) { const p = await doPlayerLookup(r5id); if (p && p.kingdom === 1057) { verifiedPlayer = { id: p.playerId, name: p.name, kingdom: p.kingdom, level: p.level, avatar: p.profilePhoto }; } }
     enterApp('admin');
   } else if (checkPassword('coord', input)) {
     AUTH.coordUnlocked = true;
     sessionSetAuth('coord');
+    const r5id = document.getElementById('r5PlayerId') ? document.getElementById('r5PlayerId').value.trim() : '';
+    if (r5id) { const p = await doPlayerLookup(r5id); if (p && p.kingdom === 1057) { verifiedPlayer = { id: p.playerId, name: p.name, kingdom: p.kingdom, level: p.level, avatar: p.profilePhoto }; } }
     enterApp('coord');
   } else {
     errEl.style.display = 'block';
@@ -2273,6 +2294,9 @@ async function landingCheckPassword() {
 function enterApp(role) {
   document.getElementById('page-landing').style.display = 'none';
   document.getElementById('mainNav').style.display = '';
+  // Show user bar
+  const storedPlayer = verifiedPlayer || (() => { try { const s = sessionStorage.getItem('verifiedPlayer'); return s ? JSON.parse(s) : null; } catch(e) { return null; } })();
+  showUserBar(storedPlayer, role);
 
   const coordOnly = ['coordinator', 'strategy', 'setup'];
   coordOnly.forEach(id => {
