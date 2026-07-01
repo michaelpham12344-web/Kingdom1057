@@ -1374,7 +1374,7 @@ function bsCalcTeam(teamId, offsetSec, logToast){
   })).sort((a,b)=>a.launchSec-b.launchSec);
   const landSec=baseLaunch+maxMarch;
 
-  const header=\`\${t.name} — Land Time (UTC): \${s2hms(landSec)}\`;
+  const header=\`\${t.name}\`;
   const resultEl=document.getElementById('bsFinalResult');
   resultEl.innerHTML=\`<div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:14px 16px">
     <div style="font-weight:600;font-size:13px;color:var(--text);margin-bottom:10px">\${header}</div>
@@ -2084,112 +2084,29 @@ async function adminReset(what) {
 function msCanAccessResults() { return typeof AUTH !== 'undefined' && AUTH.adminUnlocked; }
 
 
-// ════════════ ATTENDANCE — NEW FLOW ════════════
+// ════════════ ATTENDANCE — REWRITTEN ════════════
 
-function attShowLanding(prefix) {
-  ['Landing','Register','Summary','Events'].forEach(v => {
-    const el = document.getElementById(prefix + v);
-    if (el) el.style.display = v === 'Landing' ? 'block' : 'none';
-  });
-}
-function attShowRegister(prefix) {
-  ['Landing','Register','Summary','Events'].forEach(v => {
-    const el = document.getElementById(prefix + v);
-    if (el) el.style.display = v === 'Register' ? 'block' : 'none';
-  });
-  // Reset picker
-  const picker = document.getElementById(prefix + 'EventPicker');
-  if (picker) picker.style.display = 'none';
-}
-function attShowSummary(prefix) {
-  ['Landing','Register','Summary','Events'].forEach(v => {
-    const el = document.getElementById(prefix + v);
-    if (el) el.style.display = v === 'Summary' ? 'block' : 'none';
-  });
-  renderAttSummary(prefix);
-}
-function attShowEvents(prefix) {
-  ['Landing','Register','Summary','Events'].forEach(v => {
-    const el = document.getElementById(prefix + v);
-    if (el) el.style.display = v === 'Events' ? 'block' : 'none';
-  });
-  renderAttEventList(prefix);
-}
-
-// When renderAttendance is called (on page switch), default to landing
-function renderAttendance(prefix) {
-  attShowLanding(prefix);
-}
-
-// ── Register: ensure member exists, then show event checkboxes ──
-function attEnsureMember(prefix) {
-  const alliance = document.getElementById(prefix + 'RegAlliance').value;
-  const ign = document.getElementById(prefix + 'RegIGN').value.trim();
-  if (!alliance || !ign) { toast('Select your alliance and enter your IGN.'); return; }
-  const store = ATT[prefix];
-  let member = store.members.find(m => m.name === ign && m.alliance === alliance);
-  if (!member) {
-    member = { id: uid(), name: ign, alliance };
-    store.members.push(member);
-    syncQueuePush();
-  }
-  // Show event checkboxes
-  const pickerEl = document.getElementById(prefix + 'EventPicker');
-  const boxesEl = document.getElementById(prefix + 'EventCheckboxes');
-  if (!store.events.length) { toast('No events yet — an admin needs to create events first.'); return; }
-  boxesEl.innerHTML = store.events.map(e => {
-    const attended = e.attendance[member.id] || false;
-    return '<label style="display:flex;align-items:center;gap:8px;background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:10px 14px;cursor:pointer;min-width:160px">' +
-      '<input type="checkbox" data-event="' + e.id + '" data-member="' + member.id + '" ' + (attended ? 'checked' : '') + ' style="width:18px;height:18px;cursor:pointer">' +
-      '<span><strong>' + e.name + '</strong><br><span style="font-size:11px;color:var(--text3)">' + (e.date || '') + '</span></span></label>';
-  }).join('');
-  pickerEl.style.display = 'block';
-}
-
-function attSaveAttendance(prefix) {
-  const store = ATT[prefix];
-  const checkboxes = document.querySelectorAll('#' + prefix + 'EventCheckboxes input[type=checkbox]');
-  checkboxes.forEach(cb => {
-    const eventId = cb.getAttribute('data-event');
-    const memberId = cb.getAttribute('data-member');
-    const event = store.events.find(e => e.id === eventId);
-    if (event) {
-      if (!event.attendance) event.attendance = {};
-      event.attendance[memberId] = cb.checked;
+function attSwitchTab(prefix, tab) {
+  ['register','summary'].forEach(t => {
+    const panel = document.getElementById(prefix + 'Panel-' + t);
+    const btn = document.getElementById(prefix + 'Tab-' + t);
+    if (panel) panel.style.display = t === tab ? 'block' : 'none';
+    if (btn) {
+      btn.style.background = t === tab ? 'rgba(61,142,240,.2)' : '';
+      btn.style.color = t === tab ? 'var(--accent2)' : '';
+      btn.style.border = t === tab ? '1px solid var(--accent)' : '';
+      btn.className = t === tab ? 'btn' : 'btn btn-ghost';
     }
   });
-  syncQueuePush();
-  toast('Attendance saved!');
-  attShowLanding(prefix);
+  if (tab === 'summary') renderAttSummary(prefix);
+  if (tab === 'register') renderAttEventList(prefix);
 }
 
-// ── Summary ──
-function renderAttSummary(prefix) {
-  const contentEl = document.getElementById(prefix + 'SummaryContent');
-  if (!contentEl) return;
-  const store = ATT[prefix];
-  if (!store.members.length) { contentEl.innerHTML = '<div style="color:var(--text3)">No members yet.</div>'; return; }
-
-  const isAdmin = AUTH.adminUnlocked;
-  // Group by alliance
-  const alliances = [...new Set(store.members.map(m => m.alliance))].sort();
-  let html = '';
-  alliances.forEach(alliance => {
-    const members = store.members.filter(m => m.alliance === alliance);
-    html += '<div style="margin-bottom:18px"><div class="sec-title" style="margin-bottom:8px">' + (alliance || 'Unknown') + '</div>';
-    html += '<div style="overflow-x:auto"><table style="min-width:320px"><thead><tr><th>IGN</th><th>Attended</th><th>Score</th>' + (isAdmin ? '<th></th>' : '') + '</tr></thead><tbody>';
-    html += members.map(m => {
-      const s = attGetScore(prefix, m.id);
-      const col = s.pct >= 80 ? 'var(--green)' : s.pct >= 50 ? 'var(--gold)' : 'var(--enemy)';
-      const del = isAdmin ? '<td><button class="btn btn-danger btn-sm" onclick="attRemoveMember(\\'' + prefix + '\\',\\'' + m.id + '\\')">✕</button></td>' : '';
-      return '<tr><td><strong>' + m.name + '</strong></td><td class="mono">' + s.shown + ' / ' + s.total + '</td><td><span class="mono" style="color:' + col + ';font-weight:600">' + s.pct + '%</span></td>' + del + '</tr>';
-    }).join('');
-    html += '</tbody></table></div></div>';
-  });
-  contentEl.innerHTML = html;
+function renderAttendance(prefix) {
+  attSwitchTab(prefix, 'register');
 }
 
-// ── Event list (admin) ──
+// ── Add event ──
 function attAddEvent(prefix) {
   const nameEl = document.getElementById(prefix + 'EventName');
   const dateEl = document.getElementById(prefix + 'EventDate');
@@ -2197,9 +2114,7 @@ function attAddEvent(prefix) {
   const date = dateEl ? dateEl.value : '';
   if (!name) { toast('Enter an event name.'); return; }
   const store = ATT[prefix];
-  const attendance = {};
-  store.members.forEach(m => { attendance[m.id] = false; });
-  store.events.push({ id: uid(), name, date: date || new Date().toLocaleDateString('en-GB'), attendance });
+  store.events.push({ id: uid(), name, date: date || new Date().toLocaleDateString('en-GB'), members: [] });
   nameEl.value = '';
   if (dateEl) dateEl.value = '';
   renderAttEventList(prefix);
@@ -2207,81 +2122,143 @@ function attAddEvent(prefix) {
   toast('Event created.');
 }
 
+// ── Render event list with member management per event ──
 function renderAttEventList(prefix) {
   const el = document.getElementById(prefix + 'EventList');
   if (!el) return;
   const store = ATT[prefix];
-  const isAdmin = AUTH.adminUnlocked;
-  if (!store.events.length) { el.innerHTML = '<div style="color:var(--text3);font-size:13px">No events yet.</div>'; return; }
-  el.innerHTML = store.events.map(e => {
-    const attended = Object.values(e.attendance || {}).filter(Boolean).length;
-    const total = store.members.length;
-    const del = isAdmin ? '<button class="btn btn-danger btn-sm" onclick="attRemoveEvent(\\'' + prefix + '\\',\\'' + e.id + '\\')">🗑 Delete</button>' : '';
-    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">' +
-      '<div><strong>' + e.name + '</strong><span style="color:var(--text3);font-size:12px;margin-left:10px">' + (e.date || '') + '</span></div>' +
-      '<div style="display:flex;align-items:center;gap:12px"><span style="font-size:12px;color:var(--text2)">' + attended + ' / ' + total + ' attended</span>' + del + '</div></div>';
-  }).join('');
-}
+  const isAdmin = typeof AUTH !== 'undefined' && (AUTH.adminUnlocked || AUTH.coordUnlocked);
 
-// Keep attRemoveMember and attRemoveEvent from the previous implementation (already defined)
-// Override attGetScore to handle new structure
-function attGetScore(prefix, memberId) {
-  const store = ATT[prefix];
-  if (!store.events.length) return { pct: 0, shown: 0, total: 0 };
-  const total = store.events.length;
-  const shown = store.events.filter(e => e.attendance && e.attendance[memberId]).length;
-  return { pct: Math.round(shown / total * 100), shown, total };
-}
-
-
-function renderAttendance(prefix) {
-  const contentEl = document.getElementById(prefix + 'AttendanceContent');
-  if (!contentEl) return;
-  const store = ATT[prefix];
-
-  if (!store.members.length && !store.events.length) {
-    contentEl.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:20px 0">No members or events yet. Add members and create events above.</div>';
+  if (!store.events.length) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:12px 0">No events yet. Create one above.</div>';
     return;
   }
 
-  const isAdmin = AUTH.adminUnlocked;
+  el.innerHTML = store.events.map(evt => {
+    const memberRows = evt.members && evt.members.length
+      ? evt.members.map(m => {
+          const delBtn = isAdmin ? '<button class="btn btn-danger btn-sm" style="padding:2px 8px" onclick="attRemoveEventMember(\\'' + prefix + '\\',\\'' + evt.id + '\\',\\'' + m.id + '\\')">✕</button>' : '';
+          return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--border)">' +
+            '<span><strong>' + m.name + '</strong> <span style="color:var(--text3);font-size:12px">(' + (m.alliance||'') + ')</span></span>' +
+            delBtn + '</div>';
+        }).join('')
+      : '<div style="color:var(--text3);font-size:12px;padding:8px 10px">No members added yet.</div>';
 
-  // Summary table
-  let summaryHTML = '';
-  if (store.members.length) {
-    let rows = store.members.map(m => {
-      const { pct, shown, total } = attGetScore(prefix, m.id);
-      const col = pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--gold)' : 'var(--enemy)';
-      const delBtn = isAdmin ? '<button class="btn btn-danger btn-sm" onclick="attRemoveMember(\\'' + prefix + '\\',\\'' + m.id + '\\')">✕</button>' : '';
-      return '<tr><td><strong>' + m.name + '</strong></td><td style="color:var(--text3)">' + m.alliance + '</td><td class="mono">' + shown + ' / ' + total + '</td><td><span class="mono" style="color:' + col + ';font-weight:600">' + pct + '%</span></td>' + (isAdmin ? '<td>' + delBtn + '</td>' : '') + '</tr>';
-    }).join('');
-    summaryHTML = '<div class="card" style="margin-bottom:14px"><div class="card-title">📊 Attendance Summary</div><div style="overflow-x:auto"><table style="min-width:400px"><thead><tr><th>Member</th><th>Alliance</th><th>Attended</th><th>Score</th>' + (isAdmin ? '<th></th>' : '') + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
-  }
+    const addForm = isAdmin ? '<div style="padding:10px;background:var(--bg4);border-top:1px solid var(--border)">' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">' +
+      '<div class="field"><label style="font-size:11px">IGN</label><input type="text" id="' + prefix + 'MemberIGN-' + evt.id + '" placeholder="e.g. Olaf" style="width:140px"></div>' +
+      '<div class="field"><label style="font-size:11px">Alliance</label>' +
+      '<select id="' + prefix + 'MemberAlliance-' + evt.id + '" style="width:100px">' +
+      '<option value="">—</option><option>FIR</option><option>LOC</option><option>LYL</option><option>KNG</option><option>KOV</option><option>TLA</option>' +
+      '</select></div>' +
+      '<button class="btn btn-primary btn-sm" onclick="attAddEventMember(\\'' + prefix + '\\',\\'' + evt.id + '\\')">+ Add Member</button>' +
+      '</div></div>' : '';
 
-  // Events grid
-  let eventsHTML = '';
-  if (store.events.length) {
-    let headerCols = store.events.map(e => {
-      const delBtn = isAdmin ? '<br><button class="btn btn-danger btn-sm" style="margin-top:3px;padding:2px 6px" onclick="attRemoveEvent(\\'' + prefix + '\\',\\'' + e.id + '\\')">✕</button>' : '';
-      return '<th style="min-width:100px">' + e.name + '<br><span style="font-size:10px;color:var(--text3)">' + e.date + '</span>' + delBtn + '</th>';
-    }).join('');
-    let memberRows = store.members.map(m => {
-      let cells = store.events.map(e => {
-        const present = e.attendance[m.id];
-        const bg = present ? 'rgba(46,204,113,.2)' : 'rgba(224,58,58,.1)';
-        const border = present ? 'var(--green)' : 'rgba(224,58,58,.4)';
-        return '<td style="text-align:center"><button onclick="attToggle(\\'' + prefix + '\\',\\'' + e.id + '\\',\\'' + m.id + '\\')" style="width:36px;height:36px;border-radius:50%;border:2px solid ' + border + ';background:' + bg + ';cursor:pointer;font-size:16px">' + (present ? '✓' : '✗') + '</button></td>';
-      }).join('');
-      return '<tr><td><strong>' + m.name + '</strong></td>' + cells + '</tr>';
-    }).join('');
-    const minW = 200 + store.events.length * 110;
-    eventsHTML = '<div class="card"><div class="card-title">📅 Events</div><div style="overflow-x:auto"><table style="min-width:' + minW + 'px"><thead><tr><th>Member</th>' + headerCols + '</tr></thead><tbody>' + memberRows + '</tbody></table></div></div>';
-  }
+    const delEvtBtn = isAdmin ? '<button class="btn btn-danger btn-sm" onclick="attRemoveEvent(\\'' + prefix + '\\',\\'' + evt.id + '\\')">🗑 Delete event</button>' : '';
 
-  contentEl.innerHTML = summaryHTML + eventsHTML;
+    return '<div class="card" style="margin-bottom:12px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
+      '<div><div class="card-title" style="margin:0">' + evt.name + '</div>' +
+      '<div style="font-size:12px;color:var(--text3);margin-top:2px">' + (evt.date||'') + ' · ' + (evt.members ? evt.members.length : 0) + ' members</div></div>' +
+      delEvtBtn + '</div>' +
+      '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;overflow:hidden">' +
+      memberRows + addForm + '</div></div>';
+  }).join('');
 }
 
-// ════════════════════════════════════════════════════════
+function attAddEventMember(prefix, eventId) {
+  const ignEl = document.getElementById(prefix + 'MemberIGN-' + eventId);
+  const allianceEl = document.getElementById(prefix + 'MemberAlliance-' + eventId);
+  const ign = ignEl ? ignEl.value.trim() : '';
+  const alliance = allianceEl ? allianceEl.value : '';
+  if (!ign) { toast('Enter an IGN.'); return; }
+  const store = ATT[prefix];
+  const evt = store.events.find(e => e.id === eventId);
+  if (!evt) return;
+  if (!evt.members) evt.members = [];
+  if (evt.members.find(m => m.name === ign)) { toast('Already added.'); return; }
+  evt.members.push({ id: uid(), name: ign, alliance });
+  if (ignEl) ignEl.value = '';
+  renderAttEventList(prefix);
+  syncQueuePush();
+}
+
+function attRemoveEventMember(prefix, eventId, memberId) {
+  const evt = ATT[prefix].events.find(e => e.id === eventId);
+  if (evt) {
+    evt.members = (evt.members || []).filter(m => m.id !== memberId);
+    renderAttEventList(prefix);
+    syncQueuePush();
+  }
+}
+
+function attRemoveEvent(prefix, eventId) {
+  if (!confirm('Delete this event and all its members?')) return;
+  ATT[prefix].events = ATT[prefix].events.filter(e => e.id !== eventId);
+  renderAttEventList(prefix);
+  renderAttSummary(prefix);
+  syncQueuePush();
+}
+
+// ── Summary ──
+function renderAttSummary(prefix) {
+  const contentEl = document.getElementById(prefix + 'SummaryContent');
+  if (!contentEl) return;
+  const store = ATT[prefix];
+  if (!store.events.length) {
+    contentEl.innerHTML = '<div style="color:var(--text3);font-size:13px">No events yet.</div>';
+    return;
+  }
+
+  // Build a combined member list across all events
+  const memberMap = {}; // name+alliance -> {name, alliance, shown, total}
+  store.events.forEach(evt => {
+    (evt.members || []).forEach(m => {
+      const key = m.name + '|' + (m.alliance || '');
+      if (!memberMap[key]) memberMap[key] = { name: m.name, alliance: m.alliance || '', shown: 0, total: 0 };
+      memberMap[key].shown++;
+      memberMap[key].total++;
+    });
+  });
+
+  // Total events = store.events.length
+  const total = store.events.length;
+  Object.values(memberMap).forEach(m => { m.total = total; });
+
+  // Group by alliance
+  const byAlliance = {};
+  Object.values(memberMap).forEach(m => {
+    const a = m.alliance || 'Unknown';
+    if (!byAlliance[a]) byAlliance[a] = [];
+    byAlliance[a].push(m);
+  });
+
+  const isAdmin = typeof AUTH !== 'undefined' && (AUTH.adminUnlocked || AUTH.coordUnlocked);
+  let html = '';
+  Object.keys(byAlliance).sort().forEach(alliance => {
+    const members = byAlliance[alliance].sort((a,b) => b.shown - a.shown);
+    html += '<div style="margin-bottom:18px">';
+    html += '<div class="sec-title" style="margin-bottom:8px">' + alliance + '</div>';
+    html += '<div style="overflow-x:auto"><table style="min-width:320px"><thead><tr><th>IGN</th><th>Events Attended</th><th>Score</th></tr></thead><tbody>';
+    html += members.map(m => {
+      const pct = total > 0 ? Math.round(m.shown / total * 100) : 0;
+      const col = pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--gold)' : 'var(--enemy)';
+      return '<tr><td><strong>' + m.name + '</strong></td><td class="mono">' + m.shown + ' / ' + total + '</td>' +
+        '<td><span class="mono" style="color:' + col + ';font-weight:600">' + pct + '%</span></td></tr>';
+    }).join('');
+    html += '</tbody></table></div></div>';
+  });
+
+  if (!Object.keys(byAlliance).length) {
+    html = '<div style="color:var(--text3);font-size:13px">No members registered yet.</div>';
+  }
+  contentEl.innerHTML = html;
+}
+
+// Keep attGetScore for backward compat
+function attGetScore(prefix, memberId) { return { pct: 0, shown: 0, total: 0 }; }
+function attRemoveMember(prefix, memberId) {}
+
 // EXTEND SYNC to include ATT data and passwords
 // ════════════════════════════════════════════════════════
 const _origSyncSerialize = syncSerialize;
@@ -2391,138 +2368,64 @@ document.addEventListener('DOMContentLoaded', initApp);
 
 <!-- SWORDLAND ATTENDANCE PAGE -->
 <div id="page-swordland" class="page">
-  <!-- Landing / entry view -->
-  <div id="swLanding">
-    <div class="card" style="margin-bottom:14px;text-align:center">
-      <div class="card-title" style="font-size:20px">⚔️ Swordland Attendance</div>
-      <p style="color:var(--text2);font-size:13px;line-height:1.9;margin-bottom:18px">
-        Track attendance for Swordland events across alliances.<br>
-        Select your alliance and enter your in-game name to register your attendance, or use the admin controls to manage events and members.
-      </p>
-      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:16px">
-        <button class="btn btn-primary" onclick="attShowRegister('sw')">📝 Register Attendance</button>
-        <button class="btn btn-ghost" onclick="attShowSummary('sw')">📊 Attendance Summary</button>
-        <button class="btn btn-ghost" onclick="attShowEvents('sw')">📅 Manage Events</button>
-      </div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title" style="font-size:20px">⚔️ Swordland Attendance</div>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:14px">Track attendance for Swordland events. R4/R5 manage events and mark attendance.</p>
+    <div style="display:flex;gap:8px">
+      <button class="btn" id="swTab-register" onclick="attSwitchTab('sw','register')" style="background:rgba(61,142,240,.2);color:var(--accent2);border:1px solid var(--accent)">📝 Register Attendance</button>
+      <button class="btn btn-ghost" id="swTab-summary" onclick="attSwitchTab('sw','summary')">📊 Overall Summary</button>
     </div>
   </div>
-  <!-- Register view -->
-  <div id="swRegister" style="display:none">
+  <!-- Register Attendance sub-tab -->
+  <div id="swPanel-register">
     <div class="card" style="margin-bottom:14px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-        <button class="btn btn-ghost btn-sm" onclick="attShowLanding('sw')">← Back</button>
-        <div class="card-title" style="margin:0">📝 Register Your Attendance</div>
-      </div>
-      <div class="row">
-        <div class="field"><label>Your Alliance</label>
-          <select id="swRegAlliance" style="width:130px">
-            <option value="">Select…</option>
-            <option>FIR</option><option>LOC</option><option>LYL</option>
-            <option>KNG</option><option>KOV</option><option>TLA</option>
-          </select>
-        </div>
-        <div class="field"><label>Your IGN</label><input type="text" id="swRegIGN" placeholder="e.g. Olaf" style="width:160px"></div>
-        <button class="btn btn-primary" onclick="attEnsureMember('sw')">Continue</button>
-      </div>
-      <div id="swEventPicker" style="display:none;margin-top:14px">
-        <div class="sec-title" style="margin-bottom:10px">Select events you attended</div>
-        <div id="swEventCheckboxes" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px"></div>
-        <button class="btn btn-primary" onclick="attSaveAttendance('sw')">✅ Save Attendance</button>
-      </div>
-    </div>
-  </div>
-  <!-- Summary view -->
-  <div id="swSummary" style="display:none">
-    <div class="card" style="margin-bottom:14px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-        <button class="btn btn-ghost btn-sm" onclick="attShowLanding('sw')">← Back</button>
-        <div class="card-title" style="margin:0">📊 Attendance Summary</div>
-      </div>
-      <div id="swSummaryContent"></div>
-    </div>
-  </div>
-  <!-- Events manage view (admin) -->
-  <div id="swEvents" style="display:none">
-    <div class="card" style="margin-bottom:14px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-        <button class="btn btn-ghost btn-sm" onclick="attShowLanding('sw')">← Back</button>
-        <div class="card-title" style="margin:0">📅 Manage Events</div>
-      </div>
+      <div class="card-title">📝 Register Attendance</div>
+      <p style="color:var(--text2);font-size:12px;margin-bottom:14px">Create an event, then add which members attended. R4/R5 only.</p>
       <div class="row">
         <div class="field"><label>Event name</label><input type="text" id="swEventName" placeholder="e.g. Swordland Week 3" style="width:200px"></div>
         <div class="field"><label>Date</label><input type="date" id="swEventDate" style="width:150px"></div>
         <button class="btn btn-primary" onclick="attAddEvent('sw')">+ Create Event</button>
       </div>
-      <div id="swEventList" style="margin-top:10px"></div>
+    </div>
+    <div id="swEventList"></div>
+  </div>
+  <!-- Summary sub-tab -->
+  <div id="swPanel-summary" style="display:none">
+    <div class="card">
+      <div class="card-title">📊 Overall Attendance Summary</div>
+      <div id="swSummaryContent"><div style="color:var(--text3);font-size:13px">No events yet.</div></div>
     </div>
   </div>
 </div>
 
 <!-- TRI ALLIANCE ATTENDANCE PAGE -->
 <div id="page-trialliance" class="page">
-  <!-- Landing / entry view -->
-  <div id="taLanding">
-    <div class="card" style="margin-bottom:14px;text-align:center">
-      <div class="card-title" style="font-size:20px">🤝 Tri Alliance Attendance</div>
-      <p style="color:var(--text2);font-size:13px;line-height:1.9;margin-bottom:18px">
-        Track attendance for Tri Alliance meetings across alliances.<br>
-        Select your alliance and enter your in-game name to register your attendance, or use the admin controls to manage events and members.
-      </p>
-      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:16px">
-        <button class="btn btn-primary" onclick="attShowRegister('ta')">📝 Register Attendance</button>
-        <button class="btn btn-ghost" onclick="attShowSummary('ta')">📊 Attendance Summary</button>
-        <button class="btn btn-ghost" onclick="attShowEvents('ta')">📅 Manage Events</button>
-      </div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title" style="font-size:20px">🤝 Tri Alliance Attendance</div>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:14px">Track attendance for Tri Alliance meetings. R4/R5 manage events and mark attendance.</p>
+    <div style="display:flex;gap:8px">
+      <button class="btn" id="taTab-register" onclick="attSwitchTab('ta','register')" style="background:rgba(61,142,240,.2);color:var(--accent2);border:1px solid var(--accent)">📝 Register Attendance</button>
+      <button class="btn btn-ghost" id="taTab-summary" onclick="attSwitchTab('ta','summary')">📊 Overall Summary</button>
     </div>
   </div>
-  <!-- Register view -->
-  <div id="taRegister" style="display:none">
+  <!-- Register Attendance sub-tab -->
+  <div id="taPanel-register">
     <div class="card" style="margin-bottom:14px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-        <button class="btn btn-ghost btn-sm" onclick="attShowLanding('ta')">← Back</button>
-        <div class="card-title" style="margin:0">📝 Register Your Attendance</div>
-      </div>
-      <div class="row">
-        <div class="field"><label>Your Alliance</label>
-          <select id="taRegAlliance" style="width:130px">
-            <option value="">Select…</option>
-            <option>FIR</option><option>LOC</option><option>LYL</option>
-            <option>KNG</option><option>KOV</option><option>TLA</option>
-          </select>
-        </div>
-        <div class="field"><label>Your IGN</label><input type="text" id="taRegIGN" placeholder="e.g. Olaf" style="width:160px"></div>
-        <button class="btn btn-primary" onclick="attEnsureMember('ta')">Continue</button>
-      </div>
-      <div id="taEventPicker" style="display:none;margin-top:14px">
-        <div class="sec-title" style="margin-bottom:10px">Select events you attended</div>
-        <div id="taEventCheckboxes" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px"></div>
-        <button class="btn btn-primary" onclick="attSaveAttendance('ta')">✅ Save Attendance</button>
-      </div>
-    </div>
-  </div>
-  <!-- Summary view -->
-  <div id="taSummary" style="display:none">
-    <div class="card" style="margin-bottom:14px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-        <button class="btn btn-ghost btn-sm" onclick="attShowLanding('ta')">← Back</button>
-        <div class="card-title" style="margin:0">📊 Attendance Summary</div>
-      </div>
-      <div id="taSummaryContent"></div>
-    </div>
-  </div>
-  <!-- Events manage view (admin) -->
-  <div id="taEvents" style="display:none">
-    <div class="card" style="margin-bottom:14px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-        <button class="btn btn-ghost btn-sm" onclick="attShowLanding('ta')">← Back</button>
-        <div class="card-title" style="margin:0">📅 Manage Events</div>
-      </div>
+      <div class="card-title">📝 Register Attendance</div>
+      <p style="color:var(--text2);font-size:12px;margin-bottom:14px">Create an event, then add which members attended. R4/R5 only.</p>
       <div class="row">
         <div class="field"><label>Event name</label><input type="text" id="taEventName" placeholder="e.g. Tri Alliance Meeting 5" style="width:200px"></div>
         <div class="field"><label>Date</label><input type="date" id="taEventDate" style="width:150px"></div>
         <button class="btn btn-primary" onclick="attAddEvent('ta')">+ Create Event</button>
       </div>
-      <div id="taEventList" style="margin-top:10px"></div>
+    </div>
+    <div id="taEventList"></div>
+  </div>
+  <!-- Summary sub-tab -->
+  <div id="taPanel-summary" style="display:none">
+    <div class="card">
+      <div class="card-title">📊 Overall Attendance Summary</div>
+      <div id="taSummaryContent"><div style="color:var(--text3);font-size:13px">No events yet.</div></div>
     </div>
   </div>
 </div>
