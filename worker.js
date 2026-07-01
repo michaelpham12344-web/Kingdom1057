@@ -1,10 +1,13 @@
 /**
- * Kingdom 1057 Worker — see worker.js header for route docs
+ * Kingdom 1057 Worker — serves site + sync API
+ * GET /       -> website
+ * GET /state  -> shared JSON state
+ * PUT /state  -> save shared JSON state
  */
 const ALLOWED_ORIGIN = "*";
 const STATE_KEY = "svs_state";
 function corsHeaders(){return{"Access-Control-Allow-Origin":ALLOWED_ORIGIN,"Access-Control-Allow-Methods":"GET,PUT,OPTIONS","Access-Control-Allow-Headers":"Content-Type"};}
-const SITE_HTML = `<!DOCTYPE html>
+const SITE_HTML=`<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -211,15 +214,92 @@ tr:hover td{background:rgba(255,255,255,.02);}
 
 @media(max-width:900px){.sim-layout{grid-template-columns:1fr;}.page{padding:14px 12px;}.grid2,.grid3{grid-template-columns:1fr;}#msSlotGrid{grid-template-columns:repeat(4,1fr)!important;}#msVerifyGrid{grid-template-columns:1fr!important;}.nav{padding:0 10px;}.nav-logo{margin-right:14px;font-size:16px;}.tab{padding:14px 12px;font-size:13px;}#syncStatus{margin-right:8px;font-size:10px!important;}.utc-clock{font-size:13px!important;}.phase-tabs .tab{padding:7px 10px;font-size:12px;}}
 </style>
+<script>
+// DragDropTouch polyfill — enables HTML5 drag-and-drop on iOS and Android
+// Adapted from Bernardo Castilho's drag-drop-touch (MIT licence)
+(function(){if(typeof document==='undefined')return;var _dragSource=null,_lastTarget=null,_img=null,_ptDown=null,_lastDT=null,_isDragging=false;
+function _reset(){_isDragging=false;_dragSource=null;_lastTarget=null;if(_img){_img.parentNode&&_img.parentNode.removeChild(_img);_img=null;}}
+function _dispatchEvt(el,type,touch){var e=document.createEvent('Event');e.initEvent(type,true,true);if(touch){e.clientX=touch.clientX;e.clientY=touch.clientY;}e.dataTransfer={data:{},setData:function(k,v){this.data[k]=v;},getData:function(k){return this.data[k];},effectAllowed:'all',dropEffect:'move',setDragImage:function(img){if(_img&&_img.parentNode)_img.parentNode.removeChild(_img);_img=img.cloneNode(true);_img.style.cssText='position:fixed;left:-9999px;top:-9999px;pointer-events:none;opacity:0.7;z-index:99999;';document.body.appendChild(_img);}};el.dispatchEvent(e);return e;}
+function _closestDrop(el){while(el){if(el.getAttribute&&el.getAttribute('ondragover'))return el;el=el.parentNode;}return null;}
+document.addEventListener('touchstart',function(e){
+  var el=e.target;while(el&&!el.draggable)el=el.parentNode;
+  if(!el)return;
+  _dragSource=el;_ptDown={x:e.touches[0].clientX,y:e.touches[0].clientY};_isDragging=false;
+  _lastDT=new Date();
+},true);
+document.addEventListener('touchmove',function(e){
+  if(!_dragSource)return;
+  var t=e.touches[0];
+  if(!_isDragging){var dx=t.clientX-_ptDown.x,dy=t.clientY-_ptDown.y;if(Math.sqrt(dx*dx+dy*dy)<10)return;_isDragging=true;_dispatchEvt(_dragSource,'dragstart',t);}
+  e.preventDefault();
+  var drop=_closestDrop(document.elementFromPoint(t.clientX,t.clientY));
+  if(drop!==_lastTarget){if(_lastTarget)_dispatchEvt(_lastTarget,'dragleave',t);_lastTarget=drop;if(drop)_dispatchEvt(drop,'dragover',t);}
+  if(_img){_img.style.left=(t.clientX+10)+'px';_img.style.top=(t.clientY+10)+'px';}
+  // auto-scroll
+  var m=80,sp=12,h=window.innerHeight;
+  if(t.clientY<m)window.scrollBy(0,-sp);else if(t.clientY>h-m)window.scrollBy(0,sp);
+},true);
+document.addEventListener('touchend',function(e){
+  if(!_isDragging){_reset();return;}
+  var t=e.changedTouches[0];
+  var drop=_closestDrop(document.elementFromPoint(t.clientX,t.clientY));
+  if(drop)_dispatchEvt(drop,'drop',t);
+  _dispatchEvt(_dragSource,'dragend',t);
+  _reset();
+},true);
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js';document.head.appendChild(s);"></script>
 </head>
 <body>
-<nav class="nav">
+<!-- LANDING PAGE -->
+<div id="page-landing" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:24px">
+  <div style="max-width:480px;width:100%;text-align:center">
+    <div style="font-family:var(--head);font-size:42px;font-weight:700;color:var(--accent2);letter-spacing:.1em;margin-bottom:6px">KINGDOM<span style="color:var(--gold)">·</span>1057</div>
+    <div style="font-family:var(--head);font-size:15px;color:var(--text3);letter-spacing:.1em;margin-bottom:32px">WHITEOUT SURVIVAL — ALLIANCE COMMAND</div>
+    <div class="card" style="text-align:left;margin-bottom:20px">
+      <div class="card-title" style="font-size:14px">What is this?</div>
+      <div style="color:var(--text2);font-size:13px;line-height:1.9">
+        This is the Kingdom 1057 coordination tool for SvS (State vs State) and KvK (Kingdom vs Kingdom) events.<br><br>
+        • <strong style="color:var(--text)">Minister Spots</strong> — submit your speedup inventory to compete for minister timeslots<br>
+        • <strong style="color:var(--text)">Battle Strategy</strong> — coordinate rally leaders, teams and turrets<br>
+        • <strong style="color:var(--text)">Attendance</strong> — track Swordland and Tri Alliance participation
+      </div>
+    </div>
+    <div class="card" style="text-align:left;margin-bottom:20px">
+      <div class="card-title" style="font-size:14px">🚀 Enter as member</div>
+      <p style="color:var(--text2);font-size:12px;margin-bottom:12px">Submit your minister spot information — no password required.</p>
+      <button class="btn btn-primary" style="width:100%" onclick="landingEnterMember()">Enter as Member</button>
+    </div>
+    <div id="landingPasswordSection" style="text-align:left">
+      <div style="text-align:center;margin-bottom:12px">
+        <span style="font-size:11px;color:var(--text3);cursor:pointer;text-decoration:underline" onclick="toggleLandingPassword()">Have a password? Click here</span>
+      </div>
+      <div id="landingPasswordForm" style="display:none">
+        <div class="card">
+          <div class="card-title" style="font-size:14px">🔑 Password access</div>
+          <div class="row" style="margin-bottom:0">
+            <div class="field" style="flex:1"><label>Enter password</label>
+              <input type="password" id="landingPwInput" placeholder="••••••••" style="width:100%" onkeydown="if(event.key==='Enter')landingCheckPassword()">
+            </div>
+            <button class="btn btn-primary" style="align-self:flex-end" onclick="landingCheckPassword()">Enter</button>
+          </div>
+          <div id="landingPwError" style="display:none;color:#ff7070;font-size:12px;margin-top:8px">Incorrect password.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<nav class="nav" id="mainNav" style="display:none">
   <div class="nav-logo">KINGDOM<span>·</span>1057</div>
   <div class="tab active" onclick="showPage('coordinator')">Rally Leaders</div>
   <div class="tab" onclick="showPage('strategy')">Battle Strategy</div>
   <div class="tab" onclick="showPage('setup')">Team Setup</div>
   <div class="tab" onclick="showPage('minister')">Minister Spots</div>
+  <div class="tab" id="tabSwordland" onclick="showPage('swordland')" style="display:none">Swordland</div>
+  <div class="tab" id="tabTrialliance" onclick="showPage('trialliance')" style="display:none">Tri Alliance</div>
+  <div class="tab" id="tabAdmin" onclick="showPage('admin')" style="display:none">⚙️ Admin</div>
   <div id="syncStatus" style="font-family:var(--head);font-size:11px;font-weight:600;letter-spacing:.04em;margin-right:14px;color:var(--text3);white-space:nowrap;flex-shrink:0">Sync not configured</div>
   <div class="utc-clock" id="utcClock" style="flex-shrink:0">00:00:00</div>
 </nav>
@@ -376,8 +456,15 @@ tr:hover td{background:rgba(255,255,255,.02);}
 <div id="page-minister" class="page">
 
   <div class="card" style="margin-bottom:14px">
-    <div class="card-title">👑 Noble Advisor — Day 4</div>
-    <p style="color:var(--text2);font-size:13px;margin:0">48 timeslots (00:00–00:30 ... 23:30–00:00 UTC). Ranked by <strong style="color:var(--text)">Training (troop) speedup hours</strong> committed for this KvK. Top 48 submissions win a slot.</p>
+    <div class="card-title">👑 Minister Spots</div>
+    <div style="color:var(--text2);font-size:13px;line-height:1.8">
+      <strong style="color:var(--text)">How to use:</strong><br>
+      1. Each player uploads a screenshot of their in-game speedup inventory and fills in their amounts.<br>
+      2. Set how much of each speedup type you plan to use this KvK using the sliders.<br>
+      3. Pick your preferred timeslots (minimum 4) — these are UTC 30-minute windows across a full day.<br>
+      4. The leader runs the allocation to rank players and assign slots — highest committed hours gets priority.<br>
+      <span style="color:var(--text3);font-size:12px">48 available slots • Top 48 by committed hours win • Admin password required to manage results</span>
+    </div>
   </div>
 
   <!-- STEP TABS -->
@@ -460,8 +547,18 @@ tr:hover td{background:rgba(255,255,255,.02);}
         <div class="stat-box"><div class="stat-val" style="color:var(--green)" id="msWinnerCount">0</div><div class="stat-lbl">Spots filled (of 48)</div></div>
         <div class="stat-box"><div class="stat-val" style="color:var(--enemy)" id="msRejectedCount">0</div><div class="stat-lbl">Not selected</div></div>
       </div>
-      <button class="btn btn-gold" onclick="msRunAllocation()">⚙️ Run Allocation (rank + assign slots)</button>
-      <button class="btn btn-ghost btn-sm" onclick="msClearAllSubs()" style="margin-left:8px">🗑 Clear all submissions</button>
+      <div id="msAdminGuard" style="display:none;background:rgba(61,142,240,.08);border:1px solid var(--border);border-radius:7px;padding:14px;margin-bottom:10px">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:10px">🔒 Admin password required to manage results.</div>
+        <div style="display:flex;gap:8px">
+          <input type="password" id="msAdminPwInput" placeholder="Admin password" style="width:160px" onkeydown="if(event.key==='Enter')msUnlockAdmin()">
+          <button class="btn btn-primary btn-sm" onclick="msUnlockAdmin()">Unlock</button>
+        </div>
+        <div id="msAdminPwErr" style="display:none;color:#ff7070;font-size:12px;margin-top:6px">Incorrect password.</div>
+      </div>
+      <div id="msAdminActions" style="display:none">
+        <button class="btn btn-gold" onclick="msRunAllocation()">⚙️ Run Allocation (rank + assign slots)</button>
+        <button class="btn btn-ghost btn-sm" onclick="msClearAllSubs()" style="margin-left:8px">🗑 Clear all submissions</button>
+      </div>
     </div>
 
     <div class="card" style="margin-bottom:14px">
@@ -1274,8 +1371,8 @@ function bsCopyTeamResult(teamId){
 }
 
 // ════════════ MINISTER SPOTS ════════════
-const MS_CATEGORIES = ['construction','research','training','general'];
-const MS_CATEGORY_LABELS = {construction:'Construction',research:'Research',training:'Training (Troop)',general:'General'};
+const MS_CATEGORIES = ['general','training','construction','research'];
+const MS_CATEGORY_LABELS = {general:'General Speedup',training:'Soldier Training Speedup',construction:'Construction Speedup',research:'Research Speedup'};
 const MS_TOTAL_SLOTS = 48;
 const MS_MIN_SLOTS_PICKED = 4;
 const MS_POSITION_ID = 'noble_advisor_day4';
@@ -1334,7 +1431,7 @@ function msGoStep(n){
   if(n===2) msRenderVerifyGrid();
   if(n===3) msRenderSliderGrid();
   if(n===4) msRenderSlotGrid();
-  if(n===5) msRenderResultsSummary();
+  if(n===5){ msRenderResultsSummary(); msInitResultsTab(); }
   msRenderStepTabs();
 }
 
@@ -1683,7 +1780,11 @@ function msSubmitEntry(){
     committedHours
   };
   // replace existing entry for same person if resubmitting
-  MS.submissions=MS.submissions.filter(s=>!(s.alliance===entry.alliance && s.ign===entry.ign));
+  const existing=MS.submissions.find(s=>s.alliance===entry.alliance && s.ign===entry.ign);
+  if(existing){
+    if(!confirm('An entry for ' + entry.ign + ' (' + entry.alliance + ') already exists. Overwrite it?')) return;
+    MS.submissions=MS.submissions.filter(s=>!(s.alliance===entry.alliance && s.ign===entry.ign));
+  }
   MS.submissions.push(entry);
   syncQueuePush();
   toast('Entry submitted!');
@@ -1792,24 +1893,396 @@ function msClearAllSubs(){
   syncQueuePush();
 }
 </script>
+<script id="newSystemsJS">
+
+// ════════════════════════════════════════════════════════
+// AUTH & PASSWORD SYSTEM
+// ════════════════════════════════════════════════════════
+const AUTH = { coordUnlocked: false, adminUnlocked: false };
+const AUTH_DEFAULTS = { coord: 'kvk1057coord', admin: 'kvk1057admin' };
+let loadedPasswords = { coord: null, admin: null };
+
+async function loadPasswords() {
+  try {
+    const res = await fetch('/state', { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.pw_coord) loadedPasswords.coord = data.pw_coord;
+      if (data.pw_admin) loadedPasswords.admin = data.pw_admin;
+    }
+  } catch(e) {}
+}
+
+function getPassword(type) { return loadedPasswords[type] || AUTH_DEFAULTS[type]; }
+function checkPassword(type, input) { return input === getPassword(type); }
+
+function sessionSetAuth(type) { try { sessionStorage.setItem('auth_' + type, '1'); } catch(e) {} }
+function sessionHasAuth(type) { try { return sessionStorage.getItem('auth_' + type) === '1'; } catch(e) { return false; } }
+
+// ════════════════════════════════════════════════════════
+// LANDING PAGE
+// ════════════════════════════════════════════════════════
+function toggleLandingPassword() {
+  const f = document.getElementById('landingPasswordForm');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+function landingEnterMember() { enterApp('member'); }
+
+async function landingCheckPassword() {
+  const input = document.getElementById('landingPwInput').value;
+  const errEl = document.getElementById('landingPwError');
+  await loadPasswords();
+  if (checkPassword('admin', input)) {
+    AUTH.adminUnlocked = true; AUTH.coordUnlocked = true;
+    sessionSetAuth('admin'); sessionSetAuth('coord');
+    enterApp('admin');
+  } else if (checkPassword('coord', input)) {
+    AUTH.coordUnlocked = true;
+    sessionSetAuth('coord');
+    enterApp('coord');
+  } else {
+    errEl.style.display = 'block';
+    setTimeout(() => errEl.style.display = 'none', 2000);
+  }
+}
+
+function enterApp(role) {
+  document.getElementById('page-landing').style.display = 'none';
+  document.getElementById('mainNav').style.display = '';
+
+  const coordOnly = ['coordinator', 'strategy', 'setup'];
+  coordOnly.forEach(id => {
+    const tab = document.querySelector('.nav > .tab[onclick*="' + id + '"]');
+    if (tab) tab.style.display = (AUTH.coordUnlocked || AUTH.adminUnlocked) ? '' : 'none';
+  });
+  ['tabSwordland', 'tabTrialliance'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = (AUTH.coordUnlocked || AUTH.adminUnlocked) ? '' : 'none';
+  });
+  const adminTab = document.getElementById('tabAdmin');
+  if (adminTab) adminTab.style.display = AUTH.adminUnlocked ? '' : 'none';
+
+  if (role === 'member') showPageDirect('minister');
+  else showPageDirect('coordinator');
+}
+
+function showPageDirect(p) {
+  document.querySelectorAll('.page').forEach(e => e.classList.remove('active'));
+  const pg = document.getElementById('page-' + p);
+  if (pg) pg.classList.add('active');
+  document.querySelectorAll('.nav > .tab').forEach(e => e.classList.remove('active'));
+  const activeTab = document.querySelector('.nav > .tab[onclick*="' + p + '"]');
+  if (activeTab) activeTab.classList.add('active');
+  if (p === 'strategy') { if (typeof renderBattleStrategy === 'function') renderBattleStrategy(); bsTickClock(); }
+  if (p === 'setup') { if (typeof renderSetup === 'function') renderSetup(); }
+  if (p === 'coordinator') { if (typeof renderLeaderTable === 'function') renderLeaderTable(); }
+  if (p === 'minister') { if (typeof msInit === 'function') { msInit(); msRenderStepTabs(); } }
+  if (p === 'swordland') renderAttendance('sw');
+  if (p === 'trialliance') renderAttendance('ta');
+}
+
+function showPage(p) { showPageDirect(p); }
+
+async function initApp() {
+  await loadPasswords();
+  if (sessionHasAuth('admin')) { AUTH.adminUnlocked = true; AUTH.coordUnlocked = true; }
+  else if (sessionHasAuth('coord')) { AUTH.coordUnlocked = true; }
+
+  if (AUTH.adminUnlocked) enterApp('admin');
+  else if (AUTH.coordUnlocked) enterApp('coord');
+  else {
+    const lp = document.getElementById('page-landing');
+    const mn = document.getElementById('mainNav');
+    if (lp) lp.style.display = 'flex';
+    if (mn) mn.style.display = 'none';
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// ADMIN PANEL
+// ════════════════════════════════════════════════════════
+async function adminChangePassword(type) {
+  const inputId = type === 'coord' ? 'newCoordPw' : 'newAdminPw';
+  const newPw = document.getElementById(inputId).value.trim();
+  if (!newPw) { toast('Enter a password first.'); return; }
+  const res = await fetch('/state', { cache: 'no-store' });
+  const data = res.ok ? await res.json() : {};
+  data['pw_' + type] = newPw;
+  await fetch('/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  loadedPasswords[type] = newPw;
+  document.getElementById(inputId).value = '';
+  toast(type === 'coord' ? 'Coordinator password updated.' : 'Admin password updated.');
+}
+
+async function adminReset(what) {
+  if (!confirm('Are you sure? This cannot be undone.')) return;
+  if (what === 'ministers' || what === 'all') { MS.submissions = []; MS._lastAllocation = null; }
+  if (what === 'leaders' || what === 'all') { S.leaders = []; if (typeof renderLeaderTable === 'function') renderLeaderTable(); }
+  if (what === 'teams' || what === 'all') { S.teams = []; if (typeof renderSetup === 'function') renderSetup(); if (typeof renderBattleStrategy === 'function') renderBattleStrategy(); }
+  if (what === 'attendance' || what === 'all') { ATT.sw = { members: [], events: [] }; ATT.ta = { members: [], events: [] }; }
+  syncQueuePush();
+  toast('Reset complete.');
+}
+
+// ════════════════════════════════════════════════════════
+// MINISTER SPOTS — access helpers
+// ════════════════════════════════════════════════════════
+function msCanAccessResults() { return AUTH.adminUnlocked; }
+
+// ════════════════════════════════════════════════════════
+// ATTENDANCE TRACKING
+// ════════════════════════════════════════════════════════
+const ATT = { sw: { members: [], events: [] }, ta: { members: [], events: [] } };
+
+function attAddMember(prefix) {
+  const nameEl = document.getElementById(prefix + 'MemberName');
+  const allianceEl = document.getElementById(prefix + 'MemberAlliance');
+  const name = nameEl.value.trim();
+  const alliance = allianceEl.value.trim();
+  if (!name) { toast('Enter a member name.'); return; }
+  const store = ATT[prefix];
+  if (store.members.find(m => m.name === name)) { toast('Member already exists.'); return; }
+  store.members.push({ id: uid(), name, alliance: alliance || '' });
+  nameEl.value = ''; if (allianceEl) allianceEl.value = '';
+  renderAttendance(prefix);
+  syncQueuePush();
+}
+
+function attAddEvent(prefix) {
+  const nameEl = document.getElementById(prefix + 'EventName');
+  const name = nameEl.value.trim();
+  if (!name) { toast('Enter an event name.'); return; }
+  const store = ATT[prefix];
+  const attendance = {};
+  store.members.forEach(m => { attendance[m.id] = false; });
+  store.events.push({ id: uid(), name, date: new Date().toLocaleDateString('en-GB'), attendance });
+  nameEl.value = '';
+  renderAttendance(prefix);
+  syncQueuePush();
+}
+
+function attToggle(prefix, eventId, memberId) {
+  const event = ATT[prefix].events.find(e => e.id === eventId);
+  if (event) { event.attendance[memberId] = !event.attendance[memberId]; renderAttendance(prefix); syncQueuePush(); }
+}
+
+function attRemoveMember(prefix, memberId) {
+  if (!AUTH.adminUnlocked) { toast('Admin access required.'); return; }
+  ATT[prefix].members = ATT[prefix].members.filter(m => m.id !== memberId);
+  ATT[prefix].events.forEach(e => { delete e.attendance[memberId]; });
+  renderAttendance(prefix); syncQueuePush();
+}
+
+function attRemoveEvent(prefix, eventId) {
+  if (!AUTH.adminUnlocked) { toast('Admin access required.'); return; }
+  ATT[prefix].events = ATT[prefix].events.filter(e => e.id !== eventId);
+  renderAttendance(prefix); syncQueuePush();
+}
+
+function attGetScore(prefix, memberId) {
+  const store = ATT[prefix];
+  if (!store.events.length) return { pct: 0, shown: 0, total: 0 };
+  const total = store.events.length;
+  const shown = store.events.filter(e => e.attendance[memberId]).length;
+  return { pct: Math.round(shown / total * 100), shown, total };
+}
+
+function renderAttendance(prefix) {
+  const contentEl = document.getElementById(prefix + 'AttendanceContent');
+  if (!contentEl) return;
+  const store = ATT[prefix];
+
+  if (!store.members.length && !store.events.length) {
+    contentEl.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:20px 0">No members or events yet. Add members and create events above.</div>';
+    return;
+  }
+
+  const isAdmin = AUTH.adminUnlocked;
+
+  // Summary table
+  let summaryHTML = '';
+  if (store.members.length) {
+    let rows = store.members.map(m => {
+      const { pct, shown, total } = attGetScore(prefix, m.id);
+      const col = pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--gold)' : 'var(--enemy)';
+      const delBtn = isAdmin ? '<button class="btn btn-danger btn-sm" onclick="attRemoveMember(\\'' + prefix + '\\',\\'' + m.id + '\\')">✕</button>' : '';
+      return '<tr><td><strong>' + m.name + '</strong></td><td style="color:var(--text3)">' + m.alliance + '</td><td class="mono">' + shown + ' / ' + total + '</td><td><span class="mono" style="color:' + col + ';font-weight:600">' + pct + '%</span></td>' + (isAdmin ? '<td>' + delBtn + '</td>' : '') + '</tr>';
+    }).join('');
+    summaryHTML = '<div class="card" style="margin-bottom:14px"><div class="card-title">📊 Attendance Summary</div><div style="overflow-x:auto"><table style="min-width:400px"><thead><tr><th>Member</th><th>Alliance</th><th>Attended</th><th>Score</th>' + (isAdmin ? '<th></th>' : '') + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+  }
+
+  // Events grid
+  let eventsHTML = '';
+  if (store.events.length) {
+    let headerCols = store.events.map(e => {
+      const delBtn = isAdmin ? '<br><button class="btn btn-danger btn-sm" style="margin-top:3px;padding:2px 6px" onclick="attRemoveEvent(\\'' + prefix + '\\',\\'' + e.id + '\\')">✕</button>' : '';
+      return '<th style="min-width:100px">' + e.name + '<br><span style="font-size:10px;color:var(--text3)">' + e.date + '</span>' + delBtn + '</th>';
+    }).join('');
+    let memberRows = store.members.map(m => {
+      let cells = store.events.map(e => {
+        const present = e.attendance[m.id];
+        const bg = present ? 'rgba(46,204,113,.2)' : 'rgba(224,58,58,.1)';
+        const border = present ? 'var(--green)' : 'rgba(224,58,58,.4)';
+        return '<td style="text-align:center"><button onclick="attToggle(\\'' + prefix + '\\',\\'' + e.id + '\\',\\'' + m.id + '\\')" style="width:36px;height:36px;border-radius:50%;border:2px solid ' + border + ';background:' + bg + ';cursor:pointer;font-size:16px">' + (present ? '✓' : '✗') + '</button></td>';
+      }).join('');
+      return '<tr><td><strong>' + m.name + '</strong></td>' + cells + '</tr>';
+    }).join('');
+    const minW = 200 + store.events.length * 110;
+    eventsHTML = '<div class="card"><div class="card-title">📅 Events</div><div style="overflow-x:auto"><table style="min-width:' + minW + 'px"><thead><tr><th>Member</th>' + headerCols + '</tr></thead><tbody>' + memberRows + '</tbody></table></div></div>';
+  }
+
+  contentEl.innerHTML = summaryHTML + eventsHTML;
+}
+
+// ════════════════════════════════════════════════════════
+// EXTEND SYNC to include ATT data and passwords
+// ════════════════════════════════════════════════════════
+const _origSyncSerialize = syncSerialize;
+syncSerialize = function() {
+  const base = JSON.parse(_origSyncSerialize());
+  base.att_sw = ATT.sw;
+  base.att_ta = ATT.ta;
+  if (loadedPasswords.coord) base.pw_coord = loadedPasswords.coord;
+  if (loadedPasswords.admin) base.pw_admin = loadedPasswords.admin;
+  return JSON.stringify(base);
+};
+
+const _origSyncApplyRemote = syncApplyRemote;
+syncApplyRemote = function(data) {
+  _origSyncApplyRemote(data);
+  if (data.att_sw) ATT.sw = data.att_sw;
+  if (data.att_ta) ATT.ta = data.att_ta;
+  if (data.pw_coord) loadedPasswords.coord = data.pw_coord;
+  if (data.pw_admin) loadedPasswords.admin = data.pw_admin;
+  const active = document.querySelector('.page.active');
+  if (active && active.id === 'page-swordland') renderAttendance('sw');
+  if (active && active.id === 'page-trialliance') renderAttendance('ta');
+};
+
+
+function msUnlockAdmin(){
+  const input=document.getElementById('msAdminPwInput').value;
+  if(checkPassword('admin',input)){
+    AUTH.adminUnlocked=true;
+    sessionSetAuth('admin');
+    msShowAdminActions();
+  } else {
+    const err=document.getElementById('msAdminPwErr');
+    if(err){err.style.display='block';setTimeout(()=>err.style.display='none',2000);}
+  }
+}
+
+function msShowAdminActions(){
+  const guard=document.getElementById('msAdminGuard');
+  const actions=document.getElementById('msAdminActions');
+  if(guard) guard.style.display='none';
+  if(actions) actions.style.display='block';
+}
+
+function msInitResultsTab(){
+  if(msCanAccessResults()){
+    msShowAdminActions();
+  } else {
+    const guard=document.getElementById('msAdminGuard');
+    const actions=document.getElementById('msAdminActions');
+    if(guard) guard.style.display='block';
+    if(actions) actions.style.display='none';
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// INIT on DOM ready
+// ════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', initApp);
+
+</script>
+
+<div id="page-admin" class="page">
+
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">⚙️ Admin Panel</div>
+    <p style="color:var(--text2);font-size:13px">Manage passwords and reset data. Changes are saved to the shared KV store.</p>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">🔑 Change Coordinator Password</div>
+      <div class="row" style="margin-bottom:8px">
+        <div class="field" style="flex:1"><label>New coordinator password</label><input type="password" id="newCoordPw" style="width:100%"></div>
+      </div>
+      <button class="btn btn-primary" onclick="adminChangePassword('coord')">Save Coordinator Password</button>
+    </div>
+    <div class="card">
+      <div class="card-title">🔑 Change Admin Password</div>
+      <div class="row" style="margin-bottom:8px">
+        <div class="field" style="flex:1"><label>New admin password</label><input type="password" id="newAdminPw" style="width:100%"></div>
+      </div>
+      <button class="btn btn-primary" onclick="adminChangePassword('admin')">Save Admin Password</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">🗑 Reset Data</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-danger" onclick="adminReset('ministers')">Reset All Minister Submissions</button>
+      <button class="btn btn-danger" onclick="adminReset('leaders')">Reset All Rally Leaders</button>
+      <button class="btn btn-danger" onclick="adminReset('teams')">Reset All Teams</button>
+      <button class="btn btn-danger" onclick="adminReset('attendance')">Reset All Attendance</button>
+      <button class="btn btn-danger" onclick="adminReset('all')">⚠️ Reset EVERYTHING</button>
+    </div>
+  </div>
+</div>
+
+<!-- SWORDLAND ATTENDANCE PAGE -->
+<div id="page-swordland" class="page">
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">⚔️ Swordland Attendance</div>
+    <div class="row">
+      <div class="field"><label>Event name</label><input type="text" id="swEventName" placeholder="e.g. Swordland Week 3" style="width:200px"></div>
+      <button class="btn btn-primary" onclick="attAddEvent('sw')">+ Create Event</button>
+    </div>
+    <div class="row">
+      <div class="field"><label>Add member</label><input type="text" id="swMemberName" placeholder="IGN" style="width:160px"></div>
+      <div class="field"><label>Alliance</label><input type="text" id="swMemberAlliance" placeholder="Alliance" style="width:120px"></div>
+      <button class="btn btn-ghost" onclick="attAddMember('sw')">+ Add Member</button>
+    </div>
+  </div>
+  <div id="swAttendanceContent"></div>
+</div>
+
+<!-- TRI ALLIANCE ATTENDANCE PAGE -->
+<div id="page-trialliance" class="page">
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">🤝 Tri Alliance Attendance</div>
+    <div class="row">
+      <div class="field"><label>Event name</label><input type="text" id="taEventName" placeholder="e.g. Tri Alliance Meeting 5" style="width:200px"></div>
+      <button class="btn btn-primary" onclick="attAddEvent('ta')">+ Create Event</button>
+    </div>
+    <div class="row">
+      <div class="field"><label>Add member</label><input type="text" id="taMemberName" placeholder="IGN" style="width:160px"></div>
+      <div class="field"><label>Alliance</label><input type="text" id="taMemberAlliance" placeholder="Alliance" style="width:120px"></div>
+      <button class="btn btn-ghost" onclick="attAddMember('ta')">+ Add Member</button>
+    </div>
+  </div>
+  <div id="taAttendanceContent"></div>
+</div>
+
 </body>
 </html>
 `;
 export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-    if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders() });
-    if (url.pathname === "/state" && request.method === "GET") {
-      const raw = await env.SVS_KV.get(STATE_KEY);
-      return new Response(raw || "{}", { headers: { "Content-Type": "application/json", ...corsHeaders() } });
+  async fetch(request,env){
+    const url=new URL(request.url);
+    if(request.method==="OPTIONS") return new Response(null,{headers:corsHeaders()});
+    if(url.pathname==="/state"&&request.method==="GET"){
+      const raw=await env.SVS_KV.get(STATE_KEY);
+      return new Response(raw||"{}",{headers:{"Content-Type":"application/json",...corsHeaders()}});
     }
-    if (url.pathname === "/state" && request.method === "PUT") {
-      const body = await request.text();
-      try { JSON.parse(body); } catch(e) { return new Response(JSON.stringify({error:"Invalid JSON"}),{status:400,headers:{"Content-Type":"application/json",...corsHeaders()}}); }
-      await env.SVS_KV.put(STATE_KEY, body);
-      return new Response(JSON.stringify({ok:true}), { headers: { "Content-Type": "application/json", ...corsHeaders() } });
+    if(url.pathname==="/state"&&request.method==="PUT"){
+      const body=await request.text();
+      try{JSON.parse(body);}catch(e){return new Response(JSON.stringify({error:"Invalid JSON"}),{status:400,headers:{"Content-Type":"application/json",...corsHeaders()}});}
+      await env.SVS_KV.put(STATE_KEY,body);
+      return new Response(JSON.stringify({ok:true}),{headers:{"Content-Type":"application/json",...corsHeaders()}});
     }
-    if (request.method === "GET") return new Response(SITE_HTML, { headers: { "Content-Type": "text/html;charset=UTF-8", ...corsHeaders() } });
-    return new Response("Not found", { status: 404, headers: corsHeaders() });
-  },
+    if(request.method==="GET") return new Response(SITE_HTML,{headers:{"Content-Type":"text/html;charset=UTF-8",...corsHeaders()}});
+    return new Response("Not found",{status:404,headers:corsHeaders()});
+  }
 };
