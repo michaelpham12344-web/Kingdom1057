@@ -259,7 +259,6 @@ document.addEventListener('touchend',function(e){
       <div style="color:var(--text2);font-size:13px;line-height:1.9">
         This is the Kingdom 1057 coordination tool for KvK (Kingdom vs Kingdom) events.<br><br>
         • <strong style="color:var(--text)">Minister Spots</strong> — submit your speedup inventory and pick timeslots to compete for minister positions<br>
-        • <strong style="color:var(--text)">Battle Strategy</strong> — coordinate rally leaders, teams and turrets<br>
         • <strong style="color:var(--text)">Attendance</strong> — track Swordland and Tri Alliance participation
       </div>
     </div>
@@ -270,6 +269,13 @@ document.addEventListener('touchend',function(e){
     </div>
     <div id="landingPasswordSection" style="text-align:left">
       <div style="text-align:center;margin-bottom:12px">
+        <div style="background:rgba(61,142,240,.07);border:1px solid var(--border);border-radius:7px;padding:12px 14px;margin-bottom:10px;text-align:left">
+          <div style="font-size:12px;color:var(--text2);line-height:1.7">
+            <strong style="color:var(--text)">🔒 Password access</strong> is for <strong style="color:var(--accent2)">R4 and R5 members</strong> of participating alliances.<br>
+            It unlocks Rally Leaders, Battle Strategy, Team Setup, Swordland and Tri Alliance coordination features.<br>
+            Contact your R5 for the password.
+          </div>
+        </div>
         <span style="font-size:11px;color:var(--text3);cursor:pointer;text-decoration:underline" onclick="toggleLandingPassword()">Have a password? Click here</span>
       </div>
       <div id="landingPasswordForm" style="display:none">
@@ -399,7 +405,10 @@ document.addEventListener('touchend',function(e){
   <div class="card">
     <div class="card-title">📋 Final Calculation</div>
     <p style="color:var(--text2);font-size:12px;margin-bottom:12px">Click a team below to calculate launch times for its leaders, based on the offset selected above.</p>
-    <div id="bsTeamButtons" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"></div>
+    <div id="bsTeamButtons" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
+    <div id="bsQuickCopy" style="display:none;margin-bottom:14px">
+      <button class="btn btn-gold" onclick="bsCopySelectedTeam()">📋 Copy team for in-game chat</button>
+    </div>
     <div id="bsFinalResult">
       <div style="color:var(--text3);font-size:13px">Select an offset, then click a team to see the schedule.</div>
     </div>
@@ -598,7 +607,7 @@ function syncEnabled() {
   return SYNC_API_URL === "" || (SYNC_API_URL && !SYNC_API_URL.startsWith("REPLACE_"));
 }
 
-function syncSerialize() {
+let syncSerialize = function() {
   // Only persist what should be shared. Leave out transient per-session timers
   // (rally countdown / cooldown) since those are tied to a live moment in time.
   return JSON.stringify({
@@ -615,7 +624,7 @@ function syncSerialize() {
   });
 }
 
-function syncApplyRemote(data) {
+let syncApplyRemote = function(data) {
   syncApplyingRemote = true;
   try {
     S.leaders = (data.leaders || []).map(l => ({
@@ -1352,7 +1361,15 @@ function bsCalcTeam(teamId, offsetSec, logToast){
   <button class="btn btn-gold" style="margin-top:10px" onclick="bsCopyTeamResult('\${t.id}')">📋 Copy for in-game chat</button>\`;
 
   t._bsLastCalc={header,results,dur,landSec};
+  // Show the persistent quick-copy button above the result
+  const qc=document.getElementById('bsQuickCopy');
+  if(qc) qc.style.display='block';
   if(logToast) toast(\`\${t.name} — rally times calculated!\`);
+}
+
+function bsCopySelectedTeam(){
+  if(!BS_CALC.selectedTeamId){ toast('Select a team first.'); return; }
+  bsCopyTeamResult(BS_CALC.selectedTeamId);
 }
 
 function bsCopyTeamResult(teamId){
@@ -1397,7 +1414,7 @@ function msMarkStepComplete(n){
 }
 
 function msRenderStepTabs(){
-  const unlocked=MS._unlockedStep||1;
+  const unlocked=msCanAccessResults() ? 5 : (MS._unlockedStep||1);
   for(let i=1;i<=5;i++){
     const tab=document.getElementById('msStepTab'+i);
     if(!tab) continue;
@@ -1411,7 +1428,8 @@ function msRenderStepTabs(){
 
 function msGoStep(n){
   const unlocked=MS._unlockedStep||1;
-  if(n>unlocked){
+  // Admins can jump directly to any step including Results
+  if(n>unlocked && !msCanAccessResults()){
     toast('Please complete the previous step first.');
     n=unlocked;
   }
@@ -2031,7 +2049,7 @@ async function adminReset(what) {
 // ════════════════════════════════════════════════════════
 // MINISTER SPOTS — access helpers
 // ════════════════════════════════════════════════════════
-function msCanAccessResults() { return AUTH.adminUnlocked; }
+function msCanAccessResults() { return typeof AUTH !== 'undefined' && AUTH.adminUnlocked; }
 
 
 // ════════════ ATTENDANCE — NEW FLOW ════════════
