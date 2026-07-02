@@ -3149,30 +3149,28 @@ function attConfirmOCR(prefix, eventId, field, encodedNames) {
 }
 
 // ── Parse Legion Combatants screen (Signed Up) ──
-// Uses canvas to crop avatars, then PSM4 + whitelist for clean text
-// Strategy: name always appears on the line immediately before the power number
+// Key rules (verified against real screenshots):
+//   1. Lines with 3+ digits = power number lines → skip (even if they contain name noise)
+//   2. Name line with "No" on it = not signed up
+//   3. Name line followed (within 4 lines) by "dispatched" or "engagements" = not signed up  
+//   4. All other name lines = signed up
 async function parseSignedUpNamesFromCanvas(imageFile) {
   return new Promise((resolve) => {
     const img = new window.Image();
     img.onload = async () => {
       const canvas = document.createElement('canvas');
       const W = img.naturalWidth, H = img.naturalHeight;
-      // Crop: remove left 20% (avatars), keep middle-right (names + status)
-      const cropX = Math.floor(W * 0.20);
+      const cropX = Math.floor(W * 0.18);
       canvas.width = W - cropX;
       canvas.height = H;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, -cropX, 0);
+      canvas.getContext('2d').drawImage(img, -cropX, 0);
       canvas.toBlob(async (blob) => {
         try {
           if (typeof Tesseract === 'undefined') { resolve([]); return; }
           const worker = await Tesseract.createWorker({ logger: () => {} });
           await worker.loadLanguage('eng');
           await worker.initialize('eng');
-          await worker.setParameters({
-            tessedit_pageseg_mode: '4',
-            tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_ -.'
-          });
+          await worker.setParameters({ tessedit_pageseg_mode: '6' });
           const { data: { text } } = await worker.recognize(blob);
           await worker.terminate();
           resolve(parseSignedUpNames(text));
@@ -3186,31 +3184,66 @@ async function parseSignedUpNamesFromCanvas(imageFile) {
 function parseSignedUpNames(text) {
   const lines = text.split(/\\n/).map(l => l.trim()).filter(Boolean);
 
-  // Skip these line patterns entirely
-  const SKIP = /^(legion|join|substitute|squad|power|voted|no\\s|dispatch|x$|[^a-zA-Z]{0,3}$)/i;
-  // Power number line: optional noise + 3+ digits
-  const POWER = /[a-zA-Z\\s]{0,6}\\d{3,}/;
-  // Header line with known words
-  const HEADER = /combatant|30\\s*\\/|2\\s*\\/|52[,.]?095/i;
+  const HEADER   = /combatant|30\\/|2\\/10|squad|power|substitute/i;
+  const VOTED    = /\\bvoted\\b/i;
+  const HAS_NO   = /\\bno\\b/i;
+  const DISPATCH = /dispatch/i;
+  const ENGAGE   = /engagements/i;
+  const HAS_DIGIT = /\\d{3,}/;
+  const PURE_NUM  = /^[\\d,.\\s]+$/;
+  const NAME_W    = /^[A-Za-z][A-Za-z0-9_\\-]{1,}$/;
+  const NOISE_W   = /^(no|sy|sif|voted|join|le|ic|fe|be|rr|bn|par|or|pe|bg|ie|r|the|engagements|dispatched|legion)$/i;
 
-  const names = [];
+  function isSkip(line) {
+    return HEADER.test(line) || VOTED.test(line) || PURE_NUM.test(line) ||
+           DISPATCH.test(line) || (ENGAGE.test(line) && !NAME_W.test((line.split(/\\s+/)[0]||'')));
+  }
+
+  function extractName(line) {
+    const words = line.split(/\\s+/);
+    const candidates = words.filter(w => NAME_W.test(w) && !NOISE_W.test(w) && !/^\\d/.test(w));
+    if (!candidates.length) return null;
+    const best = candidates.sort((a,b) => b.length - a.length)[0];
+    return best.length >= 3 ? best : null;
+  }
+
+  const results = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (SKIP.test(line) || HEADER.test(line)) continue;
-    const next = lines[i + 1] || '';
-    // Name comes right before a power number line
-    if (POWER.test(next) || /^\\d{3,}/.test(next)) {
-      // Clean: strip leading non-alpha, keep name chars
-      let clean = line.replace(/^[^a-zA-Z]+/, '').replace(/[^a-zA-Z0-9_\\-\\s]/g, '').trim();
-      // Take first word-group if multiple words (handles "fe ErasableInk" → "ErasableInk")
-      const words = clean.split(/\\s+/).filter(w => w.length >= 2 && /[a-zA-Z]/.test(w));
-      // Pick the longest word (most likely the actual name, not OCR noise prefix)
-      clean = words.sort((a,b) => b.length - a.length)[0] || '';
-      if (clean.length >= 2 && !names.includes(clean)) names.push(clean);
+    if (isSkip(line)) continue;
+
+    // Lines with embedded power numbers → only extract if "No" present
+    if (HAS_DIGIT.test(line)) {
+      if (HAS_NO.test(line)) {
+        const name = extractName(line);
+        if (name) results.push({ name, signed: false });
+      }
+      continue;
     }
+
+    const name = extractName(line);
+    if (!name) continue;
+
+    // "No" on same line = not signed up
+    if (HAS_NO.test(line)) { results.push({ name, signed: false }); continue; }
+
+    // Look ahead for dispatch/engagements before next player name
+    let signed = true;
+    for (let j = i+1; j < Math.min(i+5, lines.length); j++) {
+      const ahead = lines[j];
+      if (VOTED.test(ahead)) break;
+      if (DISPATCH.test(ahead) || ENGAGE.test(ahead)) { signed = false; break; }
+      if (extractName(ahead)) break;
+    }
+    results.push({ name, signed });
   }
-  return names;
+
+  const seen = new Set();
+  return results
+    .filter(r => r.signed && !seen.has(r.name) && seen.add(r.name))
+    .map(r => r.name);
 }
+
 
 // ── Parse Battlefield Details screen (Showed Up) ──
 // The ally tab shows: rank number | avatar | name | points
