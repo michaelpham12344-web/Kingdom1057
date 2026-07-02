@@ -3040,10 +3040,24 @@ function attRenderEventPanel(prefix, evt, field, canEdit) {
   }
 
   if (canEdit) {
-    html += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px">📸 ' + hint + '</div>';
+    // Guide for Signed Up tab
+    if (field === 'signedUp') {
+      html += '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:10px 14px;margin-bottom:10px;font-size:12px">';
+      html += '<div style="font-weight:600;color:var(--text);margin-bottom:6px">📸 How to scan signed-up players</div>';
+      html += '<ol style="color:var(--text2);line-height:2;margin:0;padding-left:16px">';
+      html += '<li>In-game, open the <strong>Legion Combatants</strong> screen</li>';
+      html += '<li>Take a <strong>screenshot</strong> of the list — you can take multiple screenshots if you need to scroll</li>';
+      html += '<li>The scanner reads the <strong>right side only</strong> — it looks for <span style="color:var(--green)">Join</span> (signed up) and ignores <span style="color:var(--enemy)">No engagements</span></li>';
+      html += '<li>Make sure each player row is <strong>fully visible</strong> — partially cut-off rows at the top/bottom won\\'t be read</li>';
+      html += '</ol>';
+      html += '<div style="margin-top:8px;color:var(--text3);font-size:11px">💡 You can select multiple screenshots at once — they will all be processed together.</div>';
+      html += '</div>';
+    }
+
+    const inputId = 'ocrFile-' + prefix + '-' + evt.id + '-' + field;
     html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">';
-    html += '<input type="file" accept="image/*" multiple style="display:none" id="ocrFile-' + prefix + '-' + evt.id + '-' + field + '" onchange="attRunOCR(\\'' + prefix + '\\',\\'' + evt.id + '\\',\\'' + field + '\\',this)">';
-    html += '<button class="btn btn-primary btn-sm" onclick="document.getElementById(\\'ocrFile-' + prefix + '-' + evt.id + '-' + field + '\\').click()">📸 Scan Screenshot</button>';
+    html += '<input type="file" accept="image/*" multiple style="display:none" id="' + inputId + '" onchange="attRunOCR(\\'' + prefix + '\\',\\'' + evt.id + '\\',\\'' + field + '\\',this)">';
+    html += '<button class="btn btn-primary btn-sm" onclick="attOpenScanner(\\'' + inputId + '\\')">📸 Scan Screenshot</button>';
     html += '</div>';
     // Manual add
     html += '<div style="display:flex;gap:6px">' +
@@ -3078,10 +3092,26 @@ function attAddManualName(prefix, eventId, field) {
 }
 
 // ════════════ OCR FOR NAMES ════════════
+// Reset file input so same file can be re-selected, and handle cancel gracefully
+function attOpenScanner(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  input.value = ''; // reset so onchange fires even if same file selected again
+  input.click();
+}
+
 async function attRunOCR(prefix, eventId, field, fileInput) {
   const files = Array.from(fileInput.files || []);
-  if (!files.length) return;
+  // Reset input immediately so retry works even with same file
+  fileInput.value = '';
+
   const previewEl = document.getElementById('ocrPreview-' + prefix + '-' + eventId + '-' + field);
+
+  if (!files.length) {
+    // User cancelled — clear any previous scanning message
+    if (previewEl) previewEl.style.display = 'none';
+    return;
+  }
   if (previewEl) { previewEl.style.display = 'block'; previewEl.innerHTML = '<div style="color:var(--text3);font-size:12px">🔍 Scanning ' + files.length + ' image(s)…</div>'; }
   try {
     if (typeof Tesseract === 'undefined') throw new Error('OCR not loaded');
