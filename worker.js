@@ -3149,11 +3149,9 @@ function attConfirmOCR(prefix, eventId, field, encodedNames) {
 }
 
 // ── Parse Legion Combatants screen (Signed Up) ──
-// Key rules (verified against real screenshots):
-//   1. Lines with 3+ digits = power number lines → skip (even if they contain name noise)
-//   2. Name line with "No" on it = not signed up
-//   3. Name line followed (within 4 lines) by "dispatched" or "engagements" = not signed up  
-//   4. All other name lines = signed up
+// Uses PSM 11 (sparse text) which correctly reads "Join" and "No" as separate lines.
+// Rule: find player name lines, then look ahead for "Join" or "No" within 6 lines.
+// Canvas crops the left 18% (avatars) to reduce noise.
 async function parseSignedUpNamesFromCanvas(imageFile) {
   return new Promise((resolve) => {
     const img = new window.Image();
@@ -3170,7 +3168,7 @@ async function parseSignedUpNamesFromCanvas(imageFile) {
           const worker = await Tesseract.createWorker({ logger: () => {} });
           await worker.loadLanguage('eng');
           await worker.initialize('eng');
-          await worker.setParameters({ tessedit_pageseg_mode: '6' });
+          await worker.setParameters({ tessedit_pageseg_mode: '11' });
           const { data: { text } } = await worker.recognize(blob);
           await worker.terminate();
           resolve(parseSignedUpNames(text));
@@ -3184,63 +3182,44 @@ async function parseSignedUpNamesFromCanvas(imageFile) {
 function parseSignedUpNames(text) {
   const lines = text.split(/\\n/).map(l => l.trim()).filter(Boolean);
 
-  const HEADER   = /combatant|30\\/|2\\/10|squad|power|substitute/i;
-  const VOTED    = /\\bvoted\\b/i;
-  const HAS_NO   = /\\bno\\b/i;
-  const DISPATCH = /dispatch/i;
-  const ENGAGE   = /engagements/i;
-  const HAS_DIGIT = /\\d{3,}/;
-  const PURE_NUM  = /^[\\d,.\\s]+$/;
-  const NAME_W    = /^[A-Za-z][A-Za-z0-9_\\-]{1,}$/;
-  const NOISE_W   = /^(no|sy|sif|voted|join|le|ic|fe|be|rr|bn|par|or|pe|bg|ie|r|the|engagements|dispatched|legion)$/i;
-
-  function isSkip(line) {
-    return HEADER.test(line) || VOTED.test(line) || PURE_NUM.test(line) ||
-           DISPATCH.test(line) || (ENGAGE.test(line) && !NAME_W.test((line.split(/\\s+/)[0]||'')));
-  }
+  const HEADER  = /combatant|30\\/|2\\/10|squad|power|substitute|ph\\s*join/i;
+  const JOIN_RE = /^join$/i;
+  const NO_RE   = /^no$/i;
+  const POWER   = /\\d{3,}/;
+  const NOISE_W = /^(voted|join|no|substitute|squad|power|legion|engagements|dispatched|combatants?|oye|ones|siae|fa|sl|aa|y|f|r|w|pe|bg|ie|sy|sif|par|bn|rr|ic|fe|be|or|le|the)$/i;
+  const WORD_RE = /^[A-Za-z][A-Za-z0-9_\\-]{2,}$/;
 
   function extractName(line) {
-    const words = line.split(/\\s+/);
-    const candidates = words.filter(w => NAME_W.test(w) && !NOISE_W.test(w) && !/^\\d/.test(w));
-    if (!candidates.length) return null;
-    const best = candidates.sort((a,b) => b.length - a.length)[0];
-    return best.length >= 3 ? best : null;
+    const clean = line.replace(/^[^A-Za-z]+/, '');
+    const words = clean.split(/\\s+/).filter(w => WORD_RE.test(w) && !NOISE_W.test(w));
+    return words.length ? words.join(' ') : null;
+  }
+
+  function isPlayerLine(line) {
+    const name = extractName(line);
+    return name && !HEADER.test(line) && !JOIN_RE.test(line) && !NO_RE.test(line) && !POWER.test(line);
   }
 
   const results = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (isSkip(line)) continue;
-
-    // Lines with embedded power numbers → only extract if "No" present
-    if (HAS_DIGIT.test(line)) {
-      if (HAS_NO.test(line)) {
-        const name = extractName(line);
-        if (name) results.push({ name, signed: false });
-      }
-      continue;
-    }
-
+    if (!isPlayerLine(line)) continue;
     const name = extractName(line);
     if (!name) continue;
 
-    // "No" on same line = not signed up
-    if (HAS_NO.test(line)) { results.push({ name, signed: false }); continue; }
-
-    // Look ahead for dispatch/engagements before next player name
-    let signed = true;
-    for (let j = i+1; j < Math.min(i+5, lines.length); j++) {
-      const ahead = lines[j];
-      if (VOTED.test(ahead)) break;
-      if (DISPATCH.test(ahead) || ENGAGE.test(ahead)) { signed = false; break; }
-      if (extractName(ahead)) break;
+    let status = null;
+    for (let j = i + 1; j < Math.min(i + 6, lines.length); j++) {
+      const ahead = lines[j].trim();
+      if (JOIN_RE.test(ahead)) { status = 'join'; break; }
+      if (NO_RE.test(ahead))   { status = 'no';   break; }
+      if (isPlayerLine(ahead)) break;
     }
-    results.push({ name, signed });
+    if (status) results.push({ name, status });
   }
 
   const seen = new Set();
   return results
-    .filter(r => r.signed && !seen.has(r.name) && seen.add(r.name))
+    .filter(r => r.status === 'join' && !seen.has(r.name) && seen.add(r.name))
     .map(r => r.name);
 }
 
