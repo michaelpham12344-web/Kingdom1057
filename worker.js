@@ -538,7 +538,7 @@ document.addEventListener('touchend',function(e){
 </div>
 
 <!-- USER BAR — shown after login -->
-<div id="userBar" style="display:none;background:var(--bg3);border-bottom:1px solid var(--border);padding:6px 16px;display:none;align-items:center;gap:10px;font-size:13px">
+<div id="userBar" style="display:none;background:var(--bg3);border-bottom:1px solid var(--border);padding:6px 16px;align-items:center;gap:10px;font-size:13px">
   <img id="userBarAvatar" src="" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--border2);display:none">
   <span id="userBarName" style="font-weight:600;color:var(--text)"></span>
   <span id="userBarKingdom" style="color:var(--text3);font-size:11px"></span>
@@ -659,9 +659,6 @@ document.addEventListener('touchend',function(e){
     <div class="card-title">📋 Final Calculation</div>
     <p style="color:var(--text2);font-size:12px;margin-bottom:12px">Click a team below to calculate launch times for its leaders, based on the offset selected above.</p>
     <div id="bsTeamButtons" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
-    <div id="bsQuickCopy" style="display:none;margin-bottom:14px">
-      <button class="btn btn-gold" onclick="bsCopySelectedTeam()">📋 Copy team for in-game chat</button>
-    </div>
     <div id="bsFinalResult">
       <div style="color:var(--text3);font-size:13px">Select an offset, then click a team to see the schedule.</div>
     </div>
@@ -729,7 +726,7 @@ document.addEventListener('touchend',function(e){
     <button class="tab ms-step-tab" id="msStepTab2" onclick="msGoStep(2)">2. Verify</button>
     <button class="tab ms-step-tab" id="msStepTab3" onclick="msGoStep(3)">3. Commitment</button>
     <button class="tab ms-step-tab" id="msStepTab4" onclick="msGoStep(4)">4. Timeslots</button>
-    <button class="tab ms-step-tab" id="msStepTab5" onclick="msGoStep(5)">5. Results &amp; Schedule</button>
+    <button class="tab ms-step-tab" id="msStepTab5" onclick="msGoStep(5)" style="margin-left:auto">5. Results &amp; Schedule</button>
   </div>
 
   <!-- STEP 1: UPLOAD -->
@@ -737,8 +734,15 @@ document.addEventListener('touchend',function(e){
     <div class="card">
       <div class="card-title">📸 Step 1 — Identify &amp; Upload</div>
       <div class="row">
-        <div class="field"><label>Alliance name</label><input type="text" id="msAlliance" placeholder="e.g. HDS" style="width:140px"></div>
-        <div class="field"><label>In-game name</label><input type="text" id="msIGN" placeholder="e.g. Olaf" style="width:160px"></div>
+        <div id="msIdentityDisplay" style="background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:10px 14px;display:flex;align-items:center;gap:12px">
+          <img id="msIdentityAvatar" src="" style="width:36px;height:36px;border-radius:50%;border:2px solid var(--border2);display:none">
+          <div>
+            <div style="font-weight:600" id="msIdentityName">—</div>
+            <div style="font-size:12px;color:var(--text3)" id="msIdentityAlliance">—</div>
+          </div>
+          <input type="hidden" id="msAlliance" value="">
+          <input type="hidden" id="msIGN" value="">
+        </div>
       </div>
       <div id="msIdentityError" style="display:none;color:#ff7070;font-size:12px;margin-bottom:10px;background:rgba(224,58,58,.1);border:1px solid rgba(224,58,58,.3);border-radius:5px;padding:8px 12px">⚠ Please enter both your Alliance name and in-game name before continuing.</div>
       <div class="sec-title">Upload your inventory screenshot</div>
@@ -1675,8 +1679,7 @@ function bsCalcTeam(teamId, offsetSec, logToast){
 
   t._bsLastCalc={header,results,dur,landSec};
   // Show the persistent quick-copy button above the result
-  const qc=document.getElementById('bsQuickCopy');
-  if(qc) qc.style.display='block';
+
   if(logToast) toast(\`\${t.name} — rally times calculated!\`);
 }
 
@@ -1713,6 +1716,21 @@ function msSlotLabel(i){
 
 function msInit(){
   if(MS._unlockedStep===undefined) MS._unlockedStep=1;
+  // Auto-fill identity from verified player session
+  const vp = verifiedPlayer || (() => { try { const s = sessionStorage.getItem('verifiedPlayer'); return s ? JSON.parse(s) : null; } catch(e) { return null; } })();
+  const alliance = (typeof AUTH !== 'undefined' && AUTH.alliance) ? AUTH.alliance : (lsGet ? lsGet('alliance') : null);
+  const nameEl = document.getElementById('msIdentityName');
+  const allianceEl = document.getElementById('msIdentityAlliance');
+  const avatarEl = document.getElementById('msIdentityAvatar');
+  const msAllianceEl = document.getElementById('msAlliance');
+  const msIGNEl = document.getElementById('msIGN');
+  if (vp) {
+    if (nameEl) nameEl.textContent = vp.name || '—';
+    if (allianceEl) allianceEl.textContent = alliance ? alliance + ' · Level ' + (vp.level||'') : 'Level ' + (vp.level||'');
+    if (avatarEl && vp.avatar) { avatarEl.src = vp.avatar; avatarEl.style.display = 'block'; }
+    if (msAllianceEl) msAllianceEl.value = alliance || '';
+    if (msIGNEl) msIGNEl.value = vp.name || '';
+  }
   msGoStep(MS._currentStep||1);
   msRenderVerifyGrid();
   msRenderSliderGrid();
@@ -2996,7 +3014,7 @@ function attRenderEventPanel(prefix, evt, field, canEdit) {
   if (canEdit) {
     html += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px">📸 ' + hint + '</div>';
     html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">';
-    html += '<input type="file" accept="image/*" style="display:none" id="ocrFile-' + prefix + '-' + evt.id + '-' + field + '" onchange="attRunOCR(\\'' + prefix + '\\',\\'' + evt.id + '\\',\\'' + field + '\\',this)">';
+    html += '<input type="file" accept="image/*" multiple style="display:none" id="ocrFile-' + prefix + '-' + evt.id + '-' + field + '" onchange="attRunOCR(\\'' + prefix + '\\',\\'' + evt.id + '\\',\\'' + field + '\\',this)">';
     html += '<button class="btn btn-primary btn-sm" onclick="document.getElementById(\\'ocrFile-' + prefix + '-' + evt.id + '-' + field + '\\').click()">📸 Scan Screenshot</button>';
     html += '</div>';
     // Manual add
@@ -3033,50 +3051,44 @@ function attAddManualName(prefix, eventId, field) {
 
 // ════════════ OCR FOR NAMES ════════════
 async function attRunOCR(prefix, eventId, field, fileInput) {
-  const file = fileInput.files[0];
-  if (!file) return;
+  const files = Array.from(fileInput.files || []);
+  if (!files.length) return;
   const previewEl = document.getElementById('ocrPreview-' + prefix + '-' + eventId + '-' + field);
-  if (previewEl) { previewEl.style.display = 'block'; previewEl.innerHTML = '<div style="color:var(--text3);font-size:12px">🔍 Scanning names…</div>'; }
-
+  if (previewEl) { previewEl.style.display = 'block'; previewEl.innerHTML = '<div style="color:var(--text3);font-size:12px">🔍 Scanning ' + files.length + ' image(s)…</div>'; }
   try {
     if (typeof Tesseract === 'undefined') throw new Error('OCR not loaded');
     const worker = await Tesseract.createWorker({ logger: () => {} });
     await worker.loadLanguage('eng');
     await worker.initialize('eng');
     await worker.setParameters({ tessedit_pageseg_mode: '6' });
-    const { data: { text } } = await worker.recognize(file);
+    let allNames = [];
+    for (const file of files) {
+      const { data: { text } } = await worker.recognize(file);
+      const names = field === 'signedUp' ? parseSignedUpNames(text) : parseShowedUpNames(text);
+      names.forEach(n => { if (!allNames.includes(n)) allNames.push(n); });
+    }
     await worker.terminate();
-
-    const names = field === 'signedUp'
-      ? parseSignedUpNames(text)
-      : parseShowedUpNames(text);
-
-    if (!names.length) {
+    if (!allNames.length) {
       if (previewEl) previewEl.innerHTML = '<div style="color:var(--enemy);font-size:12px">⚠ No names detected. Try adding manually.</div>';
       return;
     }
-
-    // Show preview with confirm
+    const evt = ATT[prefix].events.find(e => e.id === eventId);
+    const existing = (evt ? evt[field] : []).map(m => m.name.toLowerCase());
+    const newNames = allNames.filter(n => !existing.includes(n.toLowerCase()));
+    const dupNames = allNames.filter(n => existing.includes(n.toLowerCase()));
     if (previewEl) {
-      const evt = ATT[prefix].events.find(e => e.id === eventId);
-      const existing = (evt ? evt[field] : []).map(m => m.name.toLowerCase());
-      const newNames = names.filter(n => !existing.includes(n.toLowerCase()));
-      const dupNames = names.filter(n => existing.includes(n.toLowerCase()));
-
-      let html = '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:12px">';
-      html += '<div style="font-weight:600;margin-bottom:8px">Found ' + names.length + ' name(s) — ' + newNames.length + ' new:</div>';
-      html += '<div style="max-height:120px;overflow-y:auto;margin-bottom:10px">';
-      newNames.forEach(n => { html += '<div style="padding:2px 0;color:var(--green)">+ ' + n + '</div>'; });
-      if (dupNames.length) dupNames.forEach(n => { html += '<div style="padding:2px 0;color:var(--text3)">↩ ' + n + ' (already in list)</div>'; });
-      html += '</div>';
+      let h = '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:12px">';
+      h += '<div style="font-weight:600;margin-bottom:8px">Found ' + allNames.length + ' name(s) — ' + newNames.length + ' new:</div>';
+      h += '<div style="max-height:160px;overflow-y:auto;margin-bottom:10px">';
+      newNames.forEach(n => { h += '<div style="padding:2px 0;color:var(--green)">+ ' + n + '</div>'; });
+      if (dupNames.length) dupNames.forEach(n => { h += '<div style="padding:2px 0;color:var(--text3)">↩ ' + n + ' (already added)</div>'; });
+      h += '</div>';
       if (newNames.length) {
-        // Store names for confirm
         const safeNames = encodeURIComponent(JSON.stringify(newNames));
-        html += '<button class="btn btn-primary btn-sm" onclick="attConfirmOCR(\\'' + prefix + '\\',\\'' + eventId + '\\',\\'' + field + '\\',' + "'" + safeNames + "'" + ')">✅ Add ' + newNames.length + ' name(s)</button> ';
+        h += '<button class="btn btn-primary btn-sm" onclick="attConfirmOCR(\\''+prefix+'\\',\\''+eventId+'\\',\\''+field+'\\',\\''+safeNames+'\\')">✅ Add ' + newNames.length + ' name(s)</button> ';
       }
-      html += '<button class="btn btn-ghost btn-sm" onclick="this.parentElement.style.display=\\'none\\'">Cancel</button>';
-      html += '</div>';
-      previewEl.innerHTML = html;
+      h += '<button class="btn btn-ghost btn-sm" onclick="this.parentElement.style.display=\\'none\\'">Cancel</button></div>';
+      previewEl.innerHTML = h;
     }
   } catch(e) {
     if (previewEl) previewEl.innerHTML = '<div style="color:var(--enemy);font-size:12px">⚠ OCR error: ' + e.message + '</div>';
@@ -3100,33 +3112,50 @@ function attConfirmOCR(prefix, eventId, field, encodedNames) {
 }
 
 // ── Parse Legion Combatants screen (Signed Up) ──
-// Keep names where the line has "Join" or "Voted" as status
-// Discard "No engagements", "Legion X dispatched", power numbers
+// Strategy: the screen has a fixed layout per row:
+//   [avatar] [Name] [power icon][number] [status: Join / No engagements / Legion X dispatched]
+// We scan for lines that are clearly names (not UI chrome, not numbers, not status text)
+// and whose nearby context contains "Join" or "Voted"
 function parseSignedUpNames(text) {
   const lines = text.split(/\\n/).map(l => l.trim()).filter(Boolean);
-  const STRIP_RE = /^(no engagements?|legion\\s*\\d+\\s*dispatch|substitute|squad\\s*power|join\\s*\\d+|ranked|combatant)/i;
+
+  // Lines to completely ignore
+  const IGNORE_RE = /^(legion\\s*\\d*\\s*combatants?|join\\s*\\d|substitute|squad\\s*power|no\\s*engage|dispatched|voted|x$|\\d+\\/\\d+|\\d{1,4}$)/i;
+  const NUMBER_RE = /^\\d[\\d,.\\s]*$/;
   const STATUS_RE = /\\b(join|voted)\\b/i;
-  const NUMBER_RE = /^\\d[\\d,./]*$/;
-  const ICON_RE = /^[\\W_]+$/; // lines that are only symbols/icons
+  const NOISE_RE = /^[^a-zA-Z0-9_\\-\\.]{0,3}$/; // pure symbols/icons
+
+  // First pass: find which line indices have "Join" or "Voted" nearby
+  const joinLines = new Set();
+  lines.forEach((line, i) => {
+    if (STATUS_RE.test(line)) {
+      // Mark surrounding lines as "has join context"
+      for (let j = Math.max(0,i-3); j <= Math.min(lines.length-1, i+1); j++) joinLines.add(j);
+    }
+  });
 
   const names = [];
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
-    // Skip known non-name lines
-    if (STRIP_RE.test(line) || NUMBER_RE.test(line.replace(/,/g,'')) || ICON_RE.test(line)) { i++; continue; }
-    // If this line or adjacent lines contain Join/Voted, the name is on the line(s) before/with it
-    const nearby = [lines[i-1]||'', line, lines[i+1]||'', lines[i+2]||''].join(' ');
-    if (STATUS_RE.test(nearby)) {
-      // The name is whichever line is NOT a status/number line
-      const candidate = line.replace(/\\b(join|voted|no engagements?)\\b/gi, '').replace(/\\d[\\d,]*/g, '').replace(/[⚔🛡👑✅🏆]/g, '').trim();
-      if (candidate.length >= 2 && !NUMBER_RE.test(candidate.replace(/,/g,''))) {
-        const clean = cleanName(candidate);
-        if (clean && !names.includes(clean)) names.push(clean);
-      }
-    }
-    i++;
-  }
+  lines.forEach((line, i) => {
+    // Skip if this line IS a status/number/noise line
+    if (IGNORE_RE.test(line)) return;
+    if (NUMBER_RE.test(line.replace(/,/g,''))) return;
+    if (NOISE_RE.test(line)) return;
+    if (line.length < 2 || line.length > 30) return;
+
+    // Must be in join context
+    if (!joinLines.has(i)) return;
+
+    // Clean the name: remove power numbers, icons, status words
+    let name = line
+      .replace(/\\b(join|voted|no\\s*engagements?|legion\\s*\\d+\\s*dispatched?)\\b/gi, '')
+      .replace(/\\d[\\d,]*/g, '')
+      .replace(/[^\\w\\s\\-_.∾≺≻*~]/g, '')
+      .replace(/\\s+/g, ' ')
+      .trim();
+
+    if (name.length >= 2 && !names.includes(name)) names.push(name);
+  });
+
   return names;
 }
 
