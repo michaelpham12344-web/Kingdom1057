@@ -809,7 +809,14 @@ document.addEventListener('touchend',function(e){
       <div class="card-title">🕐 Step 4 — Pick Your Preferred Timeslots</div>
       <p style="color:var(--text2);font-size:12px;margin-bottom:6px">Select at least <strong style="color:var(--text)">4 timeslots</strong> that work best for you (UTC). Your committed Training hours: <span id="msYourTrainingHours" class="mono" style="color:var(--gold)">0h</span></p>
       <div id="msSlotPickCount" style="font-size:12px;color:var(--text3);margin-bottom:10px">0 slots selected</div>
-      <div id="msSlotGrid" style="display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-bottom:16px"></div>
+      <div id="msSlotGrid" style="display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-bottom:8px"></div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:12px;display:flex;align-items:center;gap:10px">
+        <span>Slot popularity:</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:rgba(46,204,113,.5);display:inline-block"></span>Few requests</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:rgba(224,140,58,.5);display:inline-block"></span>Moderate</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:rgba(224,58,58,.5);display:inline-block"></span>High demand</span>
+        <span style="color:var(--text3);font-size:10px">· Number = request count</span>
+      </div>
       <div id="msDeadlineBanner" style="display:none;margin-bottom:10px"></div>
       <button class="btn btn-primary" id="msSubmitBtn" onclick="msSubmitEntry()">✅ Submit My Entry</button>
     </div>
@@ -2053,10 +2060,31 @@ function msUpdateSlider(cat){
 function msRenderSlotGrid(){
   const grid=document.getElementById('msSlotGrid'); if(!grid) return;
   const takenSlots=new Set(MS._lastAllocation?MS._lastAllocation.assignments.map(a=>a.slot):[]);
+
+  // Build popularity map: count how many submissions picked each slot
+  const popularity = new Array(MS_TOTAL_SLOTS).fill(0);
+  MS.submissions.forEach(sub => { (sub.picks||[]).forEach(p => { popularity[p]++; }); });
+  const maxPop = Math.max(1, ...popularity);
+
   grid.innerHTML=Array.from({length:MS_TOTAL_SLOTS},(_,i)=>{
     const selected=MS.draft.picks.includes(i);
     const taken=takenSlots.has(i)&&!selected;
-    return \`<button class="ms-slot-btn \${selected?'selected':''} \${taken?'taken':''}" onclick="\${taken?'':'msTogglePick('+i+')'}" title="\${taken?'Already allocated':''}">\${msSlotLabel(i)}</button>\`;
+    const pop = popularity[i];
+
+    // Heatmap colour: green (low) → yellow → red (high)
+    let heatStyle = '';
+    if (pop > 0 && !selected && !taken) {
+      const ratio = pop / maxPop;
+      const r = Math.round(46 + (224-46)*ratio);
+      const g = Math.round(204 - (204-58)*ratio);
+      const b = Math.round(113 - 113*ratio);
+      heatStyle = \`box-shadow:inset 0 0 0 2px rgba(\${r},\${g},\${b},0.5);\`;
+    }
+
+    // Badge showing request count
+    const badge = pop > 0 ? \`<span style="position:absolute;top:-4px;right:-4px;background:rgba(0,0,0,.7);color:#fff;font-size:9px;border-radius:8px;padding:1px 4px;line-height:1.4">\${pop}</span>\` : '';
+
+    return \`<button class="ms-slot-btn \${selected?'selected':''} \${taken?'taken':''}" onclick="\${taken?'':'msTogglePick('+i+')'}" title="\${taken?'Already allocated':pop>0?pop+' request(s) for this slot':''}" style="position:relative;\${heatStyle}">\${msSlotLabel(i)}\${badge}</button>\`;
   }).join('');
   msUpdateSlotCount();
   const trainingHours=(MS.draft.verify.training?MS.draft.verify.training.hours:0)*((MS.draft.commit.training!==undefined?MS.draft.commit.training:50)/100);
@@ -3057,17 +3085,26 @@ async function attRunOCR(prefix, eventId, field, fileInput) {
   if (previewEl) { previewEl.style.display = 'block'; previewEl.innerHTML = '<div style="color:var(--text3);font-size:12px">🔍 Scanning ' + files.length + ' image(s)…</div>'; }
   try {
     if (typeof Tesseract === 'undefined') throw new Error('OCR not loaded');
-    const worker = await Tesseract.createWorker({ logger: () => {} });
-    await worker.loadLanguage('eng');
-    await worker.initialize('eng');
-    await worker.setParameters({ tessedit_pageseg_mode: '6' });
     let allNames = [];
-    for (const file of files) {
-      const { data: { text } } = await worker.recognize(file);
-      const names = field === 'signedUp' ? parseSignedUpNames(text) : parseShowedUpNames(text);
-      names.forEach(n => { if (!allNames.includes(n)) allNames.push(n); });
+    if (field === 'signedUp') {
+      // Use canvas crop approach for Legion Combatants screen
+      for (const file of files) {
+        const names = await parseSignedUpNamesFromCanvas(file);
+        names.forEach(n => { if (!allNames.includes(n)) allNames.push(n); });
+      }
+    } else {
+      // Standard OCR for Battlefield Details
+      const worker = await Tesseract.createWorker({ logger: () => {} });
+      await worker.loadLanguage('eng');
+      await worker.initialize('eng');
+      await worker.setParameters({ tessedit_pageseg_mode: '6' });
+      for (const file of files) {
+        const { data: { text } } = await worker.recognize(file);
+        const names = parseShowedUpNames(text);
+        names.forEach(n => { if (!allNames.includes(n)) allNames.push(n); });
+      }
+      await worker.terminate();
     }
-    await worker.terminate();
     if (!allNames.length) {
       if (previewEl) previewEl.innerHTML = '<div style="color:var(--enemy);font-size:12px">⚠ No names detected. Try adding manually.</div>';
       return;
@@ -3112,50 +3149,66 @@ function attConfirmOCR(prefix, eventId, field, encodedNames) {
 }
 
 // ── Parse Legion Combatants screen (Signed Up) ──
-// Strategy: the screen has a fixed layout per row:
-//   [avatar] [Name] [power icon][number] [status: Join / No engagements / Legion X dispatched]
-// We scan for lines that are clearly names (not UI chrome, not numbers, not status text)
-// and whose nearby context contains "Join" or "Voted"
+// Uses canvas to crop avatars, then PSM4 + whitelist for clean text
+// Strategy: name always appears on the line immediately before the power number
+async function parseSignedUpNamesFromCanvas(imageFile) {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = async () => {
+      const canvas = document.createElement('canvas');
+      const W = img.naturalWidth, H = img.naturalHeight;
+      // Crop: remove left 20% (avatars), keep middle-right (names + status)
+      const cropX = Math.floor(W * 0.20);
+      canvas.width = W - cropX;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, -cropX, 0);
+      canvas.toBlob(async (blob) => {
+        try {
+          if (typeof Tesseract === 'undefined') { resolve([]); return; }
+          const worker = await Tesseract.createWorker({ logger: () => {} });
+          await worker.loadLanguage('eng');
+          await worker.initialize('eng');
+          await worker.setParameters({
+            tessedit_pageseg_mode: '4',
+            tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_ -.'
+          });
+          const { data: { text } } = await worker.recognize(blob);
+          await worker.terminate();
+          resolve(parseSignedUpNames(text));
+        } catch(e) { resolve([]); }
+      }, 'image/png');
+    };
+    img.src = URL.createObjectURL(imageFile);
+  });
+}
+
 function parseSignedUpNames(text) {
   const lines = text.split(/\\n/).map(l => l.trim()).filter(Boolean);
 
-  // Lines to completely ignore
-  const IGNORE_RE = /^(legion\\s*\\d*\\s*combatants?|join\\s*\\d|substitute|squad\\s*power|no\\s*engage|dispatched|voted|x$|\\d+\\/\\d+|\\d{1,4}$)/i;
-  const NUMBER_RE = /^\\d[\\d,.\\s]*$/;
-  const STATUS_RE = /\\b(join|voted)\\b/i;
-  const NOISE_RE = /^[^a-zA-Z0-9_\\-\\.]{0,3}$/; // pure symbols/icons
-
-  // First pass: find which line indices have "Join" or "Voted" nearby
-  const joinLines = new Set();
-  lines.forEach((line, i) => {
-    if (STATUS_RE.test(line)) {
-      // Mark surrounding lines as "has join context"
-      for (let j = Math.max(0,i-3); j <= Math.min(lines.length-1, i+1); j++) joinLines.add(j);
-    }
-  });
+  // Skip these line patterns entirely
+  const SKIP = /^(legion|join|substitute|squad|power|voted|no\\s|dispatch|x$|[^a-zA-Z]{0,3}$)/i;
+  // Power number line: optional noise + 3+ digits
+  const POWER = /[a-zA-Z\\s]{0,6}\\d{3,}/;
+  // Header line with known words
+  const HEADER = /combatant|30\\s*\\/|2\\s*\\/|52[,.]?095/i;
 
   const names = [];
-  lines.forEach((line, i) => {
-    // Skip if this line IS a status/number/noise line
-    if (IGNORE_RE.test(line)) return;
-    if (NUMBER_RE.test(line.replace(/,/g,''))) return;
-    if (NOISE_RE.test(line)) return;
-    if (line.length < 2 || line.length > 30) return;
-
-    // Must be in join context
-    if (!joinLines.has(i)) return;
-
-    // Clean the name: remove power numbers, icons, status words
-    let name = line
-      .replace(/\\b(join|voted|no\\s*engagements?|legion\\s*\\d+\\s*dispatched?)\\b/gi, '')
-      .replace(/\\d[\\d,]*/g, '')
-      .replace(/[^\\w\\s\\-_.∾≺≻*~]/g, '')
-      .replace(/\\s+/g, ' ')
-      .trim();
-
-    if (name.length >= 2 && !names.includes(name)) names.push(name);
-  });
-
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (SKIP.test(line) || HEADER.test(line)) continue;
+    const next = lines[i + 1] || '';
+    // Name comes right before a power number line
+    if (POWER.test(next) || /^\\d{3,}/.test(next)) {
+      // Clean: strip leading non-alpha, keep name chars
+      let clean = line.replace(/^[^a-zA-Z]+/, '').replace(/[^a-zA-Z0-9_\\-\\s]/g, '').trim();
+      // Take first word-group if multiple words (handles "fe ErasableInk" → "ErasableInk")
+      const words = clean.split(/\\s+/).filter(w => w.length >= 2 && /[a-zA-Z]/.test(w));
+      // Pick the longest word (most likely the actual name, not OCR noise prefix)
+      clean = words.sort((a,b) => b.length - a.length)[0] || '';
+      if (clean.length >= 2 && !names.includes(clean)) names.push(clean);
+    }
+  }
   return names;
 }
 
