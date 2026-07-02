@@ -493,7 +493,7 @@ document.addEventListener('touchend',function(e){
         <div id="playerLookupResult" style="display:none;margin-bottom:12px"></div>
         <div id="landingRoleButtons" style="display:none;flex-direction:column;gap:8px">
           <button class="btn btn-primary" onclick="landingEnterMember()">✅ Enter as Member of 1057</button>
-          <button class="btn btn-ghost" onclick="landingStartWithPassword()">🔑 I have a password</button>
+          <button class="btn btn-ghost" onclick="landingStartWithPassword()">🛡 R4/R5</button>
         </div>
       </div>
 
