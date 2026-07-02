@@ -540,11 +540,15 @@ document.addEventListener('touchend',function(e){
 <!-- USER BAR — shown after login -->
 <div id="userBar" style="display:none;background:var(--bg3);border-bottom:1px solid var(--border);padding:6px 16px;align-items:center;gap:10px;font-size:13px">
   <img id="userBarAvatar" src="" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--border2);display:none">
-  <span id="userBarName" style="font-weight:600;color:var(--text)"></span>
+  <div style="display:flex;flex-direction:column;gap:1px">
+    <span id="userBarName" style="font-weight:600;color:var(--text);line-height:1.2"></span>
+    <span id="userBarPlayerId" style="font-size:10px;color:var(--text3);font-family:monospace"></span>
+  </div>
   <span id="userBarKingdom" style="color:var(--text3);font-size:11px"></span>
   <span id="userBarRole" style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(61,142,240,.15);color:var(--accent2);margin-left:4px"></span>
   <span style="flex:1"></span>
-  <span id="syncStatus" style="font-size:11px;color:var(--text3)"></span>
+  <span id="syncStatus" style="font-size:11px;color:var(--text3);margin-right:8px"></span>
+  <button class="btn btn-ghost btn-sm" onclick="logOut()" style="font-size:11px;padding:3px 10px;opacity:.8">Sign Out</button>
 </div>
 
 <nav class="nav" id="mainNav" style="display:none">
@@ -722,11 +726,29 @@ document.addEventListener('touchend',function(e){
 
   <!-- STEP TABS -->
   <div class="phase-tabs" style="margin-bottom:18px">
+    <button class="tab ms-step-tab" id="msStepTab0" onclick="msGoStep(0)" style="display:none">📋 My Submission</button>
     <button class="tab ms-step-tab active" id="msStepTab1" onclick="msGoStep(1)">1. Upload</button>
     <button class="tab ms-step-tab" id="msStepTab2" onclick="msGoStep(2)">2. Verify</button>
     <button class="tab ms-step-tab" id="msStepTab3" onclick="msGoStep(3)">3. Commitment</button>
-    <button class="tab ms-step-tab" id="msStepTab4" onclick="msGoStep(4)">4. Timeslots</button>
-    <button class="tab ms-step-tab" id="msStepTab5" onclick="msGoStep(5)" style="margin-left:auto">5. Results &amp; Schedule</button>
+    <button class="tab ms-step-tab" id="msStepTab4" onclick="msGoStep(4)">4. Timeslots &amp; Submit</button>
+    <button class="tab ms-step-tab" id="msStepTab5" onclick="msGoStep(5)" style="margin-left:auto;display:none">5. Results &amp; Schedule</button>
+  </div>
+
+  <!-- STEP 0: MY SUBMISSION OVERVIEW -->
+  <div id="msStep0" class="ms-step" style="display:none">
+    <div class="card" style="margin-bottom:14px;border:1px solid rgba(46,204,113,.2)">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+        <div>
+          <div class="card-title" style="margin:0">✅ Submission Received</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:3px">Your entry has been saved. You're all set!</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="msEditSubmission()">✏️ Edit my submission</button>
+      </div>
+      <div id="msOverviewContent"></div>
+    </div>
+    <div style="background:rgba(61,142,240,.06);border:1px solid rgba(61,142,240,.2);border-radius:7px;padding:12px 14px;font-size:12px;color:var(--text2)">
+      💡 <strong>Want to change your entry?</strong> Click "Edit my submission" above. You'll go back to Step 1 and need to complete all steps again. Your current submission will be kept until you submit a new one.
+    </div>
   </div>
 
   <!-- STEP 1: UPLOAD -->
@@ -913,7 +935,8 @@ let syncSerialize = function() {
     attackAllianceName: document.getElementById('attackAllianceName') ? document.getElementById('attackAllianceName').value : '',
     msSubmissions: (typeof MS!=='undefined') ? MS.submissions : [],
     msLastAllocation: (typeof MS!=='undefined') ? MS._lastAllocation : null,
-    msDeadline: (typeof MS!=='undefined') ? MS.deadline : null
+    msDeadline: (typeof MS!=='undefined') ? MS.deadline : null,
+    msSubmissionsByPlayer: (typeof MS!=='undefined') ? (MS.submissionsByPlayer||{}) : {}
   });
 }
 
@@ -937,6 +960,7 @@ let syncApplyRemote = function(data) {
       MS.submissions = data.msSubmissions || [];
       MS._lastAllocation = data.msLastAllocation || null;
       MS.deadline = data.msDeadline || null;
+      if(data.msSubmissionsByPlayer) { MS.submissionsByPlayer = data.msSubmissionsByPlayer; MS.submissions = Object.values(MS.submissionsByPlayer); }
       if (typeof msRenderResultsSummary==='function') msRenderResultsSummary();
       if (typeof msRenderFinalSchedule==='function') msRenderFinalSchedule();
       if (typeof msRenderRejectedList==='function') msRenderRejectedList();
@@ -1723,6 +1747,23 @@ function msSlotLabel(i){
 
 function msInit(){
   if(MS._unlockedStep===undefined) MS._unlockedStep=1;
+  // Restore submission from localStorage if available
+  const pid = verifiedPlayer ? String(verifiedPlayer.id) : null;
+  if(pid && !MS._submittedEntry) {
+    const saved = lsGet('ms_submitted_' + pid);
+    if(saved) {
+      MS._submittedEntry = saved;
+      // Also make sure it's in the submissions array
+      MS.submissionsByPlayer = MS.submissionsByPlayer || {};
+      MS.submissionsByPlayer[pid] = saved;
+      MS.submissions = Object.values(MS.submissionsByPlayer);
+    }
+  }
+  // Also check the shared submissions array for this player's entry
+  if(pid && !MS._submittedEntry) {
+    const fromState = MS.submissions.find(s => s.playerId === pid);
+    if(fromState) { MS._submittedEntry = fromState; lsSet('ms_submitted_' + pid, fromState); }
+  }
   // Auto-fill identity from verified player session
   const vp = verifiedPlayer || (() => { try { const s = sessionStorage.getItem('verifiedPlayer'); return s ? JSON.parse(s) : null; } catch(e) { return null; } })();
   const alliance = (typeof AUTH !== 'undefined' && AUTH.alliance) ? AUTH.alliance : (lsGet ? lsGet('alliance') : null);
@@ -1737,6 +1778,16 @@ function msInit(){
     if (avatarEl && vp.avatar) { avatarEl.src = vp.avatar; avatarEl.style.display = 'block'; }
     if (msAllianceEl) msAllianceEl.value = alliance || '';
     if (msIGNEl) msIGNEl.value = vp.name || '';
+  }
+  // If member has existing submission, show overview directly
+  if(MS._submittedEntry && !msCanAccessResults()) {
+    const tab0 = document.getElementById('msStepTab0');
+    if(tab0) tab0.style.display = '';
+    msGoStep(0);
+    msRenderOverview(MS._submittedEntry);
+    msRenderStepTabs();
+    msUpdateDeadlineBanners();
+    return;
   }
   msGoStep(MS._currentStep||1);
   msRenderVerifyGrid();
@@ -1753,8 +1804,19 @@ function msMarkStepComplete(n){
 }
 
 function msRenderStepTabs(){
-  const unlocked=msCanAccessResults() ? 5 : (MS._unlockedStep||1);
-  for(let i=1;i<=5;i++){
+  const isR4 = msCanAccessResults();
+  const hasSubmission = !!MS._submittedEntry;
+  const unlocked = isR4 ? 5 : (hasSubmission ? 0 : (MS._unlockedStep||1));
+
+  // Step 0 (overview) - only shown if member has submitted
+  const tab0 = document.getElementById('msStepTab0');
+  if(tab0) tab0.style.display = (!isR4 && hasSubmission) ? '' : 'none';
+
+  // Step 5 (results) - only shown for R4/R5
+  const tab5 = document.getElementById('msStepTab5');
+  if(tab5) tab5.style.display = isR4 ? '' : 'none';
+
+  for(let i=1;i<=4;i++){
     const tab=document.getElementById('msStepTab'+i);
     if(!tab) continue;
     const isLocked=i>unlocked;
@@ -1766,14 +1828,20 @@ function msRenderStepTabs(){
 }
 
 function msGoStep(n){
-  const unlocked=MS._unlockedStep||1;
-  // Admins can jump directly to any step including Results
-  if(n>unlocked && !msCanAccessResults()){
-    toast('Please complete the previous step first.');
-    n=unlocked;
-  }
+  const isR4 = msCanAccessResults();
+  const hasSubmission = !!MS._submittedEntry;
+  const unlocked = isR4 ? 5 : (hasSubmission ? 0 : (MS._unlockedStep||1));
+
+  // Block step 5 for non-R4/R5
+  if(n===5 && !isR4){ toast('Results are only visible to R4/R5.'); return; }
+  // If member has submitted, steps 1-4 are locked (they must click Edit)
+  if(!isR4 && hasSubmission && n>=1 && n<=4){ toast('Click "Edit my submission" to make changes.'); n=0; }
+  // Normal step lock
+  if(n>1 && n>unlocked && !isR4 && !hasSubmission){ toast('Please complete the previous step first.'); n=unlocked; }
+
   MS._currentStep=n;
-  for(let i=1;i<=5;i++){
+  // Show/hide step panels (0-5)
+  for(let i=0;i<=5;i++){
     const el=document.getElementById('msStep'+i);
     const tab=document.getElementById('msStepTab'+i);
     if(el) el.style.display=(i===n)?'block':'none';
@@ -1881,12 +1949,12 @@ async function msRunOCR(){
     });
     await worker.loadLanguage('eng');
     await worker.initialize('eng');
-    // PSM 6 = "assume a single uniform block of text" — keeps each table row
-    // (category name + duration) together on one line, which the default
-    // auto-segmentation mode does NOT do for this in-game screen (it splits
-    // the two columns into separate blocks read independently).
     await worker.setParameters({ tessedit_pageseg_mode: '6' });
-    const result=await worker.recognize(msUploadedImageData);
+    // Pre-process: crop to values column + boost contrast (handles Snapchat/social overlays,
+    // wrapped lines, Day(s) mode, and any language)
+    statusEl.textContent = 'Pre-processing image…';
+    const processedBlob = await msPreprocessImage(msUploadedImageData);
+    const result=await worker.recognize(processedBlob || msUploadedImageData);
     await worker.terminate();
     const text=result.data.text||'';
     msParseOCRText(text);
@@ -1915,81 +1983,75 @@ function msSkipToManual(){
 }
 
 function msParseOCRText(text){
-  // POSITIONAL PARSER — language agnostic, no keyword matching.
-  // The game ALWAYS shows speedups in the same order:
-  //   1. General  2. Soldier Training  3. Construction  4. Research
-  // We just extract all duration values top-to-bottom and assign by position.
-  // This works regardless of language, OCR noise, or label corruption.
-
-  const lines = text.split(/\\n+/).map(l => l.trim()).filter(Boolean);
+  // Smart merge: join continuation lines (e.g. "min(s)" on its own line)
+  const UNIT_ONLY = /^\\s*[^0-9]*(?:min|hr|day|sec)[^0-9]*\\s*$/i;
+  const rawLines = text.split(/\\n/);
+  const lines = [];
+  rawLines.forEach(line => {
+    line = line.trim();
+    if (!line) return;
+    if (lines.length && UNIT_ONLY.test(line)) {
+      lines[lines.length-1] = lines[lines.length-1] + ' ' + line;
+    } else { lines.push(line); }
+  });
 
   function normalizeOCR(s) {
-    s = s.replace(/(\\d)[Il](?=\\d|\\b)/g, '$11'); // I/l → 1 near digits
-    s = s.replace(/\\bI(\\d)/g, '1$1');
-    s = s.replace(/(\\d),(\\d{3})/g, '$1$2');     // thousands comma: 1,369 → 1369
-    s = s.replace(/(\\d),(\\d{3})/g, '$1$2');     // run twice for 1,000,000
+    s = s.replace(/(\\d),(\\d{3})/g, '$1$2');
+    s = s.replace(/(\\d),(\\d{3})/g, '$1$2');
     return s;
   }
 
-  // Time unit keywords in all supported languages
-  // English: hr(s), min(s), day(s) — game uses these regardless of UI language
-  // We also accept common OCR corruptions of these words
   function parseDurationToHours(s) {
     s = normalizeOCR(s);
     let total = 0, matched = false;
-    const re = /(\\d+(?:\\.\\d+)?)\\s*(day\\(s\\)|days?|d\\b|hr\\(s\\)|h(?:rs?|ours?)\\b|h\\b|min\\(s\\)|min(?:ute)?s?\\b|m\\b|sec\\(s\\)|sec(?:ond)?s?\\b|s\\b)/gi;
+    const re = /(\\d+(?:\\.\\d+)?)\\s*([a-zA-Z\\(\\)]{1,10})/g;
     let m;
     while ((m = re.exec(s)) !== null) {
       const n = parseFloat(m[1]);
       const u = m[2].toLowerCase();
-      if (u.startsWith('d'))      total += n * 24;
-      else if (u.startsWith('h')) total += n;
-      else if (u.startsWith('m')) total += n / 60;
-      else if (u.startsWith('s')) total += n / 3600;
-      matched = true;
+      if (/^d/.test(u) && !/h/.test(u)) { total += n*24; matched = true; }
+      else if (/h/.test(u))              { total += n;    matched = true; }
+      else if (/^m/.test(u) && !/h/.test(u)) { total += n/60; matched = true; }
     }
     return matched ? total : null;
   }
 
-  // Boundary lines — values below these should be ignored (they're not the 4 speedup types)
-  const BOUNDARY_RE = /learning\\s*speedup|soldier\\s*heal|healing\\s*speedup/i;
-
-  // Collect all duration blocks in top-to-bottom order, stopping at boundaries
-  const durationBlocks = [];
-  let i = 0;
-  while (i < lines.length) {
-    if (BOUNDARY_RE.test(lines[i])) break; // stop at Learning/Healing section
-    const h = parseDurationToHours(lines[i]);
-    if (h !== null && h > 0) {
-      // Merge with next line if it looks like a continuation (no digit of its own)
-      let raw = lines[i], total = h, j = i + 1;
-      while (j < lines.length && !BOUNDARY_RE.test(lines[j])) {
-        const extra = parseDurationToHours(lines[j]);
-        if (extra !== null && !/\\d/.test(lines[j].replace(/hr\\(s\\)|min\\(s\\)|day\\(s\\)/gi, ''))) {
-          // continuation line (unit-only like "min(s)" with no leading digit)
-          total += extra; raw += ' ' + lines[j]; j++;
-        } else break;
-      }
-      durationBlocks.push({ hours: total, raw });
-      i = j;
-    } else {
-      i++;
-    }
+  const BOUNDARY = /learning|soldier\\s*heal|healing/i;
+  const blocks = [];
+  for (const line of lines) {
+    if (BOUNDARY.test(line)) break;
+    const h = parseDurationToHours(line);
+    if (h !== null && h > 0 && h < 100000) blocks.push(h);
   }
 
-  // Assign first 4 blocks to categories in order: general, training, construction, research
   MS_CATEGORIES.forEach((cat, idx) => {
-    if (idx < durationBlocks.length) {
-      const { hours, raw } = durationBlocks[idx];
-      MS.draft.verify[cat] = {
-        amount: Math.round(hours * 100) / 100,
-        unit: 'hours', hours,
-        ocrAmount: Math.round(hours * 100) / 100,
-        ocrRaw: raw
-      };
+    if (idx < blocks.length) {
+      const hours = blocks[idx];
+      MS.draft.verify[cat] = { amount: Math.round(hours*100)/100, unit:'hours', hours, ocrAmount: Math.round(hours*100)/100, ocrRaw:'' };
     } else {
-      MS.draft.verify[cat] = { amount: 0, unit: 'hours', hours: 0, ocrAmount: null, ocrRaw: null };
+      MS.draft.verify[cat] = { amount:0, unit:'hours', hours:0, ocrAmount:null, ocrRaw:null };
     }
+  });
+}
+
+// Pre-process image with Canvas: crop right 65% and middle 50% vertically
+// This strips phone UI chrome, social overlays (Snapchat etc), and category label column
+async function msPreprocessImage(file) {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const W = img.naturalWidth, H = img.naturalHeight;
+      const x1 = Math.floor(W * 0.35);
+      const y1 = Math.floor(H * 0.33);
+      const y2 = Math.floor(H * 0.82);
+      const canvas = document.createElement('canvas');
+      canvas.width = W - x1; canvas.height = y2 - y1;
+      const ctx = canvas.getContext('2d');
+      ctx.filter = 'contrast(180%) saturate(0%)';
+      ctx.drawImage(img, -x1, -y1);
+      canvas.toBlob(blob => resolve(blob), 'image/png');
+    };
+    img.src = URL.createObjectURL(file);
   });
 }
 
@@ -2159,47 +2221,110 @@ function msUpdateDeadlineBanners() {
 }
 
 function msSubmitEntry(){
-  // Check deadline
   if(msIsDeadlinePassed()){ toast('Submissions are closed — the deadline has passed.'); return; }
-  if(MS.draft.picks.length<MS_MIN_SLOTS_PICKED){ alert(\`Please select at least \${MS_MIN_SLOTS_PICKED} timeslots.\`); return; }
+  if(MS.draft.picks.length<MS_MIN_SLOTS_PICKED){ alert('Please select at least ' + MS_MIN_SLOTS_PICKED + ' timeslots.'); return; }
+
   const committedHours={};
   MS_CATEGORIES.forEach(cat=>{
     const hours=MS.draft.verify[cat]?MS.draft.verify[cat].hours:0;
     const pct=MS.draft.commit[cat]!==undefined?MS.draft.commit[cat]:50;
     committedHours[cat]=hours*pct/100;
   });
+
+  const pid = verifiedPlayer ? String(verifiedPlayer.id) : null;
   const entry={
     id: uid(),
+    playerId: pid,
     alliance: MS.draft.alliance,
     ign: MS.draft.ign,
     verify: JSON.parse(JSON.stringify(MS.draft.verify)),
     commit: JSON.parse(JSON.stringify(MS.draft.commit)),
     picks: [...MS.draft.picks],
-    committedHours
+    committedHours,
+    submittedAt: new Date().toISOString()
   };
-  // replace existing entry for same person if resubmitting
-  const existing=MS.submissions.find(s=>s.alliance===entry.alliance && s.ign===entry.ign);
-  if(existing){
-    if(!confirm('An entry for ' + entry.ign + ' (' + entry.alliance + ') already exists. Overwrite it?')) return;
-    MS.submissions=MS.submissions.filter(s=>!(s.alliance===entry.alliance && s.ign===entry.ign));
-  }
-  MS.submissions.push(entry);
-  syncQueuePush();
-  toast('Entry submitted!');
 
-  // reset draft
-  MS.draft={alliance:'',ign:'',verify:{},commit:{},picks:[]};
-  document.getElementById('msAlliance').value='';
-  document.getElementById('msIGN').value='';
-  msUploadedImageData=null;
-  const wrap=document.getElementById('msImgPreviewWrap'); if(wrap) wrap.style.display='none';
-  const fileInput=document.getElementById('msFileInput'); if(fileInput) fileInput.value='';
-  // also clear the OCR progress bar for the next person's entry
-  const progWrap=document.getElementById('msOCRProgressWrap'); if(progWrap) progWrap.style.display='none';
-  MS._unlockedStep=5; // allow viewing results
-  msGoStep(5);
-  // reset back to step 1 lock state for the NEXT person's submission, but keep step 5 (results) viewable
-  MS._unlockedStep=1;
+  // Store keyed by Player ID if available, otherwise by IGN
+  if(pid) {
+    MS.submissionsByPlayer = MS.submissionsByPlayer || {};
+    MS.submissionsByPlayer[pid] = entry;
+    // Keep submissions array in sync (for allocation)
+    MS.submissions = Object.values(MS.submissionsByPlayer);
+  } else {
+    MS.submissions = MS.submissions.filter(s => !(s.alliance===entry.alliance && s.ign===entry.ign));
+    MS.submissions.push(entry);
+  }
+
+  // Save to localStorage so it survives navigation
+  if(pid) {
+    lsSet('ms_submitted_' + pid, entry);
+  }
+
+  syncQueuePush();
+  toast('Entry submitted! ✅');
+
+  // Show overview tab
+  msShowOverview(entry);
+}
+
+function msShowOverview(entry) {
+  // Show overview tab, hide steps 1-4
+  const tab0 = document.getElementById('msStepTab0');
+  if(tab0) tab0.style.display = '';
+  MS._submittedEntry = entry;
+  MS._unlockedStep = 0; // lock steps 1-4
+  msGoStep(0);
+  msRenderOverview(entry);
+}
+
+function msRenderOverview(entry) {
+  const el = document.getElementById('msOverviewContent');
+  if(!el || !entry) return;
+  const totalH = MS_CATEGORIES.reduce((s,c) => s + (entry.committedHours[c]||0), 0);
+  let html = '<div class="grid2" style="margin-bottom:14px">';
+  html += '<div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">IGN</div><div style="font-weight:600">' + (entry.ign||'—') + '</div></div>';
+  html += '<div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">Alliance</div><div style="font-weight:600">' + (entry.alliance||'—') + '</div></div>';
+  html += '<div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">Total committed hours</div><div style="font-weight:600;color:var(--gold)">' + totalH.toFixed(1) + 'h</div></div>';
+  html += '<div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">Submitted</div><div style="font-size:12px">' + (entry.submittedAt ? new Date(entry.submittedAt).toLocaleString() : '—') + '</div></div>';
+  html += '</div>';
+  // Speedup breakdown
+  html += '<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text)">Speedup Commitment</div>';
+  html += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+  MS_CATEGORIES.forEach(cat => {
+    const v = entry.verify[cat];
+    const h = entry.committedHours[cat]||0;
+    const pct = entry.commit[cat]||50;
+    html += '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:8px 12px;min-width:140px">' +
+      '<div style="font-size:11px;color:var(--text3)">' + MS_CATEGORY_LABELS[MS_CATEGORIES.indexOf(cat)] + '</div>' +
+      '<div style="font-weight:600;color:var(--accent2)">' + h.toFixed(1) + 'h</div>' +
+      '<div style="font-size:11px;color:var(--text3)">' + pct + '% of ' + (v?v.hours.toFixed(1):0) + 'h total</div>' +
+      '</div>';
+  });
+  html += '</div></div>';
+  // Slot picks
+  html += '<div><div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text)">Preferred Timeslots (' + (entry.picks||[]).length + ')</div>';
+  html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+  (entry.picks||[]).sort((a,b)=>a-b).forEach(s => {
+    html += '<span style="background:rgba(61,142,240,.15);color:var(--accent2);border:1px solid var(--accent);border-radius:5px;padding:3px 8px;font-size:12px;font-family:monospace">' + msSlotLabel(s) + '</span>';
+  });
+  html += '</div></div>';
+  el.innerHTML = html;
+}
+
+function msEditSubmission() {
+  if(!confirm("This will let you edit your submission. You'll need to go through all steps again. Your current submission stays saved until you submit a new one. Continue?")) return;
+  // Clear draft but keep existing submission intact until they resubmit
+  MS.draft = {alliance:'', ign:'', verify:{}, commit:{}, picks:[]};
+  MS._unlockedStep = 1;
+  MS._submittedEntry = null;
+  // Hide overview tab
+  const tab0 = document.getElementById('msStepTab0');
+  if(tab0) tab0.style.display = 'none';
+  // Clear localStorage progress
+  const pid = verifiedPlayer ? String(verifiedPlayer.id) : null;
+  if(pid) lsClear('ms_progress_' + pid);
+  msInit();
+  msGoStep(1);
 }
 
 // ── STEP 5: ALLOCATION ──
@@ -2660,26 +2785,38 @@ function enterApp(role) {
   document.getElementById('mainNav').style.display = '';
 
   // Tab visibility by role
-  const coordTabs = ['coordinator','strategy','setup'];
-  coordTabs.forEach(id => {
+  const isMemberOnly = role === 'member';
+  const isRally = role === 'rallyleader';
+  const isR4 = isR4R5();
+  const isAdm = isAdmin();
+
+  // Coordinator tabs (Rally Leaders, Team Setup, Battle Strategy)
+  ['coordinator','setup','strategy'].forEach(id => {
     const tab = document.querySelector('.nav > .tab[onclick*="' + id + '"]');
-    if (tab) tab.style.display = isRallyLeader() ? '' : 'none';
+    if(tab) tab.style.display = (isRally || isR4 || isAdm) ? '' : 'none';
   });
+
+  // Minister Spots — members and R4/R5/Admin only, NOT rally leaders
+  const msTab = document.querySelector('.nav > .tab[onclick*="minister"]');
+  if(msTab) msTab.style.display = (isMemberOnly || isR4 || isAdm) ? '' : 'none';
+
+  // Swordland / Tri Alliance — R4/R5, Admin, Rally Leaders (view only)
   ['tabSwordland','tabTrialliance'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.style.display = (isR4R5() || AUTH.role === 'rallyleader' || AUTH.role === 'member') ? '' : 'none';
+    if(el) el.style.display = (isRally || isR4 || isAdm) ? '' : 'none';
   });
+
+  // Admin tab
   const adminTab = document.getElementById('tabAdmin');
-  if (adminTab) adminTab.style.display = isAdmin() ? '' : 'none';
+  if(adminTab) adminTab.style.display = isAdm ? '' : 'none';
 
   // Show user bar
   const stored = verifiedPlayer || (() => { try { const s = sessionStorage.getItem('verifiedPlayer'); return s ? JSON.parse(s) : null; } catch(e) { return null; } })();
   showUserBar(stored, role);
 
-  // Default page
-  if (role === 'member') showPageDirect('minister');
-  else if (role === 'rallyleader') showPageDirect('coordinator');
-  else if (role === 'r4r5') showPageDirect('coordinator');
+  // Default page by role
+  if(isMemberOnly) showPageDirect('minister');
+  else if(isRally) showPageDirect('coordinator');
   else showPageDirect('coordinator');
 }
 
@@ -2708,6 +2845,42 @@ function showPageDirect(p) {
 // ════════════════════════════════════════════════════════
 // SESSION RESTORE
 // ════════════════════════════════════════════════════════
+
+// ── Logout ──
+function logOut() {
+  if(!confirm('Sign out of Kingdom 1057?')) return;
+  // Clear session
+  try { sessionStorage.clear(); } catch(e) {}
+  // Clear role from localStorage (but keep player ID for convenience)
+  lsClear('role');
+  lsClear('alliance');
+  // Reset AUTH
+  AUTH.role = null;
+  AUTH.alliance = null;
+  verifiedPlayer = null;
+  // Reset MS state
+  MS._submittedEntry = null;
+  MS._unlockedStep = 1;
+  // Hide app, show landing
+  document.getElementById('userBar').style.display = 'none';
+  document.getElementById('mainNav').style.display = 'none';
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const lp = document.getElementById('page-landing');
+  if(lp) { lp.style.display = 'flex'; }
+  // Reset landing page steps
+  ['landingStepEntry','landingStepAlliance','landingStepPassword'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.style.display = id === 'landingStepEntry' ? 'block' : 'none';
+  });
+  const guide = document.getElementById('landingGuide');
+  if(guide) guide.style.display = 'block';
+  const roleButtons = document.getElementById('landingRoleButtons');
+  if(roleButtons) roleButtons.style.display = 'none';
+  const resultEl = document.getElementById('playerLookupResult');
+  if(resultEl) resultEl.style.display = 'none';
+  const pidInput = document.getElementById('landingPlayerId');
+  if(pidInput) pidInput.value = '';
+}
 async function initApp() {
   await loadPasswords();
 
