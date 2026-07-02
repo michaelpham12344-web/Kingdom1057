@@ -3149,9 +3149,10 @@ function attConfirmOCR(prefix, eventId, field, encodedNames) {
 }
 
 // ── Parse Legion Combatants screen (Signed Up) ──
-// Uses PSM 11 (sparse text) which correctly reads "Join" and "No" as separate lines.
-// Rule: find player name lines, then look ahead for "Join" or "No" within 6 lines.
-// Canvas crops the left 18% (avatars) to reduce noise.
+// PSM 11 (sparse text) correctly reads "Join" and "No" as separate isolated lines.
+// Logic: find player name → look ahead up to 6 lines for "Join" (✅) or "No" (❌).
+// Handles numeric names like "1913", multi-word names like "Lord Help Us",
+// and noise prefixes like "i Ride" → "Ride", "pee Lord Help Us" → "Lord Help Us".
 async function parseSignedUpNamesFromCanvas(imageFile) {
   return new Promise((resolve) => {
     const img = new window.Image();
@@ -3182,33 +3183,46 @@ async function parseSignedUpNamesFromCanvas(imageFile) {
 function parseSignedUpNames(text) {
   const lines = text.split(/\\n/).map(l => l.trim()).filter(Boolean);
 
-  const HEADER  = /combatant|30\\/|2\\/10|squad|power|substitute|ph\\s*join/i;
-  const JOIN_RE = /^join$/i;
-  const NO_RE   = /^no$/i;
-  const POWER   = /\\d{3,}/;
-  const NOISE_W = /^(voted|join|no|substitute|squad|power|legion|engagements|dispatched|combatants?|oye|ones|siae|fa|sl|aa|y|f|r|w|pe|bg|ie|sy|sif|par|bn|rr|ic|fe|be|or|le|the)$/i;
-  const WORD_RE = /^[A-Za-z][A-Za-z0-9_\\-]{2,}$/;
+  const HEADER   = /combatant|combata|30\\/|2\\/10|squad|power|substitute|ph\\s*join/i;
+  const JOIN_RE  = /^join$/i;
+  const NO_RE    = /^no$/i;
+  // Power number: has comma+digits pattern like "1,774" or "51,768" or 5+ plain digits
+  const POWER_RE = /\\d,\\d{3}|\\d{5,}/;
+  // Short pure number = valid player name (like "1913")
+  const SHORT_NUM = /^\\d{2,4}$/;
+  // Single-word noise tokens (OCR artifacts, UI words)
+  const NOISE_W  = /^(voted|join|no|substitute|squad|power|legion|engagements|dispatched|combatants?|ts|im|j|fi|ons|its|fat|ons|pe|bg|ie|sy|sif|par|bn|rr|ic|fe|be|or|le|the|ay|sy|iy|pee|ons|oye|ones|aa|fa|sl|y|f|r|w)$/i;
+  const WORD_RE  = /^[A-Za-z][A-Za-z0-9_\\-]{1,}$/;
 
-  function extractName(line) {
-    const clean = line.replace(/^[^A-Za-z]+/, '');
-    const words = clean.split(/\\s+/).filter(w => WORD_RE.test(w) && !NOISE_W.test(w));
+  function extractName(rawLine) {
+    // Strip leading non-alphanumeric chars (symbols, OCR noise)
+    let s = rawLine.replace(/^[^A-Za-z0-9]+/, '');
+    // Strip leading short noise word (1-3 chars) like "i ", "pee ", "> V"
+    s = s.replace(/^[a-zA-Z]{1,3}\\s+/, '').trim();
+    if (SHORT_NUM.test(s)) return s;
+    const words = s.split(/\\s+/).filter(w =>
+      (WORD_RE.test(w) || SHORT_NUM.test(w)) && !NOISE_W.test(w)
+    );
     return words.length ? words.join(' ') : null;
   }
 
-  function isPlayerLine(line) {
-    const name = extractName(line);
-    return name && !HEADER.test(line) && !JOIN_RE.test(line) && !NO_RE.test(line) && !POWER.test(line);
+  function isPlayerLine(rawLine) {
+    const s = rawLine.trim();
+    if (HEADER.test(s)) return false;
+    if (JOIN_RE.test(s) || NO_RE.test(s)) return false;
+    if (POWER_RE.test(s)) return false;
+    const name = extractName(s);
+    return !!(name && name.length >= 2);
   }
 
   const results = [];
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (!isPlayerLine(line)) continue;
-    const name = extractName(line);
+    if (!isPlayerLine(lines[i])) continue;
+    const name = extractName(lines[i]);
     if (!name) continue;
 
     let status = null;
-    for (let j = i + 1; j < Math.min(i + 6, lines.length); j++) {
+    for (let j = i + 1; j < Math.min(i + 7, lines.length); j++) {
       const ahead = lines[j].trim();
       if (JOIN_RE.test(ahead)) { status = 'join'; break; }
       if (NO_RE.test(ahead))   { status = 'no';   break; }
