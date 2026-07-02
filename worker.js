@@ -12,7 +12,7 @@
  */
 
 const KINGSHOT_API  = "https://kingshot.net/api";
-const GIFTCODE_API  = "https://ks-giftcode.centurygame.com/api";
+const GIFTCODE_API  = "https://ks-giftcode.centurygame.com/api"; 
 const SALT          = "tB87#kPtkxqOS2";
 const BATCH_SIZE    = 5;   // players per cron run — keeps well under 30s CPU limit
 
