@@ -536,19 +536,38 @@ document.addEventListener('touchend',function(e){
         </div>
       </div>
 
-      <!-- RIGHT: Admin only password entry -->
-      <div class="card" style="text-align:left;border:1px solid rgba(255,200,0,.2)">
-        <div style="font-family:var(--head);font-size:16px;font-weight:700;color:var(--gold);margin-bottom:4px">⚙️ Admin Access</div>
-        <p style="color:var(--text2);font-size:12px;margin-bottom:14px;line-height:1.6">Administrator access only. No Player ID required.</p>
-        <div style="display:flex;gap:8px;margin-bottom:10px">
-          <input type="password" id="adminPwInput" placeholder="Admin password" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')landingAdminLogin()">
-          <button class="btn btn-primary" onclick="landingAdminLogin()">Enter</button>
+      <!-- RIGHT: R4/R5 password via Player ID (same left card handles this) -->
+      <div class="card" style="text-align:left;border:1px solid rgba(61,142,240,.15);background:rgba(61,142,240,.03)">
+        <div style="font-family:var(--head);font-size:16px;font-weight:700;color:var(--accent2);margin-bottom:4px">🛡 R4 / R5 Access</div>
+        <p style="color:var(--text2);font-size:12px;margin-bottom:14px;line-height:1.7">
+          R4 and R5 members also enter via Player ID on the left.<br>
+          After verification, choose <strong>"I have a password"</strong> to access coordination tools.
+        </p>
+        <div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:12px;color:var(--text3);line-height:1.7">
+          💡 Your alliance is set permanently on first login.<br>
+          🔒 Contact your R5 for the coordinator password.
         </div>
-        <div id="adminPwError" style="display:none;color:#ff7070;font-size:12px;margin-bottom:8px">Incorrect password.</div>
-        <p style="color:var(--text3);font-size:11px">🔒 This panel is exclusively for the kingdom administrator.</p>
       </div>
     </div>
 
+    <!-- Discreet admin link at the very bottom -->
+    <div style="text-align:center;margin-top:20px">
+      <span style="font-size:10px;color:var(--bg3);cursor:pointer;user-select:none" onclick="toggleAdminModal()">·</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- Admin login modal (hidden by default) -->
+<div id="adminModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center">
+  <div class="card" style="width:320px;text-align:left">
+    <div style="font-weight:700;font-size:15px;margin-bottom:12px">Admin Login</div>
+    <input type="password" id="adminPwInput" placeholder="Password" style="width:100%;margin-bottom:10px;box-sizing:border-box" onkeydown="if(event.key==='Enter')landingAdminLogin();if(event.key==='Escape')toggleAdminModal()">
+    <div id="adminPwError" style="display:none;color:#ff7070;font-size:12px;margin-bottom:8px">Incorrect password.</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" style="flex:1" onclick="landingAdminLogin()">Enter</button>
+      <button class="btn btn-ghost" onclick="toggleAdminModal()">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -2396,6 +2415,39 @@ let _landingPwType = null;  // 'rallyleader' | 'r4r5'
 function toggleLandingPassword() {}  // no longer needed, kept for compat
 
 // Member: Player ID verified → show alliance picker → enter
+function toggleAdminModal() {
+  const modal = document.getElementById('adminModal');
+  if (!modal) return;
+  const visible = modal.style.display === 'flex';
+  modal.style.display = visible ? 'none' : 'flex';
+  if (!visible) {
+    const input = document.getElementById('adminPwInput');
+    if (input) { input.value = ''; setTimeout(() => input.focus(), 50); }
+    const err = document.getElementById('adminPwError');
+    if (err) err.style.display = 'none';
+  }
+}
+
+async function landingAdminLogin() {
+  const input = document.getElementById('adminPwInput');
+  const errEl = document.getElementById('adminPwError');
+  if (!input) return;
+  const pw = input.value;
+  await loadPasswords();
+  if (checkPassword('admin', pw)) {
+    AUTH.role = 'admin';
+    sessionSetAuth('admin', null);
+    const modal = document.getElementById('adminModal');
+    if (modal) modal.style.display = 'none';
+    enterApp('admin');
+  } else {
+    if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Incorrect password.'; }
+    input.value = '';
+    input.focus();
+    setTimeout(() => { if (errEl) errEl.style.display = 'none'; }, 3000);
+  }
+}
+
 // ── localStorage helpers — remember player across sessions ──
 function lsSet(key, val) { try { localStorage.setItem('ks1057_' + key, JSON.stringify(val)); } catch(e) {} }
 function lsGet(key) { try { const v = localStorage.getItem('ks1057_' + key); return v ? JSON.parse(v) : null; } catch(e) { return null; } }
