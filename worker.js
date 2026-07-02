@@ -821,7 +821,8 @@ document.addEventListener('touchend',function(e){
       <p style="color:var(--text2);font-size:12px;margin-bottom:6px">Select at least <strong style="color:var(--text)">4 timeslots</strong> that work best for you (UTC). Your committed Training hours: <span id="msYourTrainingHours" class="mono" style="color:var(--gold)">0h</span></p>
       <div id="msSlotPickCount" style="font-size:12px;color:var(--text3);margin-bottom:10px">0 slots selected</div>
       <div id="msSlotGrid" style="display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-bottom:16px"></div>
-      <button class="btn btn-primary" onclick="msSubmitEntry()">✅ Submit My Entry</button>
+      <div id="msDeadlineBanner" style="display:none;margin-bottom:10px"></div>
+      <button class="btn btn-primary" id="msSubmitBtn" onclick="msSubmitEntry()">✅ Submit My Entry</button>
     </div>
   </div>
 
@@ -843,6 +844,16 @@ document.addEventListener('touchend',function(e){
         <div id="msAdminPwErr" style="display:none;color:#ff7070;font-size:12px;margin-top:6px">Incorrect password.</div>
       </div>
       <div id="msAdminActions" style="display:none">
+        <div id="msDeadlineAdminBanner" style="display:none;background:rgba(255,157,77,.1);border:1px solid rgba(255,157,77,.4);border-radius:7px;padding:10px 14px;margin-bottom:12px">
+          <strong style="color:#ff9d4d">⏰ Deadline passed</strong> — submissions are locked. Ready to run allocation.
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+          <div class="field"><label style="font-size:11px">Submission deadline (UTC)</label>
+            <input type="datetime-local" id="msDeadlineInput" style="width:200px">
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="msSetDeadline()">Set Deadline</button>
+          <button class="btn btn-ghost btn-sm" onclick="msReopenSubmissions()">🔓 Reopen Submissions</button>
+        </div>
         <button class="btn btn-gold" onclick="msRunAllocation()">⚙️ Run Allocation (rank + assign slots)</button>
         <button class="btn btn-ghost btn-sm" onclick="msClearAllSubs()" style="margin-left:8px">🗑 Clear all submissions</button>
       </div>
@@ -871,6 +882,7 @@ const S = {
 
 // Minister Spots shared state (declared early so sync functions below can reference it safely)
 const MS = {
+  deadline: null,
   draft: { alliance:'', ign:'', verify:{}, commit:{}, picks:[] }, // in-progress entry
   submissions: [], // {id, alliance, ign, verify:{cat:{amount,unit,hours}}, commit:{cat:pct}, picks:[slotIdx...], committedHours:{cat:hours}}
   _lastAllocation: null,
@@ -904,7 +916,8 @@ let syncSerialize = function() {
     garrisonAllianceName: document.getElementById('garrisonAllianceName') ? document.getElementById('garrisonAllianceName').value : '',
     attackAllianceName: document.getElementById('attackAllianceName') ? document.getElementById('attackAllianceName').value : '',
     msSubmissions: (typeof MS!=='undefined') ? MS.submissions : [],
-    msLastAllocation: (typeof MS!=='undefined') ? MS._lastAllocation : null
+    msLastAllocation: (typeof MS!=='undefined') ? MS._lastAllocation : null,
+    msDeadline: (typeof MS!=='undefined') ? MS.deadline : null
   });
 }
 
@@ -927,6 +940,7 @@ let syncApplyRemote = function(data) {
     if (typeof MS!=='undefined') {
       MS.submissions = data.msSubmissions || [];
       MS._lastAllocation = data.msLastAllocation || null;
+      MS.deadline = data.msDeadline || null;
       if (typeof msRenderResultsSummary==='function') msRenderResultsSummary();
       if (typeof msRenderFinalSchedule==='function') msRenderFinalSchedule();
       if (typeof msRenderRejectedList==='function') msRenderRejectedList();
@@ -1720,6 +1734,7 @@ function msInit(){
   msRenderSlotGrid();
   msRenderResultsSummary();
   msRenderStepTabs();
+  msUpdateDeadlineBanners();
 }
 
 function msMarkStepComplete(n){
@@ -2057,7 +2072,64 @@ function msUpdateSlotCount(){
   el.style.color=n<MS_MIN_SLOTS_PICKED?'#ff9d4d':'var(--green)';
 }
 
+// ── Deadline management ──
+function msGetDeadline() {
+  try { return MS.deadline ? new Date(MS.deadline) : null; } catch(e) { return null; }
+}
+function msIsDeadlinePassed() {
+  const d = msGetDeadline();
+  return d ? Date.now() > d.getTime() : false;
+}
+function msSetDeadline() {
+  const input = document.getElementById('msDeadlineInput');
+  if (!input || !input.value) { toast('Pick a date and time first.'); return; }
+  // datetime-local gives local time — store as UTC ISO string
+  MS.deadline = new Date(input.value).toISOString();
+  syncQueuePush();
+  msUpdateDeadlineBanners();
+  toast('Deadline set: ' + new Date(MS.deadline).toUTCString());
+}
+function msReopenSubmissions() {
+  MS.deadline = null;
+  syncQueuePush();
+  msUpdateDeadlineBanners();
+  toast('Submissions reopened.');
+}
+function msUpdateDeadlineBanners() {
+  const passed = msIsDeadlinePassed();
+  const dl = msGetDeadline();
+  // Member banner (Step 4)
+  const memberBanner = document.getElementById('msDeadlineBanner');
+  const submitBtn = document.getElementById('msSubmitBtn');
+  if (memberBanner) {
+    if (dl && passed) {
+      memberBanner.style.display = 'block';
+      memberBanner.innerHTML = '<div style="background:rgba(224,58,58,.1);border:1px solid rgba(224,58,58,.4);border-radius:7px;padding:10px 14px;color:var(--enemy)">🔒 Submissions are closed. The deadline has passed.</div>';
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.style.opacity = '0.4'; }
+    } else if (dl) {
+      memberBanner.style.display = 'block';
+      memberBanner.innerHTML = '<div style="background:rgba(255,157,77,.08);border:1px solid rgba(255,157,77,.3);border-radius:7px;padding:10px 14px;font-size:12px;color:#ff9d4d">⏰ Submission deadline: <strong>' + new Date(dl).toUTCString() + '</strong></div>';
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = ''; }
+    } else {
+      memberBanner.style.display = 'none';
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = ''; }
+    }
+  }
+  // Admin banner (Step 5)
+  const adminBanner = document.getElementById('msDeadlineAdminBanner');
+  if (adminBanner) adminBanner.style.display = (dl && passed) ? 'block' : 'none';
+  // Pre-fill deadline input with current value
+  const dlInput = document.getElementById('msDeadlineInput');
+  if (dlInput && dl) {
+    // Convert ISO to local datetime-local format
+    const local = new Date(dl.getTime() - dl.getTimezoneOffset()*60000).toISOString().slice(0,16);
+    dlInput.value = local;
+  }
+}
+
 function msSubmitEntry(){
+  // Check deadline
+  if(msIsDeadlinePassed()){ toast('Submissions are closed — the deadline has passed.'); return; }
   if(MS.draft.picks.length<MS_MIN_SLOTS_PICKED){ alert(\`Please select at least \${MS_MIN_SLOTS_PICKED} timeslots.\`); return; }
   const committedHours={};
   MS_CATEGORIES.forEach(cat=>{
@@ -2108,38 +2180,54 @@ function msRenderResultsSummary(){
 
 function msRunAllocation(){
   if(!MS.submissions.length){ toast('No submissions yet.'); return; }
+
+  // Collect pinned slots from previous allocation — these are locked
+  const pinned = new Map(); // slot → entry (preserved from previous run)
+  if(MS._lastAllocation){
+    MS._lastAllocation.assignments.forEach(a => {
+      if(a.pinned) pinned.set(a.slot, a.entry);
+    });
+  }
+
   // Rank by committed Training hours, descending
   const ranked=[...MS.submissions].sort((a,b)=>b.committedHours[MS_RANK_CATEGORY]-a.committedHours[MS_RANK_CATEGORY]);
-  const winners=ranked.slice(0,MS_TOTAL_SLOTS);
-  const rejected=ranked.slice(MS_TOTAL_SLOTS);
 
-  // Draft-style slot assignment: highest hours picks first from their preferred slots
-  const takenSlots=new Set();
-  const assignments=[]; // {entry, slot}
-  const unassigned=[];
-  winners.forEach(entry=>{
-    const pick=entry.picks.find(s=>!takenSlots.has(s));
-    if(pick!==undefined){
-      takenSlots.add(pick);
-      assignments.push({entry,slot:pick});
-    } else {
-      unassigned.push(entry); // all their preferred slots got taken by higher-priority people
-    }
+  // Remove from ranking anyone who is in a pinned slot (they're already placed)
+  const pinnedIGNs = new Set([...pinned.values()].map(e => e.ign));
+  const unranked = ranked.filter(e => !pinnedIGNs.has(e.ign));
+
+  const winners = unranked.slice(0, MS_TOTAL_SLOTS - pinned.size);
+  const rejected = unranked.slice(MS_TOTAL_SLOTS - pinned.size);
+
+  // Build taken slots set from pinned
+  const takenSlots = new Set(pinned.keys());
+  const assignments = [];
+
+  // Place pinned slots first
+  pinned.forEach((entry, slot) => {
+    assignments.push({entry, slot, pinned: true});
   });
-  // For anyone who lost all their preferred slots, give them any remaining open slot (still ranked top-48 overall)
-  unassigned.forEach(entry=>{
+
+  // Assign remaining winners to free slots
+  const unassigned = [];
+  winners.forEach(entry => {
+    const pick = entry.picks.find(s => !takenSlots.has(s));
+    if(pick !== undefined){ takenSlots.add(pick); assignments.push({entry, slot:pick}); }
+    else { unassigned.push(entry); }
+  });
+  unassigned.forEach(entry => {
     for(let i=0;i<MS_TOTAL_SLOTS;i++){
       if(!takenSlots.has(i)){ takenSlots.add(i); assignments.push({entry,slot:i,fallback:true}); break; }
     }
   });
-  assignments.sort((a,b)=>a.slot-b.slot);
+  assignments.sort((a,b) => a.slot - b.slot);
 
-  MS._lastAllocation={winners,rejected,assignments};
+  MS._lastAllocation = {winners:[...ranked.filter(e=>!rejected.includes(e))], rejected, assignments};
   msRenderResultsSummary();
   msRenderFinalSchedule();
   msRenderRejectedList();
   syncQueuePush();
-  toast('Allocation complete!');
+  toast(pinned.size ? \`Allocation complete! \${pinned.size} pinned slot(s) preserved.\` : 'Allocation complete!');
 }
 
 function msRenderFinalSchedule(){
@@ -2148,14 +2236,58 @@ function msRenderFinalSchedule(){
     el.innerHTML='<div style="color:var(--text3);font-size:13px">Run allocation to generate the schedule.</div>';
     return;
   }
-  el.innerHTML=MS._lastAllocation.assignments.map(a=>\`
-    <div class="ms-rank-row winner">
-      <span class="ms-rank-num mono">\${msSlotLabel(a.slot)}</span>
-      <strong>\${a.entry.ign}</strong>
-      <span style="color:var(--text3);font-size:12px">\${a.entry.alliance}</span>
-      <span style="margin-left:auto" class="mono" style="color:var(--gold)">\${a.entry.committedHours[MS_RANK_CATEGORY].toFixed(1)}h training</span>
-      \${a.fallback?'<span style="font-size:10px;color:#ff9d4d;margin-left:8px">(backup slot)</span>':''}
-    </div>\`).join('');
+  const canEdit = msCanAccessResults();
+  el.innerHTML = (canEdit ? '<div style="font-size:11px;color:var(--text3);margin-bottom:10px">🔒 Pinned slots are preserved when re-running allocation. Drag slots to swap. Click 🔒 to toggle pin.</div>' : '') +
+    MS._lastAllocation.assignments.map((a,i)=>{
+      const pinned = a.pinned ? true : false;
+      const dragAttrs = canEdit ? \`draggable="true" ondragstart="msDragStart(event,\${i})" ondragover="msDragOver(event)" ondrop="msDrop(event,\${i})" ondragleave="msDragLeave(event)"\` : '';
+      return \`<div class="ms-rank-row winner" data-idx="\${i}" \${dragAttrs} style="cursor:\${canEdit?'grab':'default'};user-select:none;transition:opacity .15s">
+        <span class="ms-rank-num mono">\${msSlotLabel(a.slot)}</span>
+        <strong>\${a.entry.ign}</strong>
+        <span style="color:var(--text3);font-size:12px">\${a.entry.alliance}</span>
+        <span style="margin-left:auto" class="mono" style="color:var(--gold)">\${a.entry.committedHours[MS_RANK_CATEGORY].toFixed(1)}h</span>
+        \${a.fallback?'<span style="font-size:10px;color:#ff9d4d;margin-left:6px">(backup)</span>':''}
+        \${canEdit?\`<button onclick="msTogglePin(\${i})" title="\${pinned?'Unpin slot':'Pin slot'}" style="margin-left:8px;background:none;border:none;cursor:pointer;font-size:14px;padding:2px">\${pinned?'🔒':'🔓'}</button>\`:''}
+      </div>\`;
+    }).join('');
+}
+
+let _msDragSrcIdx = null;
+function msDragStart(e, idx) {
+  _msDragSrcIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  e.target.style.opacity = '0.4';
+}
+function msDragOver(e) {
+  e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.style.background = 'rgba(61,142,240,.15)';
+}
+function msDragLeave(e) { e.currentTarget.style.background = ''; }
+function msDrop(e, targetIdx) {
+  e.preventDefault();
+  e.currentTarget.style.background = '';
+  if (_msDragSrcIdx === null || _msDragSrcIdx === targetIdx) return;
+  const assignments = MS._lastAllocation.assignments;
+  // Swap the entries (preserve slots, swap who fills them)
+  const srcEntry = assignments[_msDragSrcIdx].entry;
+  const tgtEntry = assignments[targetIdx].entry;
+  assignments[_msDragSrcIdx].entry = tgtEntry;
+  assignments[targetIdx].entry = srcEntry;
+  // Pin both swapped slots
+  assignments[_msDragSrcIdx].pinned = true;
+  assignments[targetIdx].pinned = true;
+  _msDragSrcIdx = null;
+  msRenderFinalSchedule();
+  syncQueuePush();
+  toast('Slots swapped and pinned.');
+}
+
+function msTogglePin(idx) {
+  const a = MS._lastAllocation.assignments[idx];
+  a.pinned = !a.pinned;
+  msRenderFinalSchedule();
+  syncQueuePush();
+  toast(a.pinned ? 'Slot pinned — protected from re-allocation.' : 'Slot unpinned.');
 }
 function msRenderRejectedList(){
   const el=document.getElementById('msRejectedList'); if(!el) return;
