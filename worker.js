@@ -213,7 +213,7 @@ function json(data, status=200) {
   return new Response(JSON.stringify(data), { status, headers:{'Content-Type':'application/json',...cors()} });
 }
 
-const SITE_HTML = `<!DOCTYPE html>
+const SITE_HTML=`<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -486,39 +486,66 @@ document.addEventListener('touchend',function(e){
     <!-- Two-column entry -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="landing-grid">
 
-      <!-- LEFT: Member -->
+      <!-- LEFT: Member / R4/R5 / Rally Leader via Player ID -->
       <div class="card" style="text-align:left;border:1px solid rgba(46,204,113,.2)">
         <div style="font-family:var(--head);font-size:16px;font-weight:700;color:var(--green);margin-bottom:4px">🎮 Enter as Member of 1057</div>
-        <p style="color:var(--text2);font-size:12px;margin-bottom:14px;line-height:1.6">Verify your Player ID to submit your minister spot inventory.</p>
-        <div style="display:flex;gap:8px;margin-bottom:10px">
-          <input type="text" id="landingPlayerId" placeholder="Your Player ID — e.g. 8767319" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')lookupPlayer()">
-          <button class="btn btn-primary" id="lookupBtn" onclick="lookupPlayer()">🔍</button>
-        </div>
-        <div id="playerLookupResult" style="display:none;margin-bottom:10px"></div>
-        <button id="enterMemberBtn" class="btn btn-primary" style="width:100%;display:none" onclick="landingEnterMember()">✅ Enter as Member of 1057</button>
-        <p style="color:var(--text3);font-size:11px;margin-top:10px">📍 In-game: tap your avatar → your Player ID is shown below your name.</p>
-      </div>
+        <p style="color:var(--text2);font-size:12px;margin-bottom:14px;line-height:1.6">Verify your Player ID to enter. R4/R5 and Rally Leaders also enter here.</p>
 
-      <!-- RIGHT: R4/R5 -->
-      <div class="card" style="text-align:left;border:1px solid rgba(61,142,240,.2)">
-        <div style="font-family:var(--head);font-size:16px;font-weight:700;color:var(--accent2);margin-bottom:4px">🔑 R4 / R5 Access</div>
-        <p style="color:var(--text2);font-size:12px;margin-bottom:14px;line-height:1.6">Alliance leadership access — unlocks all coordination and strategy tools.</p>
-        <div style="margin-bottom:8px">
-          <input type="text" id="r5PlayerId" placeholder="Player ID of 1057 (same as above)" style="width:100%;box-sizing:border-box" onkeydown="if(event.key==='Enter')document.getElementById('landingPwInput').focus()">
-        </div>
-        <div style="display:flex;gap:8px;margin-bottom:10px">
-          <input type="password" id="landingPwInput" placeholder="Password" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')landingCheckPassword()">
-          <button class="btn btn-primary" onclick="landingCheckPassword()">Enter</button>
-        </div>
-        <div id="landingPwError" style="display:none;color:#ff7070;font-size:12px;margin-bottom:8px">Incorrect password.</div>
-        <div style="position:relative;display:inline-block">
-          <span style="font-size:11px;color:var(--text3);cursor:default"
-            onmouseenter="document.getElementById('pwTooltip').style.display='block'"
-            onmouseleave="document.getElementById('pwTooltip').style.display='none'">ℹ️ Password access is exclusive to R4 and R5 members</span>
-          <div id="pwTooltip" style="display:none;position:absolute;bottom:130%;left:0;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:10px 14px;width:250px;font-size:12px;color:var(--text2);line-height:1.7;z-index:999;pointer-events:none">
-            R4 and R5 rights are exclusive to alliance leadership. Contact your R5 to receive your access code.
+        <!-- Step 1: Player ID -->
+        <div id="landingStepEntry">
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <input type="text" id="landingPlayerId" placeholder="Your Player ID — e.g. 8767319" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')lookupPlayer()">
+            <button class="btn btn-primary" id="lookupBtn" onclick="lookupPlayer()">🔍</button>
+          </div>
+          <div id="playerLookupResult" style="display:none;margin-bottom:10px"></div>
+          <div id="landingRoleButtons" style="display:none;flex-direction:column;gap:8px">
+            <button class="btn btn-primary" onclick="landingEnterMember()">✅ Enter as Member of 1057</button>
+            <button class="btn btn-ghost" onclick="landingStartWithPassword()">🔑 I have a password</button>
           </div>
         </div>
+
+        <!-- Step 2: Alliance picker -->
+        <div id="landingStepAlliance" style="display:none">
+          <div class="card-title" style="font-size:14px;margin-bottom:10px">🏰 Select your Alliance</div>
+          <p style="color:var(--text2);font-size:12px;margin-bottom:12px">Your alliance is permanent — only an admin can change it later.</p>
+          <select id="alliancePicker" style="width:100%;margin-bottom:12px">
+            <option value="">Select your alliance…</option>
+            <option>FIR</option><option>LOC</option><option>LYL</option>
+            <option>KNG</option><option>KOV</option><option>TLA</option>
+          </select>
+          <button id="allianceNextStep" class="btn btn-primary" style="width:100%" data-next="" onclick="landingConfirmAlliance()">Continue →</button>
+        </div>
+
+        <!-- Step 3: Password (R4/R5 and Rally Leader) -->
+        <div id="landingStepPassword" style="display:none">
+          <div class="card-title" style="font-size:14px;margin-bottom:10px" id="landingPwLabel">Password</div>
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <input type="password" id="landingPwInput" placeholder="Password" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')landingCheckPassword()">
+            <button class="btn btn-primary" onclick="landingCheckPassword()">Enter</button>
+          </div>
+          <div id="landingPwError" style="display:none;color:#ff7070;font-size:12px;margin-bottom:8px">Incorrect password.</div>
+        </div>
+
+        <div style="margin-top:12px;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px 14px">
+          <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">📍 Where to find your Player ID</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.7;margin-bottom:10px">
+            Tap your <strong>profile picture</strong> in the top-left corner of the game.<br>
+            Your Player ID is the number shown next to <strong style="color:var(--gold)">ID:</strong> — as highlighted below.
+          </div>
+          <img src="data:image/jpeg;base64,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" alt="Player ID location in Kingshot" style="width:100%;border-radius:6px;border:1px solid var(--border)">
+        </div>
+      </div>
+
+      <!-- RIGHT: Admin only password entry -->
+      <div class="card" style="text-align:left;border:1px solid rgba(255,200,0,.2)">
+        <div style="font-family:var(--head);font-size:16px;font-weight:700;color:var(--gold);margin-bottom:4px">⚙️ Admin Access</div>
+        <p style="color:var(--text2);font-size:12px;margin-bottom:14px;line-height:1.6">Administrator access only. No Player ID required.</p>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input type="password" id="adminPwInput" placeholder="Admin password" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')landingAdminLogin()">
+          <button class="btn btn-primary" onclick="landingAdminLogin()">Enter</button>
+        </div>
+        <div id="adminPwError" style="display:none;color:#ff7070;font-size:12px;margin-bottom:8px">Incorrect password.</div>
+        <p style="color:var(--text3);font-size:11px">🔒 This panel is exclusively for the kingdom administrator.</p>
       </div>
     </div>
 
@@ -731,6 +758,22 @@ document.addEventListener('touchend',function(e){
       <div id="msIdentityError" style="display:none;color:#ff7070;font-size:12px;margin-bottom:10px;background:rgba(224,58,58,.1);border:1px solid rgba(224,58,58,.3);border-radius:5px;padding:8px 12px">⚠ Please enter both your Alliance name and in-game name before continuing.</div>
       <div class="sec-title">Upload your inventory screenshot</div>
       <p style="color:var(--text2);font-size:12px;margin-bottom:10px">Take a screenshot of your speedup items in the in-game inventory (Construction, Research, Training, General). Works from phone or desktop.</p>
+      <!-- HOW-TO GUIDE -->
+      <div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+        <img src="data:image/jpeg;base64,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" alt="How to screenshot speedups" style="width:140px;border-radius:6px;border:1px solid var(--border);flex-shrink:0">
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">📸 How to take the screenshot</div>
+          <ul style="color:var(--text2);font-size:12px;line-height:2;margin:0;padding-left:16px">
+            <li>Open the game and tap your <strong>Backpack</strong></li>
+            <li>Go to the <strong>top right upper corner</strong></li>
+            <li>Tap the <strong>Speedups</strong> tab</li>
+            <li>At the bottom, make sure <strong style="color:var(--gold)">Hrs ✓</strong> is selected — not Day(s) or Min</li>
+            <li>Take a screenshot showing all 4 speedup types: General, Soldier Training, Construction and Research</li>
+          </ul>
+          <div style="margin-top:10px;font-size:12px;color:#ff9d4d">⚠ <strong>Important:</strong> Make sure <strong>Hrs</strong> is checked (green tick) at the bottom — exactly like in the example image. This gives the most accurate reading. If you use Day(s) or Min instead, the numbers may be slightly off.</div>
+          <div style="margin-top:6px;font-size:12px;color:var(--text3)">💡 <strong>Tip:</strong> The screenshot doesn't need to be perfect — as long as the 4 speedup rows and their numbers are visible, the scanner will pick them up automatically.</div>
+        </div>
+      </div>
       <input type="file" id="msFileInput" accept="image/*" style="margin-bottom:10px">
       <div id="msImgPreviewWrap" style="display:none;margin:12px 0">
         <img id="msImgPreview" style="max-width:280px;border-radius:8px;border:1px solid var(--border)">
@@ -2150,16 +2193,33 @@ function msClearAllSubs(){
 // ════════════════════════════════════════════════════════
 // AUTH & PASSWORD SYSTEM
 // ════════════════════════════════════════════════════════
-const AUTH = { coordUnlocked: false, adminUnlocked: false };
-const AUTH_DEFAULTS = { coord: 'kvk1057coord', admin: 'kvk1057admin' };
-let loadedPasswords = { coord: null, admin: null };
+// ════════════════════════════════════════════════════════
+// AUTH SYSTEM v2 — 3 roles: member, rallyleader, r4r5, admin
+// ════════════════════════════════════════════════════════
+
+const AUTH = {
+  role: null,        // 'member' | 'rallyleader' | 'r4r5' | 'admin'
+  alliance: null,    // 'FIR'|'LOC'|'LYL'|'KNG'|'KOV'|'TLA' | null
+  playerVerified: false
+};
+
+const AUTH_DEFAULTS = {
+  rallyleader: 'kvk1057rally',
+  r4r5: 'kvk1057r4r5',
+  admin: 'kvk1057admin'
+};
+
+let loadedPasswords = { rallyleader: null, r4r5: null, admin: null };
+
+const ALLIANCES = ['FIR','LOC','LYL','KNG','KOV','TLA'];
 
 async function loadPasswords() {
   try {
     const res = await fetch('/state', { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
-      if (data.pw_coord) loadedPasswords.coord = data.pw_coord;
+      if (data.pw_rallyleader) loadedPasswords.rallyleader = data.pw_rallyleader;
+      if (data.pw_r4r5) loadedPasswords.r4r5 = data.pw_r4r5;
       if (data.pw_admin) loadedPasswords.admin = data.pw_admin;
     }
   } catch(e) {}
@@ -2168,130 +2228,187 @@ async function loadPasswords() {
 function getPassword(type) { return loadedPasswords[type] || AUTH_DEFAULTS[type]; }
 function checkPassword(type, input) { return input === getPassword(type); }
 
-function sessionSetAuth(type) { try { sessionStorage.setItem('auth_' + type, '1'); } catch(e) {} }
-function sessionHasAuth(type) { try { return sessionStorage.getItem('auth_' + type) === '1'; } catch(e) { return false; } }
-
-// ════════════════════════════════════════════════════════
-// LANDING PAGE
-// ════════════════════════════════════════════════════════
-function toggleLandingPassword() {
-  const f = document.getElementById('landingPasswordForm');
-  f.style.display = f.style.display === 'none' ? 'block' : 'none';
-}
-// Verified player from KingShot API
-let verifiedPlayer = null;
-
-function showUserBar(player, role) {
-  const bar = document.getElementById('userBar');
-  if (!bar) return;
-  bar.style.display = 'flex';
-  if (player) {
-    const av = document.getElementById('userBarAvatar');
-    if (av && player.avatar) { av.src = player.avatar; av.style.display = 'block'; }
-    const nm = document.getElementById('userBarName');
-    if (nm) nm.textContent = player.name || '';
-    const kg = document.getElementById('userBarKingdom');
-    if (kg) kg.textContent = 'Kingdom ' + (player.kingdom || '1057');
-  }
-  const rl = document.getElementById('userBarRole');
-  if (rl) {
-    if (role === 'admin')  { rl.textContent = '⚙️ Admin';  rl.style.background = 'rgba(255,200,0,.15)'; rl.style.color = 'var(--gold)'; }
-    else if (role === 'coord') { rl.textContent = '🛡 R4/R5'; rl.style.background = 'rgba(61,142,240,.15)'; rl.style.color = 'var(--accent2)'; }
-    else { rl.textContent = '👤 Member'; rl.style.background = 'rgba(46,204,113,.1)'; rl.style.color = 'var(--green)'; }
-  }
-}
-
-async function doPlayerLookup(playerId) {
+function sessionSetAuth(role, alliance) {
   try {
-    const res = await fetch('/kingshot-player?id=' + encodeURIComponent(playerId));
-    const data = await res.json();
-    if (data.status === 'success' && data.data) return data.data;
+    sessionStorage.setItem('auth_role', role);
+    if (alliance) sessionStorage.setItem('auth_alliance', alliance);
   } catch(e) {}
-  return null;
+}
+function sessionGetAuth() {
+  try {
+    return {
+      role: sessionStorage.getItem('auth_role'),
+      alliance: sessionStorage.getItem('auth_alliance')
+    };
+  } catch(e) { return {}; }
 }
 
-async function lookupPlayer() {
-  const id = document.getElementById('landingPlayerId').value.trim();
-  if (!id) { toast('Enter your Player ID.'); return; }
-  const btn = document.getElementById('lookupBtn');
-  const resultEl = document.getElementById('playerLookupResult');
-  const enterBtn = document.getElementById('enterMemberBtn');
-  btn.disabled = true; btn.textContent = '⏳';
-  resultEl.style.display = 'none'; if (enterBtn) enterBtn.style.display = 'none';
-  const p = await doPlayerLookup(id);
-  if (p) {
-    const inKingdom = p.kingdom === 1057;
-    const col = inKingdom ? 'var(--green)' : 'var(--enemy)';
-    const msg = inKingdom ? '✅ Kingdom 1057' : '❌ Kingdom ' + p.kingdom + ' — not Kingdom 1057';
-    resultEl.innerHTML = '<div style="display:flex;align-items:center;gap:10px;background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:10px 12px">' +
-      (p.profilePhoto ? '<img src="' + p.profilePhoto + '" style="width:40px;height:40px;border-radius:50%;border:2px solid var(--border2)">' : '') +
-      '<div><div style="font-weight:700">' + p.name + '</div><div style="font-size:11px;color:var(--text3)">Lvl ' + p.level + ' · ID: ' + p.playerId + '</div>' +
-      '<div style="font-size:12px;font-weight:600;color:' + col + '">' + msg + '</div></div></div>';
-    resultEl.style.display = 'block';
-    if (inKingdom) {
-      verifiedPlayer = { id: p.playerId, name: p.name, kingdom: p.kingdom, level: p.level, avatar: p.profilePhoto };
-      if (enterBtn) enterBtn.style.display = 'block';
-    }
-  } else {
-    resultEl.innerHTML = '<div style="color:var(--enemy);font-size:13px;padding:6px 0">⚠ Player not found or API unavailable. Try the password instead.</div>';
-    resultEl.style.display = 'block';
-  }
-  btn.disabled = false; btn.textContent = '🔍 Lookup';
+// Role checks
+function isAdmin()       { return AUTH.role === 'admin'; }
+function isR4R5()        { return AUTH.role === 'r4r5' || isAdmin(); }
+function isRallyLeader() { return AUTH.role === 'rallyleader' || isR4R5(); }
+function isMember()      { return AUTH.role === 'member' || isRallyLeader(); }
+
+function msCanAccessResults() {
+  return typeof AUTH !== 'undefined' && isR4R5();
 }
 
+// ════════════════════════════════════════════════════════
+// LANDING PAGE FLOW
+// ════════════════════════════════════════════════════════
+
+// Step state for landing
+let _landingStep = 'entry'; // 'entry' | 'alliance' | 'password'
+let _landingPwType = null;  // 'rallyleader' | 'r4r5'
+
+function toggleLandingPassword() {}  // no longer needed, kept for compat
+
+// Member: Player ID verified → show alliance picker → enter
+// ── localStorage helpers — remember player across sessions ──
+function lsSet(key, val) { try { localStorage.setItem('ks1057_' + key, JSON.stringify(val)); } catch(e) {} }
+function lsGet(key) { try { const v = localStorage.getItem('ks1057_' + key); return v ? JSON.parse(v) : null; } catch(e) { return null; } }
+function lsClear(key) { try { localStorage.removeItem('ks1057_' + key); } catch(e) {} }
+
+// ── Check KV for stored alliance ──
+function _checkStoredAlliance(playerId, cb) {
+  fetch('/player-alliance?id=' + encodeURIComponent(playerId))
+    .then(r => r.json())
+    .then(d => cb(d.alliance || null))
+    .catch(() => cb(null));
+}
+
+function _showAlliancePicker(nextStep) {
+  document.getElementById('landingStepEntry').style.display = 'none';
+  document.getElementById('landingStepAlliance').style.display = 'block';
+  document.getElementById('landingStepPassword').style.display = 'none';
+  document.getElementById('allianceNextStep').dataset.next = nextStep;
+}
+
+function _showPasswordField() {
+  document.getElementById('landingStepEntry').style.display = 'none';
+  document.getElementById('landingStepAlliance').style.display = 'none';
+  document.getElementById('landingStepPassword').style.display = 'block';
+  document.getElementById('landingPwLabel').textContent = 'Enter your password';
+  setTimeout(() => { const i = document.getElementById('landingPwInput'); if(i) i.focus(); }, 100);
+}
+
+// ── Button 1: Enter as Member ──
 function landingEnterMember() {
-  if (verifiedPlayer) {
-    try { sessionStorage.setItem('verifiedPlayer', JSON.stringify(verifiedPlayer)); } catch(e) {}
-    fetch('/register-player', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: verifiedPlayer.id, name: verifiedPlayer.name, kingdom: verifiedPlayer.kingdom }) }).catch(() => {});
-  }
-  enterApp('member');
+  if (!verifiedPlayer) return;
+  _checkStoredAlliance(verifiedPlayer.id, (stored) => {
+    if (stored) {
+      AUTH.alliance = stored;
+      _registerAndEnter('member', stored);
+    } else {
+      _showAlliancePicker('member');
+    }
+  });
 }
 
+// ── Button 2: I have a password ──
+function landingStartWithPassword() {
+  if (!verifiedPlayer) { toast('Verify your Player ID first.'); return; }
+  // Check if alliance already stored — password users may still need it (for R4/R5)
+  _checkStoredAlliance(verifiedPlayer.id, (stored) => {
+    AUTH.alliance = stored || null;
+    if (!stored) {
+      _showAlliancePicker('password');
+    } else {
+      _showPasswordField();
+    }
+  });
+}
+
+// ── Legacy stubs (no longer used but kept for compat) ──
+function landingStartR4R5() { landingStartWithPassword(); }
+function landingStartRallyLeader() { landingStartWithPassword(); }
+
+function landingConfirmAlliance() {
+  const sel = document.getElementById('alliancePicker').value;
+  if (!sel) { toast('Please select your alliance.'); return; }
+  AUTH.alliance = sel;
+  const next = document.getElementById('allianceNextStep').dataset.next;
+  if (next === 'member') {
+    _registerAndEnter('member', sel);
+  } else if (next === 'password') {
+    _showPasswordField();
+  }
+}
+
+// ── Password check — role determined by which password matches ──
 async function landingCheckPassword() {
   const input = document.getElementById('landingPwInput').value;
   const errEl = document.getElementById('landingPwError');
   await loadPasswords();
-  if (checkPassword('admin', input)) {
-    AUTH.adminUnlocked = true; AUTH.coordUnlocked = true;
-    sessionSetAuth('admin'); sessionSetAuth('coord');
-    // Also try to look up R4/R5 Player ID if provided
-    const r5id = document.getElementById('r5PlayerId') ? document.getElementById('r5PlayerId').value.trim() : '';
-    if (r5id) { const p = await doPlayerLookup(r5id); if (p && p.kingdom === 1057) { verifiedPlayer = { id: p.playerId, name: p.name, kingdom: p.kingdom, level: p.level, avatar: p.profilePhoto }; } }
-    enterApp('admin');
-  } else if (checkPassword('coord', input)) {
-    AUTH.coordUnlocked = true;
-    sessionSetAuth('coord');
-    const r5id = document.getElementById('r5PlayerId') ? document.getElementById('r5PlayerId').value.trim() : '';
-    if (r5id) { const p = await doPlayerLookup(r5id); if (p && p.kingdom === 1057) { verifiedPlayer = { id: p.playerId, name: p.name, kingdom: p.kingdom, level: p.level, avatar: p.profilePhoto }; } }
-    enterApp('coord');
+
+  let role = null;
+  if (checkPassword('admin', input))       role = 'admin';
+  else if (checkPassword('r4r5', input))   role = 'r4r5';
+  else if (checkPassword('rallyleader', input)) role = 'rallyleader';
+
+  if (role) {
+    // Rally leaders don't need an alliance
+    const alliance = (role === 'rallyleader') ? null : AUTH.alliance;
+    _registerAndEnter(role, alliance);
   } else {
     errEl.style.display = 'block';
-    setTimeout(() => errEl.style.display = 'none', 2000);
+    setTimeout(() => errEl.style.display = 'none', 2500);
   }
 }
 
+function _registerAndEnter(role, alliance) {
+  if (verifiedPlayer) {
+    try { sessionStorage.setItem('verifiedPlayer', JSON.stringify(verifiedPlayer)); } catch(e) {}
+    // Persist to localStorage so next visit skips the form
+    lsSet('player', { id: verifiedPlayer.id, name: verifiedPlayer.name, kingdom: verifiedPlayer.kingdom, avatar: verifiedPlayer.avatar });
+    lsSet('alliance', alliance);
+    lsSet('role', role);
+    // Register in KV
+    fetch('/register-player', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: verifiedPlayer.id, name: verifiedPlayer.name, kingdom: verifiedPlayer.kingdom, alliance, role })
+    }).catch(() => {});
+  }
+  AUTH.role = role;
+  AUTH.alliance = alliance;
+  sessionSetAuth(role, alliance);
+  enterApp(role);
+}
+
+// ════════════════════════════════════════════════════════
+// ENTER APP — show/hide tabs by role
+// ════════════════════════════════════════════════════════
 function enterApp(role) {
+  AUTH.role = role;
   document.getElementById('page-landing').style.display = 'none';
   document.getElementById('mainNav').style.display = '';
-  // Show user bar
-  const storedPlayer = verifiedPlayer || (() => { try { const s = sessionStorage.getItem('verifiedPlayer'); return s ? JSON.parse(s) : null; } catch(e) { return null; } })();
-  showUserBar(storedPlayer, role);
 
-  const coordOnly = ['coordinator', 'strategy', 'setup'];
-  coordOnly.forEach(id => {
+  // Tab visibility by role
+  const coordTabs = ['coordinator','strategy','setup'];
+  coordTabs.forEach(id => {
     const tab = document.querySelector('.nav > .tab[onclick*="' + id + '"]');
-    if (tab) tab.style.display = (AUTH.coordUnlocked || AUTH.adminUnlocked) ? '' : 'none';
+    if (tab) tab.style.display = isRallyLeader() ? '' : 'none';
   });
-  ['tabSwordland', 'tabTrialliance'].forEach(id => {
+  ['tabSwordland','tabTrialliance'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.style.display = (AUTH.coordUnlocked || AUTH.adminUnlocked) ? '' : 'none';
+    if (el) el.style.display = (isR4R5() || AUTH.role === 'rallyleader' || AUTH.role === 'member') ? '' : 'none';
   });
   const adminTab = document.getElementById('tabAdmin');
-  if (adminTab) adminTab.style.display = AUTH.adminUnlocked ? '' : 'none';
+  if (adminTab) adminTab.style.display = isAdmin() ? '' : 'none';
 
+  // Show user bar
+  const stored = verifiedPlayer || (() => { try { const s = sessionStorage.getItem('verifiedPlayer'); return s ? JSON.parse(s) : null; } catch(e) { return null; } })();
+  showUserBar(stored, role);
+
+  // Default page
   if (role === 'member') showPageDirect('minister');
+  else if (role === 'rallyleader') showPageDirect('coordinator');
+  else if (role === 'r4r5') showPageDirect('coordinator');
   else showPageDirect('coordinator');
 }
+
+function showPage(p) { showPageDirect(p); }
 
 function showPageDirect(p) {
   document.querySelectorAll('.page').forEach(e => e.classList.remove('active'));
@@ -2300,43 +2417,82 @@ function showPageDirect(p) {
   document.querySelectorAll('.nav > .tab').forEach(e => e.classList.remove('active'));
   const activeTab = document.querySelector('.nav > .tab[onclick*="' + p + '"]');
   if (activeTab) activeTab.classList.add('active');
-  if (p === 'strategy') { if (typeof renderBattleStrategy === 'function') renderBattleStrategy(); bsTickClock(); }
-  if (p === 'setup') { if (typeof renderSetup === 'function') renderSetup(); }
-  if (p === 'coordinator') { if (typeof renderLeaderTable === 'function') renderLeaderTable(); }
-  if (p === 'minister') { if (typeof msInit === 'function') { msInit(); msRenderStepTabs(); msInitResultsTab(); } }
-  if (p === 'swordland') renderAttendance('sw');
-  if (p === 'trialliance') renderAttendance('ta');
+  if (p === 'strategy')    { if (typeof renderBattleStrategy==='function') renderBattleStrategy(); bsTickClock(); }
+  if (p === 'setup')       { if (typeof renderSetup==='function') renderSetup(); }
+  if (p === 'coordinator') { if (typeof renderLeaderTable==='function') renderLeaderTable(); }
+  if (p === 'minister')    { if (typeof msInit==='function') { msInit(); msRenderStepTabs(); msInitResultsTab(); } }
+  if (p === 'swordland')   { renderAttendance('sw'); }
+  if (p === 'trialliance') { renderAttendance('ta'); }
   if (p === 'admin') {
-    const coordEl = document.getElementById('currentCoordPw');
-    const adminEl = document.getElementById('currentAdminPw');
-    if (coordEl) coordEl.textContent = getPassword('coord');
-    if (adminEl) adminEl.textContent = getPassword('admin');
+    adminRefreshPasswordDisplay();
     adminLoadGiftLog();
+    adminLoadMembers();
   }
 }
 
-function showPage(p) { showPageDirect(p); }
-
+// ════════════════════════════════════════════════════════
+// SESSION RESTORE
+// ════════════════════════════════════════════════════════
 async function initApp() {
   await loadPasswords();
-  if (sessionHasAuth('admin')) { AUTH.adminUnlocked = true; AUTH.coordUnlocked = true; }
-  else if (sessionHasAuth('coord')) { AUTH.coordUnlocked = true; }
 
-  if (AUTH.adminUnlocked) enterApp('admin');
-  else if (AUTH.coordUnlocked) enterApp('coord');
-  else {
-    const lp = document.getElementById('page-landing');
-    const mn = document.getElementById('mainNav');
-    if (lp) lp.style.display = 'flex';
-    if (mn) mn.style.display = 'none';
+  // Try session first (same tab/window)
+  const { role, alliance } = sessionGetAuth();
+  if (role) {
+    AUTH.role = role;
+    AUTH.alliance = alliance || null;
+    try { verifiedPlayer = JSON.parse(sessionStorage.getItem('verifiedPlayer')); } catch(e) {}
+    enterApp(role);
+    return;
   }
+
+  // Try localStorage (returning visitor on new tab/session)
+  const savedPlayer = lsGet('player');
+  const savedAlliance = lsGet('alliance');
+  const savedRole = lsGet('role');
+
+  if (savedPlayer && savedPlayer.kingdom === 1057) {
+    verifiedPlayer = { ...savedPlayer, avatar: savedPlayer.avatar || null };
+    // Only auto-enter as member — password roles must re-enter password for security
+    if (savedRole === 'member' && savedAlliance) {
+      AUTH.role = 'member';
+      AUTH.alliance = savedAlliance;
+      sessionSetAuth('member', savedAlliance);
+      enterApp('member');
+      return;
+    }
+    // For password roles: pre-fill their Player ID and skip the lookup step
+    const landingPwInput = document.getElementById('landingPlayerId');
+    if (landingPwInput && savedPlayer.id) {
+      landingPwInput.value = savedPlayer.id;
+      // Auto-run the lookup to show their profile
+      lookupPlayer();
+    }
+  }
+
+  const lp = document.getElementById('page-landing');
+  const mn = document.getElementById('mainNav');
+  if (lp) lp.style.display = 'flex';
+  if (mn) mn.style.display = 'none';
 }
 
 // ════════════════════════════════════════════════════════
 // ADMIN PANEL
 // ════════════════════════════════════════════════════════
+function adminRefreshPasswordDisplay() {
+  [
+    ['currentRallyPw', 'rallyleader'],
+    ['currentR4R5Pw', 'r4r5'],
+    ['currentAdminPw', 'admin']
+  ].forEach(([id, type]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = getPassword(type);
+  });
+}
+
 async function adminChangePassword(type) {
-  const inputId = type === 'coord' ? 'newCoordPw' : 'newAdminPw';
+  const inputId = { rallyleader:'newRallyPw', r4r5:'newR4R5Pw', admin:'newAdminPw' }[type];
+  const displayId = { rallyleader:'currentRallyPw', r4r5:'currentR4R5Pw', admin:'currentAdminPw' }[type];
   const newPw = document.getElementById(inputId).value.trim();
   if (!newPw) { toast('Enter a password first.'); return; }
   const res = await fetch('/state', { cache: 'no-store' });
@@ -2345,78 +2501,94 @@ async function adminChangePassword(type) {
   await fetch('/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
   loadedPasswords[type] = newPw;
   document.getElementById(inputId).value = '';
-  // Update displayed current password
-  const displayId = type === 'coord' ? 'currentCoordPw' : 'currentAdminPw';
-  const displayEl = document.getElementById(displayId);
-  if (displayEl) displayEl.textContent = newPw;
-  toast(type === 'coord' ? 'Coordinator password updated.' : 'Admin password updated.');
+  const el = document.getElementById(displayId);
+  if (el) el.textContent = newPw;
+  toast('Password updated.');
 }
 
-async function adminRedeemNow() {
-  const statusEl = document.getElementById('giftRedeemStatus');
-  const logEl = document.getElementById('giftRedeemLog');
-  if (statusEl) statusEl.textContent = '⏳ Redeeming… this may take a minute.';
+async function adminLoadMembers() {
+  const el = document.getElementById('adminMemberList');
+  if (!el) return;
   try {
-    const res = await fetch('/admin-redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminKey: getPassword('admin') }) });
+    const res = await fetch('/player-list');
     const data = await res.json();
-    if (statusEl) statusEl.textContent = data.message || 'Done.';
-    adminLoadGiftLog();
-  } catch(e) {
-    if (statusEl) statusEl.textContent = '⚠ Error: ' + e.message;
-  }
+    const players = Object.values(data.players || {});
+    if (!players.length) { el.innerHTML = '<div style="color:var(--text3)">No registered players yet.</div>'; return; }
+    // Group by alliance
+    const byAlliance = {};
+    players.forEach(p => {
+      const a = p.alliance || 'Unknown';
+      if (!byAlliance[a]) byAlliance[a] = [];
+      byAlliance[a].push(p);
+    });
+    let html = '';
+    Object.keys(byAlliance).sort().forEach(alliance => {
+      html += '<div style="margin-bottom:16px">';
+      html += '<div class="sec-title" style="margin-bottom:8px">' + alliance + ' <span style="color:var(--text3);font-weight:400">(' + byAlliance[alliance].length + ')</span></div>';
+      html += '<table style="min-width:500px"><thead><tr><th>IGN</th><th>Player ID</th><th>Role</th><th>Alliance</th><th></th></tr></thead><tbody>';
+      html += byAlliance[alliance].map(p => {
+        const roleLabel = { admin:'⚙️ Admin', r4r5:'🛡 R4/R5', rallyleader:'⚔️ Rally Leader', member:'👤 Member' }[p.role] || '👤 Member';
+        const allianceOpts = ALLIANCES.map(a => '<option value="' + a + '"' + (a === p.alliance ? ' selected' : '') + '>' + a + '</option>').join('');
+        return '<tr>' +
+          '<td><strong>' + p.name + '</strong></td>' +
+          '<td class="mono" style="color:var(--text3)">' + p.id + '</td>' +
+          '<td>' + roleLabel + '</td>' +
+          '<td><select onchange="adminChangeAlliance(\\'' + p.id + '\\',this.value)" style="width:80px">' + allianceOpts + '</select></td>' +
+          '<td><button class="btn btn-danger btn-sm" onclick="adminRemovePlayer(\\'' + p.id + '\\')">✕</button></td>' +
+          '</tr>';
+      }).join('');
+      html += '</tbody></table></div>';
+    });
+    el.innerHTML = '<div style="overflow-x:auto">' + html + '</div>';
+  } catch(e) { el.innerHTML = '<div style="color:var(--enemy)">Error loading members.</div>'; }
 }
 
-async function adminLoadGiftLog() {
-  const logEl = document.getElementById('giftRedeemLog');
-  if (!logEl) return;
+async function adminChangeAlliance(playerId, newAlliance) {
   try {
-    const res = await fetch('/gift-log');
-    const data = await res.json();
-    if (!data.log || !data.log.length) { logEl.innerHTML = '<div style="color:var(--text3)">No redemptions yet.</div>'; return; }
-    logEl.innerHTML = data.log.slice().reverse().map(entry =>
-      '<div style="border-bottom:1px solid var(--border);padding:6px 0">' +
-      '<span style="color:var(--text3)">' + entry.time + '</span> ' +
-      '<strong>' + (entry.code || '?') + '</strong> — ' +
-      (entry.results || []).map(r => '<span style="color:' + (r.ok ? 'var(--green)' : 'var(--enemy)') + '">' + r.name + ' (' + (r.ok ? '✓' : r.err) + ')</span>').join(', ') +
-      '</div>'
-    ).join('');
-  } catch(e) { logEl.innerHTML = '<div style="color:var(--enemy)">Could not load log.</div>'; }
+    await fetch('/update-player', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: playerId, alliance: newAlliance }) });
+    toast('Alliance updated.');
+  } catch(e) { toast('Error updating alliance.'); }
+}
+
+async function adminRemovePlayer(playerId) {
+  if (!confirm('Remove this player? They will need to re-register.')) return;
+  try {
+    await fetch('/remove-player', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: playerId }) });
+    toast('Player removed.');
+    adminLoadMembers();
+  } catch(e) { toast('Error removing player.'); }
 }
 
 async function adminReset(what) {
   if (!confirm('Are you sure? This cannot be undone.')) return;
   if (what === 'ministers' || what === 'all') { MS.submissions = []; MS._lastAllocation = null; }
-  if (what === 'leaders' || what === 'all') { S.leaders = []; if (typeof renderLeaderTable === 'function') renderLeaderTable(); }
-  if (what === 'teams' || what === 'all') { S.teams = []; if (typeof renderSetup === 'function') renderSetup(); if (typeof renderBattleStrategy === 'function') renderBattleStrategy(); }
-  if (what === 'attendance' || what === 'all') { ATT.sw = { members: [], events: [] }; ATT.ta = { members: [], events: [] }; }
+  if (what === 'leaders' || what === 'all') { S.leaders = []; if (typeof renderLeaderTable==='function') renderLeaderTable(); }
+  if (what === 'teams' || what === 'all') { S.teams = []; if (typeof renderSetup==='function') renderSetup(); if (typeof renderBattleStrategy==='function') renderBattleStrategy(); }
+  if (what === 'attendance' || what === 'all') { ATT.sw = { members:[], events:[] }; ATT.ta = { members:[], events:[] }; }
   syncQueuePush();
   toast('Reset complete.');
 }
 
 // ════════════════════════════════════════════════════════
-// MINISTER SPOTS — access helpers
-// ════════════════════════════════════════════════════════
-function msCanAccessResults() { return typeof AUTH !== 'undefined' && AUTH.adminUnlocked; }
-
-
-// ════════════ ATTENDANCE — REWRITTEN ════════════
-
 // ════════════ ATTENDANCE DATA ════════════
 const ATT = {
-  sw: { members: [], events: [] },
-  ta: { members: [], events: [] }
+  sw: { events: [] },
+  ta: { events: [] }
 };
+// Event structure:
+// { id, name, date, alliance, signedUp: [{id,name}], showedUp: [{id,name}] }
 
+// ════════════ SUB-TABS (register / summary) ════════════
 function attSwitchTab(prefix, tab) {
   ['register','summary'].forEach(t => {
     const panel = document.getElementById(prefix + 'Panel-' + t);
     const btn = document.getElementById(prefix + 'Tab-' + t);
     if (panel) panel.style.display = t === tab ? 'block' : 'none';
     if (btn) {
+      btn.className = t === tab ? 'btn' : 'btn btn-ghost';
       btn.style.background = t === tab ? 'rgba(61,142,240,.2)' : '';
       btn.style.color = t === tab ? 'var(--accent2)' : '';
       btn.style.border = t === tab ? '1px solid var(--accent)' : '';
-      btn.className = t === tab ? 'btn' : 'btn btn-ghost';
     }
   });
   if (tab === 'summary') renderAttSummary(prefix);
@@ -2427,15 +2599,19 @@ function renderAttendance(prefix) {
   attSwitchTab(prefix, 'register');
 }
 
-// ── Add event ──
+// ════════════ CREATE EVENT ════════════
 function attAddEvent(prefix) {
   const nameEl = document.getElementById(prefix + 'EventName');
   const dateEl = document.getElementById(prefix + 'EventDate');
-  const name = nameEl.value.trim();
+  const name = nameEl ? nameEl.value.trim() : '';
   const date = dateEl ? dateEl.value : '';
   if (!name) { toast('Enter an event name.'); return; }
-  const store = ATT[prefix];
-  store.events.push({ id: uid(), name, date: date || new Date().toLocaleDateString('en-GB'), members: [] });
+  const alliance = (typeof AUTH !== 'undefined' && AUTH.alliance) ? AUTH.alliance : 'ALL';
+  ATT[prefix].events.push({
+    id: uid(), name, alliance,
+    date: date || new Date().toLocaleDateString('en-GB'),
+    signedUp: [], showedUp: []
+  });
   nameEl.value = '';
   if (dateEl) dateEl.value = '';
   renderAttEventList(prefix);
@@ -2443,154 +2619,401 @@ function attAddEvent(prefix) {
   toast('Event created.');
 }
 
-// ── Render event list with member management per event ──
+function attRemoveEvent(prefix, eventId) {
+  if (!confirm('Delete this event?')) return;
+  ATT[prefix].events = ATT[prefix].events.filter(e => e.id !== eventId);
+  renderAttEventList(prefix);
+  syncQueuePush();
+}
+
+// ════════════ EVENT LIST ════════════
 function renderAttEventList(prefix) {
   const el = document.getElementById(prefix + 'EventList');
   if (!el) return;
   const store = ATT[prefix];
-  const isAdmin = typeof AUTH !== 'undefined' && (AUTH.adminUnlocked || AUTH.coordUnlocked);
+  const userAlliance = (typeof AUTH !== 'undefined') ? AUTH.alliance : null;
+  const isAdminOrR4 = typeof isR4R5 === 'function' ? isR4R5() : false;
+  const isAdm = typeof isAdmin === 'function' ? isAdmin() : false;
 
-  if (!store.events.length) {
+  // Filter events by alliance (non-admins only see own alliance)
+  const events = isAdm ? store.events :
+    store.events.filter(e => !e.alliance || e.alliance === 'ALL' || e.alliance === userAlliance);
+
+  if (!events.length) {
     el.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:12px 0">No events yet. Create one above.</div>';
     return;
   }
 
-  el.innerHTML = store.events.map(evt => {
-    const memberRows = evt.members && evt.members.length
-      ? evt.members.map(m => {
-          const delBtn = isAdmin ? '<button class="btn btn-danger btn-sm" style="padding:2px 8px" onclick="attRemoveEventMember(\\'' + prefix + '\\',\\'' + evt.id + '\\',\\'' + m.id + '\\')">✕</button>' : '';
-          return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--border)">' +
-            '<span><strong>' + m.name + '</strong> <span style="color:var(--text3);font-size:12px">(' + (m.alliance||'') + ')</span></span>' +
-            delBtn + '</div>';
-        }).join('')
-      : '<div style="color:var(--text3);font-size:12px;padding:8px 10px">No members added yet.</div>';
-
-    const addForm = isAdmin ? '<div style="padding:10px;background:var(--bg4);border-top:1px solid var(--border)">' +
-      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">' +
-      '<div class="field"><label style="font-size:11px">IGN</label><input type="text" id="' + prefix + 'MemberIGN-' + evt.id + '" placeholder="e.g. Olaf" style="width:140px"></div>' +
-      '<div class="field"><label style="font-size:11px">Alliance</label>' +
-      '<select id="' + prefix + 'MemberAlliance-' + evt.id + '" style="width:100px">' +
-      '<option value="">—</option><option>FIR</option><option>LOC</option><option>LYL</option><option>KNG</option><option>KOV</option><option>TLA</option>' +
-      '</select></div>' +
-      '<button class="btn btn-primary btn-sm" onclick="attAddEventMember(\\'' + prefix + '\\',\\'' + evt.id + '\\')">+ Add Member</button>' +
-      '</div></div>' : '';
-
-    const delEvtBtn = isAdmin ? '<button class="btn btn-danger btn-sm" onclick="attRemoveEvent(\\'' + prefix + '\\',\\'' + evt.id + '\\')">🗑 Delete event</button>' : '';
+  el.innerHTML = events.map(evt => {
+    const signedCount = (evt.signedUp||[]).length;
+    const showedCount = (evt.showedUp||[]).length;
+    const canEdit = isAdm || isAdminOrR4;
+    const delBtn = canEdit ? '<button class="btn btn-danger btn-sm" onclick="attRemoveEvent(\\'' + prefix + '\\',\\'' + evt.id + '\\')">🗑</button>' : '';
 
     return '<div class="card" style="margin-bottom:12px">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
       '<div><div class="card-title" style="margin:0">' + evt.name + '</div>' +
-      '<div style="font-size:12px;color:var(--text3);margin-top:2px">' + (evt.date||'') + ' · ' + (evt.members ? evt.members.length : 0) + ' members</div></div>' +
-      delEvtBtn + '</div>' +
-      '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;overflow:hidden">' +
-      memberRows + addForm + '</div></div>';
+      '<div style="font-size:12px;color:var(--text3);margin-top:2px">' + evt.date +
+      (evt.alliance ? ' · ' + evt.alliance : '') +
+      ' · <span style="color:var(--accent2)">' + signedCount + ' signed up</span>' +
+      ' · <span style="color:var(--green)">' + showedCount + ' showed up</span></div></div>' +
+      delBtn + '</div>' +
+      attRenderEventTabs(prefix, evt, canEdit) +
+      '</div>';
   }).join('');
 }
 
-function attAddEventMember(prefix, eventId) {
-  const ignEl = document.getElementById(prefix + 'MemberIGN-' + eventId);
-  const allianceEl = document.getElementById(prefix + 'MemberAlliance-' + eventId);
-  const ign = ignEl ? ignEl.value.trim() : '';
-  const alliance = allianceEl ? allianceEl.value : '';
-  if (!ign) { toast('Enter an IGN.'); return; }
-  const store = ATT[prefix];
-  const evt = store.events.find(e => e.id === eventId);
+function attRenderEventTabs(prefix, evt, canEdit) {
+  const tabId = prefix + '_' + evt.id;
+  return '<div>' +
+    '<div style="display:flex;gap:6px;margin-bottom:10px">' +
+    '<button class="btn btn-sm" id="etab-su-' + tabId + '" onclick="attShowEventTab(\\'' + prefix + '\\',\\'' + evt.id + '\\',\\'signedUp\\')" ' +
+    'style="background:rgba(61,142,240,.2);color:var(--accent2);border:1px solid var(--accent)">📋 Signed Up (' + (evt.signedUp||[]).length + ')</button>' +
+    '<button class="btn btn-ghost btn-sm" id="etab-sh-' + tabId + '" onclick="attShowEventTab(\\'' + prefix + '\\',\\'' + evt.id + '\\',\\'showedUp\\')">✅ Showed Up (' + (evt.showedUp||[]).length + ')</button>' +
+    '</div>' +
+    '<div id="epanel-su-' + tabId + '">' + attRenderEventPanel(prefix, evt, 'signedUp', canEdit) + '</div>' +
+    '<div id="epanel-sh-' + tabId + '" style="display:none">' + attRenderEventPanel(prefix, evt, 'showedUp', canEdit) + '</div>' +
+    '</div>';
+}
+
+function attShowEventTab(prefix, eventId, panel) {
+  const tabId = prefix + '_' + eventId;
+  ['signedUp','showedUp'].forEach(p => {
+    const pEl = document.getElementById('epanel-' + (p==='signedUp'?'su':'sh') + '-' + tabId);
+    const tEl = document.getElementById('etab-' + (p==='signedUp'?'su':'sh') + '-' + tabId);
+    if (pEl) pEl.style.display = p === panel ? 'block' : 'none';
+    if (tEl) {
+      tEl.className = p === panel ? 'btn btn-sm' : 'btn btn-ghost btn-sm';
+      tEl.style.background = p === panel ? 'rgba(61,142,240,.2)' : '';
+      tEl.style.color = p === panel ? 'var(--accent2)' : '';
+      tEl.style.border = p === panel ? '1px solid var(--accent)' : '';
+    }
+  });
+}
+
+function attRenderEventPanel(prefix, evt, field, canEdit) {
+  const list = (evt[field]||[]);
+  const label = field === 'signedUp' ? 'Legion Combatants (Join/Voted names)' : 'Battlefield Details (Ally tab names)';
+  const hint = field === 'signedUp'
+    ? 'Upload a screenshot of Legion Combatants — names with Join or Voted will be extracted.'
+    : 'Upload a screenshot of Battlefield Details — switch to the Ally tab first, then screenshot.';
+
+  let html = '';
+  // Name list
+  if (list.length) {
+    html += '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:10px;max-height:180px;overflow-y:auto">';
+    html += list.map((m,i) =>
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 6px;border-bottom:1px solid var(--border)">' +
+      '<span>' + m.name + '</span>' +
+      (canEdit ? '<button class="btn btn-danger btn-sm" style="padding:2px 6px" onclick="attRemoveName(\\'' + prefix + '\\',\\'' + evt.id + '\\',\\'' + field + '\\',' + i + ')">✕</button>' : '') +
+      '</div>'
+    ).join('');
+    html += '</div>';
+  } else {
+    html += '<div style="color:var(--text3);font-size:12px;margin-bottom:10px">No names yet.</div>';
+  }
+
+  if (canEdit) {
+    html += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px">📸 ' + hint + '</div>';
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">';
+    html += '<input type="file" accept="image/*" style="display:none" id="ocrFile-' + prefix + '-' + evt.id + '-' + field + '" onchange="attRunOCR(\\'' + prefix + '\\',\\'' + evt.id + '\\',\\'' + field + '\\',this)">';
+    html += '<button class="btn btn-primary btn-sm" onclick="document.getElementById(\\'ocrFile-' + prefix + '-' + evt.id + '-' + field + '\\').click()">📸 Scan Screenshot</button>';
+    html += '</div>';
+    // Manual add
+    html += '<div style="display:flex;gap:6px">' +
+      '<input type="text" id="manualName-' + prefix + '-' + evt.id + '-' + field + '" placeholder="Add name manually" style="flex:1;min-width:0" ' +
+      'onkeydown="if(event.key===\\'Enter\\')attAddManualName(\\'' + prefix + '\\',\\'' + evt.id + '\\',\\'' + field + '\\')">' +
+      '<button class="btn btn-ghost btn-sm" onclick="attAddManualName(\\'' + prefix + '\\',\\'' + evt.id + '\\',\\'' + field + '\\')">+ Add</button>' +
+      '</div>';
+    // OCR preview
+    html += '<div id="ocrPreview-' + prefix + '-' + evt.id + '-' + field + '" style="display:none;margin-top:10px"></div>';
+  }
+
+  return html;
+}
+
+// ════════════ NAME MANAGEMENT ════════════
+function attRemoveName(prefix, eventId, field, idx) {
+  const evt = ATT[prefix].events.find(e => e.id === eventId);
+  if (evt) { evt[field].splice(idx, 1); renderAttEventList(prefix); syncQueuePush(); }
+}
+
+function attAddManualName(prefix, eventId, field) {
+  const inputEl = document.getElementById('manualName-' + prefix + '-' + eventId + '-' + field);
+  const name = inputEl ? inputEl.value.trim() : '';
+  if (!name) return;
+  const evt = ATT[prefix].events.find(e => e.id === eventId);
   if (!evt) return;
-  if (!evt.members) evt.members = [];
-  if (evt.members.find(m => m.name === ign)) { toast('Already added.'); return; }
-  evt.members.push({ id: uid(), name: ign, alliance });
-  if (ignEl) ignEl.value = '';
+  if (evt[field].find(m => m.name.toLowerCase() === name.toLowerCase())) { toast('Already in list.'); return; }
+  evt[field].push({ id: uid(), name });
+  if (inputEl) inputEl.value = '';
   renderAttEventList(prefix);
   syncQueuePush();
 }
 
-function attRemoveEventMember(prefix, eventId, memberId) {
-  const evt = ATT[prefix].events.find(e => e.id === eventId);
-  if (evt) {
-    evt.members = (evt.members || []).filter(m => m.id !== memberId);
+// ════════════ OCR FOR NAMES ════════════
+async function attRunOCR(prefix, eventId, field, fileInput) {
+  const file = fileInput.files[0];
+  if (!file) return;
+  const previewEl = document.getElementById('ocrPreview-' + prefix + '-' + eventId + '-' + field);
+  if (previewEl) { previewEl.style.display = 'block'; previewEl.innerHTML = '<div style="color:var(--text3);font-size:12px">🔍 Scanning names…</div>'; }
+
+  try {
+    if (typeof Tesseract === 'undefined') throw new Error('OCR not loaded');
+    const worker = await Tesseract.createWorker({ logger: () => {} });
+    await worker.loadLanguage('eng');
+    await worker.initialize('eng');
+    await worker.setParameters({ tessedit_pageseg_mode: '6' });
+    const { data: { text } } = await worker.recognize(file);
+    await worker.terminate();
+
+    const names = field === 'signedUp'
+      ? parseSignedUpNames(text)
+      : parseShowedUpNames(text);
+
+    if (!names.length) {
+      if (previewEl) previewEl.innerHTML = '<div style="color:var(--enemy);font-size:12px">⚠ No names detected. Try adding manually.</div>';
+      return;
+    }
+
+    // Show preview with confirm
+    if (previewEl) {
+      const evt = ATT[prefix].events.find(e => e.id === eventId);
+      const existing = (evt ? evt[field] : []).map(m => m.name.toLowerCase());
+      const newNames = names.filter(n => !existing.includes(n.toLowerCase()));
+      const dupNames = names.filter(n => existing.includes(n.toLowerCase()));
+
+      let html = '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:12px">';
+      html += '<div style="font-weight:600;margin-bottom:8px">Found ' + names.length + ' name(s) — ' + newNames.length + ' new:</div>';
+      html += '<div style="max-height:120px;overflow-y:auto;margin-bottom:10px">';
+      newNames.forEach(n => { html += '<div style="padding:2px 0;color:var(--green)">+ ' + n + '</div>'; });
+      if (dupNames.length) dupNames.forEach(n => { html += '<div style="padding:2px 0;color:var(--text3)">↩ ' + n + ' (already in list)</div>'; });
+      html += '</div>';
+      if (newNames.length) {
+        // Store names for confirm
+        const safeNames = encodeURIComponent(JSON.stringify(newNames));
+        html += '<button class="btn btn-primary btn-sm" onclick="attConfirmOCR(\\'' + prefix + '\\',\\'' + eventId + '\\',\\'' + field + '\\',' + "'" + safeNames + "'" + ')">✅ Add ' + newNames.length + ' name(s)</button> ';
+      }
+      html += '<button class="btn btn-ghost btn-sm" onclick="this.parentElement.style.display=\\'none\\'">Cancel</button>';
+      html += '</div>';
+      previewEl.innerHTML = html;
+    }
+  } catch(e) {
+    if (previewEl) previewEl.innerHTML = '<div style="color:var(--enemy);font-size:12px">⚠ OCR error: ' + e.message + '</div>';
+  }
+}
+
+function attConfirmOCR(prefix, eventId, field, encodedNames) {
+  try {
+    const names = JSON.parse(decodeURIComponent(encodedNames));
+    const evt = ATT[prefix].events.find(e => e.id === eventId);
+    if (!evt) return;
+    names.forEach(name => {
+      if (!evt[field].find(m => m.name.toLowerCase() === name.toLowerCase())) {
+        evt[field].push({ id: uid(), name });
+      }
+    });
     renderAttEventList(prefix);
     syncQueuePush();
-  }
+    toast(names.length + ' name(s) added!');
+  } catch(e) { toast('Error adding names.'); }
 }
 
-function attRemoveEvent(prefix, eventId) {
-  if (!confirm('Delete this event and all its members?')) return;
-  ATT[prefix].events = ATT[prefix].events.filter(e => e.id !== eventId);
-  renderAttEventList(prefix);
+// ── Parse Legion Combatants screen (Signed Up) ──
+// Keep names where the line has "Join" or "Voted" as status
+// Discard "No engagements", "Legion X dispatched", power numbers
+function parseSignedUpNames(text) {
+  const lines = text.split(/\\n/).map(l => l.trim()).filter(Boolean);
+  const STRIP_RE = /^(no engagements?|legion\\s*\\d+\\s*dispatch|substitute|squad\\s*power|join\\s*\\d+|ranked|combatant)/i;
+  const STATUS_RE = /\\b(join|voted)\\b/i;
+  const NUMBER_RE = /^\\d[\\d,./]*$/;
+  const ICON_RE = /^[\\W_]+$/; // lines that are only symbols/icons
+
+  const names = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    // Skip known non-name lines
+    if (STRIP_RE.test(line) || NUMBER_RE.test(line.replace(/,/g,'')) || ICON_RE.test(line)) { i++; continue; }
+    // If this line or adjacent lines contain Join/Voted, the name is on the line(s) before/with it
+    const nearby = [lines[i-1]||'', line, lines[i+1]||'', lines[i+2]||''].join(' ');
+    if (STATUS_RE.test(nearby)) {
+      // The name is whichever line is NOT a status/number line
+      const candidate = line.replace(/\\b(join|voted|no engagements?)\\b/gi, '').replace(/\\d[\\d,]*/g, '').replace(/[⚔🛡👑✅🏆]/g, '').trim();
+      if (candidate.length >= 2 && !NUMBER_RE.test(candidate.replace(/,/g,''))) {
+        const clean = cleanName(candidate);
+        if (clean && !names.includes(clean)) names.push(clean);
+      }
+    }
+    i++;
+  }
+  return names;
+}
+
+// ── Parse Battlefield Details screen (Showed Up) ──
+// The ally tab shows: rank number | avatar | name | points
+// We extract names by stripping leading numbers, trailing numbers, known UI text
+function parseShowedUpNames(text) {
+  const lines = text.split(/\\n/).map(l => l.trim()).filter(Boolean);
+  const SKIP_RE = /^(ranking|governor|personal\\s*relic|ally|enemy|battlefield|leave|rules|vs|\\d+\\/\\d+|\\+\\d+\\/m|squad\\s*power)/i;
+  const NUMBER_RE = /^[\\d,./]+$/;
+  const names = [];
+
+  lines.forEach(line => {
+    if (SKIP_RE.test(line) || NUMBER_RE.test(line.replace(/,/g,''))) return;
+    // Strip leading rank number and trailing points number
+    let cleaned = line
+      .replace(/^\\d+\\s*/, '')           // leading rank
+      .replace(/[\\d,]+\\s*$/, '')        // trailing points
+      .replace(/\\[.*?\\]/g, '')          // [ALLIANCE] tags
+      .replace(/[⚔🛡👑✅🏆⚡💪🔥]/g, '') // game icons
+      .trim();
+    const clean = cleanName(cleaned);
+    if (clean && clean.length >= 2 && !names.includes(clean)) names.push(clean);
+  });
+  return names;
+}
+
+function cleanName(s) {
+  return s.replace(/[^\\w\\sÀ-ÿ\\-_.*~∾≺≻]/g, '').replace(/\\s+/g, ' ').trim();
+}
+
+// ════════════ SUMMARY ════════════
+// ── Fuzzy name similarity (Levenshtein distance) ──
+function nameSimilarity(a, b) {
+  a = a.toLowerCase(); b = b.toLowerCase();
+  if (a === b) return 1;
+  const la = a.length, lb = b.length;
+  if (!la || !lb) return 0;
+  const dp = Array.from({length: la+1}, (_,i) => Array.from({length: lb+1}, (_,j) => i ? j ? 0 : i : j));
+  for (let i=1;i<=la;i++) for (let j=1;j<=lb;j++)
+    dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
+  return 1 - dp[la][lb] / Math.max(la, lb);
+}
+
+// Find near-matches between signedUp and showedUp lists (similarity >= 0.75 but not exact)
+function findMismatches(signedUp, showedUp) {
+  const mismatches = [];
+  signedUp.forEach(su => {
+    const exactMatch = showedUp.find(sh => sh.name.toLowerCase() === su.name.toLowerCase());
+    if (!exactMatch) {
+      // Find closest match in showedUp
+      let bestMatch = null, bestScore = 0;
+      showedUp.forEach(sh => {
+        const score = nameSimilarity(su.name, sh.name);
+        if (score > bestScore && score >= 0.75) { bestScore = score; bestMatch = sh; }
+      });
+      if (bestMatch) mismatches.push({ suName: su.name, shName: bestMatch.name, score: bestScore });
+    }
+  });
+  return mismatches;
+}
+
+function attMergeName(prefix, eventId, fromName, toName) {
+  const evt = ATT[prefix].events.find(e => e.id === eventId);
+  if (!evt) return;
+  // Rename all occurrences of fromName in both lists to toName
+  ['signedUp','showedUp'].forEach(field => {
+    evt[field].forEach(m => { if (m.name === fromName) m.name = toName; });
+  });
   renderAttSummary(prefix);
   syncQueuePush();
+  toast('Names merged: "' + fromName + '" → "' + toName + '"');
 }
 
-// ── Summary ──
 function renderAttSummary(prefix) {
-  const contentEl = document.getElementById(prefix + 'SummaryContent');
-  if (!contentEl) return;
+  const el = document.getElementById(prefix + 'SummaryContent');
+  if (!el) return;
   const store = ATT[prefix];
-  if (!store.events.length) {
-    contentEl.innerHTML = '<div style="color:var(--text3);font-size:13px">No events yet.</div>';
-    return;
-  }
+  const userAlliance = (typeof AUTH !== 'undefined') ? AUTH.alliance : null;
+  const isAdm = typeof isAdmin === 'function' ? isAdmin() : false;
+  const events = isAdm ? store.events :
+    store.events.filter(e => !e.alliance || e.alliance === 'ALL' || e.alliance === userAlliance);
 
-  // Build a combined member list across all events
-  const memberMap = {}; // name+alliance -> {name, alliance, shown, total}
-  store.events.forEach(evt => {
-    (evt.members || []).forEach(m => {
-      const key = m.name + '|' + (m.alliance || '');
-      if (!memberMap[key]) memberMap[key] = { name: m.name, alliance: m.alliance || '', shown: 0, total: 0 };
-      memberMap[key].shown++;
-      memberMap[key].total++;
+  if (!events.length) { el.innerHTML = '<div style="color:var(--text3)">No events yet.</div>'; return; }
+
+  // ── Mismatch warnings across all events ──
+  let mismatchHTML = '';
+  events.forEach(evt => {
+    const mismatches = findMismatches(evt.signedUp||[], evt.showedUp||[]);
+    if (mismatches.length) {
+      mismatchHTML += '<div style="background:rgba(255,157,77,.08);border:1px solid rgba(255,157,77,.4);border-radius:7px;padding:12px 14px;margin-bottom:14px">';
+      mismatchHTML += '<div style="font-weight:600;color:#ff9d4d;margin-bottom:8px">⚠ Possible name mismatches in <em>' + evt.name + '</em></div>';
+      mismatchHTML += '<div style="font-size:12px;color:var(--text2)">These names look very similar but didn\\'t match exactly — likely OCR errors:</div>';
+      mismatches.forEach(m => {
+        const pct = Math.round(m.score * 100);
+        mismatchHTML += '<div style="display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap">' +
+          '<span class="mono" style="color:var(--enemy)">"' + m.suName + '"</span>' +
+          '<span style="color:var(--text3)">vs</span>' +
+          '<span class="mono" style="color:var(--green)">"' + m.shName + '"</span>' +
+          '<span style="color:var(--text3);font-size:11px">(' + pct + '% similar)</span>' +
+          '<button class="btn btn-gold btn-sm" onclick="attMergeName(\\'' + prefix + '\\',\\'' + evt.id + '\\',\\'' +
+          m.suName.replace(/'/g,"\\\\'") + '\\',\\'' + m.shName.replace(/'/g,"\\\\'") + '\\')">' +
+          'Merge → "' + m.shName + '"</button>' +
+          '</div>';
+      });
+      mismatchHTML += '</div>';
+    }
+  });
+
+  // ── Member attendance table ──
+  const memberMap = {};
+  events.forEach(evt => {
+    (evt.signedUp||[]).forEach(m => {
+      if (!memberMap[m.name]) memberMap[m.name] = { signedUp:0, showedUp:0 };
+      memberMap[m.name].signedUp++;
+    });
+    (evt.showedUp||[]).forEach(m => {
+      if (!memberMap[m.name]) memberMap[m.name] = { signedUp:0, showedUp:0 };
+      memberMap[m.name].showedUp++;
     });
   });
 
-  // Total events = store.events.length
-  const total = store.events.length;
-  Object.values(memberMap).forEach(m => { m.total = total; });
+  const members = Object.entries(memberMap).sort((a,b) => b[1].showedUp - a[1].showedUp);
+  let html = mismatchHTML;
+  html += '<div style="overflow-x:auto"><table style="min-width:400px"><thead><tr>' +
+    '<th>Name</th><th>Signed Up</th><th>Showed Up</th><th>Attendance</th>' +
+    '</tr></thead><tbody>';
 
-  // Group by alliance
-  const byAlliance = {};
-  Object.values(memberMap).forEach(m => {
-    const a = m.alliance || 'Unknown';
-    if (!byAlliance[a]) byAlliance[a] = [];
-    byAlliance[a].push(m);
+  members.forEach(([name, s]) => {
+    const pct = s.signedUp > 0 ? Math.round(s.showedUp / s.signedUp * 100) : 0;
+    const col = pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--gold)' : 'var(--enemy)';
+    html += '<tr><td><strong>' + name + '</strong></td>' +
+      '<td class="mono">' + s.signedUp + '</td>' +
+      '<td class="mono">' + s.showedUp + '</td>' +
+      '<td><span class="mono" style="color:' + col + ';font-weight:600">' + pct + '%</span></td></tr>';
   });
+  html += '</tbody></table></div>';
 
-  const isAdmin = typeof AUTH !== 'undefined' && (AUTH.adminUnlocked || AUTH.coordUnlocked);
-  let html = '';
-  Object.keys(byAlliance).sort().forEach(alliance => {
-    const members = byAlliance[alliance].sort((a,b) => b.shown - a.shown);
-    html += '<div style="margin-bottom:18px">';
-    html += '<div class="sec-title" style="margin-bottom:8px">' + alliance + '</div>';
-    html += '<div style="overflow-x:auto"><table style="min-width:320px"><thead><tr><th>IGN</th><th>Events Attended</th><th>Score</th></tr></thead><tbody>';
-    html += members.map(m => {
-      const pct = total > 0 ? Math.round(m.shown / total * 100) : 0;
-      const col = pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--gold)' : 'var(--enemy)';
-      return '<tr><td><strong>' + m.name + '</strong></td><td class="mono">' + m.shown + ' / ' + total + '</td>' +
-        '<td><span class="mono" style="color:' + col + ';font-weight:600">' + pct + '%</span></td></tr>';
-    }).join('');
-    html += '</tbody></table></div></div>';
+  // ── Per-event breakdown ──
+  html += '<div style="margin-top:16px"><div class="sec-title" style="margin-bottom:8px">Per Event</div>';
+  events.forEach(evt => {
+    const su = (evt.signedUp||[]).length;
+    const sh = (evt.showedUp||[]).length;
+    const absent = (evt.signedUp||[]).filter(m =>
+      !(evt.showedUp||[]).find(s => s.name.toLowerCase() === m.name.toLowerCase()));
+    html += '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:8px">' +
+      '<div style="font-weight:600">' + evt.name + ' <span style="color:var(--text3);font-size:11px">' + evt.date + '</span></div>' +
+      '<div style="font-size:12px;margin-top:6px;display:flex;flex-wrap:wrap;gap:10px">' +
+      '<span>' + su + ' signed up</span>' +
+      '<span style="color:var(--green)">✅ ' + sh + ' showed up</span>' +
+      (absent.length ? '<span style="color:var(--enemy)">❌ ' + absent.length + ' absent: ' +
+        absent.map(m => '<strong>' + m.name + '</strong>').join(', ') + '</span>' : '<span style="color:var(--green)">🎉 Full attendance!</span>') +
+      '</div></div>';
   });
-
-  if (!Object.keys(byAlliance).length) {
-    html = '<div style="color:var(--text3);font-size:13px">No members registered yet.</div>';
-  }
-  contentEl.innerHTML = html;
+  html += '</div>';
+  el.innerHTML = html;
 }
-
-// Keep attGetScore for backward compat
-function attGetScore(prefix, memberId) { return { pct: 0, shown: 0, total: 0 }; }
-function attRemoveMember(prefix, memberId) {}
 
 // EXTEND SYNC to include ATT data and passwords
 // ════════════════════════════════════════════════════════
 const _origSyncSerialize = syncSerialize;
 syncSerialize = function() {
   const base = JSON.parse(_origSyncSerialize());
-  if (typeof ATT !== 'undefined') {
-    base.att_sw = ATT.sw;
-    base.att_ta = ATT.ta;
-  }
+  if (typeof ATT !== 'undefined') { base.att_sw = ATT.sw; base.att_ta = ATT.ta; }
   if (typeof loadedPasswords !== 'undefined') {
-    if (loadedPasswords.coord) base.pw_coord = loadedPasswords.coord;
+    if (loadedPasswords.rallyleader) base.pw_rallyleader = loadedPasswords.rallyleader;
+    if (loadedPasswords.r4r5) base.pw_r4r5 = loadedPasswords.r4r5;
     if (loadedPasswords.admin) base.pw_admin = loadedPasswords.admin;
   }
   return JSON.stringify(base);
@@ -2604,7 +3027,8 @@ syncApplyRemote = function(data) {
     if (data.att_ta) ATT.ta = data.att_ta;
   }
   if (typeof loadedPasswords !== 'undefined') {
-    if (data.pw_coord) loadedPasswords.coord = data.pw_coord;
+    if (data.pw_rallyleader) loadedPasswords.rallyleader = data.pw_rallyleader;
+    if (data.pw_r4r5) loadedPasswords.r4r5 = data.pw_r4r5;
     if (data.pw_admin) loadedPasswords.admin = data.pw_admin;
   }
   const active = document.querySelector('.page.active');
@@ -2612,72 +3036,49 @@ syncApplyRemote = function(data) {
   if (active && active.id === 'page-trialliance') renderAttendance('ta');
 };
 
-
-function msUnlockAdmin(){
-  const input=document.getElementById('msAdminPwInput').value;
-  if(checkPassword('admin',input)){
-    AUTH.adminUnlocked=true;
-    sessionSetAuth('admin');
-    msShowAdminActions();
-  } else {
-    const err=document.getElementById('msAdminPwErr');
-    if(err){err.style.display='block';setTimeout(()=>err.style.display='none',2000);}
-  }
-}
-
-function msShowAdminActions(){
-  const guard=document.getElementById('msAdminGuard');
-  const actions=document.getElementById('msAdminActions');
-  if(guard) guard.style.display='none';
-  if(actions) actions.style.display='block';
-}
-
-function msInitResultsTab(){
-  // Admin users (already authenticated) get direct access — no password prompt
-  if(msCanAccessResults()){
-    msShowAdminActions();
-  } else {
-    const guard=document.getElementById('msAdminGuard');
-    const actions=document.getElementById('msAdminActions');
-    if(guard) guard.style.display='block';
-    if(actions) actions.style.display='none';
-  }
-}
-
-// ════════════════════════════════════════════════════════
-// INIT on DOM ready
-// ════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', initApp);
 
 </script>
 
+<!-- ADMIN PAGE -->
 <div id="page-admin" class="page">
-
   <div class="card" style="margin-bottom:14px">
     <div class="card-title">⚙️ Admin Panel</div>
-    <p style="color:var(--text2);font-size:13px">Manage passwords and reset data. Changes are saved to the shared KV store.</p>
+    <p style="color:var(--text2);font-size:13px">Full administrator access. Changes are saved to KV.</p>
   </div>
-  <div class="grid2">
+  <!-- Passwords -->
+  <div class="grid2" style="margin-bottom:14px">
     <div class="card">
-      <div class="card-title">🔑 Change Coordinator Password</div>
-      <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Current password: <span class="mono" id="currentCoordPw" style="color:var(--gold)">loading…</span></div>
-      <div class="row" style="margin-bottom:8px">
-        <div class="field" style="flex:1"><label>New coordinator password</label><input type="password" id="newCoordPw" style="width:100%"></div>
-      </div>
-      <button class="btn btn-primary" onclick="adminChangePassword('coord')">Save Coordinator Password</button>
+      <div class="card-title">⚔️ Rally Leader Password</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Current: <span class="mono" id="currentRallyPw" style="color:var(--gold)">loading…</span></div>
+      <div class="row" style="margin-bottom:8px"><div class="field" style="flex:1"><label>New password</label><input type="password" id="newRallyPw" style="width:100%"></div></div>
+      <button class="btn btn-primary btn-sm" onclick="adminChangePassword('rallyleader')">Save</button>
     </div>
     <div class="card">
-      <div class="card-title">🔑 Change Admin Password</div>
-      <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Current password: <span class="mono" id="currentAdminPw" style="color:var(--gold)">loading…</span></div>
-      <div class="row" style="margin-bottom:8px">
-        <div class="field" style="flex:1"><label>New admin password</label><input type="password" id="newAdminPw" style="width:100%"></div>
-      </div>
-      <button class="btn btn-primary" onclick="adminChangePassword('admin')">Save Admin Password</button>
+      <div class="card-title">🛡 R4/R5 Password</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Current: <span class="mono" id="currentR4R5Pw" style="color:var(--gold)">loading…</span></div>
+      <div class="row" style="margin-bottom:8px"><div class="field" style="flex:1"><label>New password</label><input type="password" id="newR4R5Pw" style="width:100%"></div></div>
+      <button class="btn btn-primary btn-sm" onclick="adminChangePassword('r4r5')">Save</button>
+    </div>
+    <div class="card">
+      <div class="card-title">⚙️ Admin Password</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Current: <span class="mono" id="currentAdminPw" style="color:var(--gold)">loading…</span></div>
+      <div class="row" style="margin-bottom:8px"><div class="field" style="flex:1"><label>New password</label><input type="password" id="newAdminPw" style="width:100%"></div></div>
+      <button class="btn btn-primary btn-sm" onclick="adminChangePassword('admin')">Save</button>
     </div>
   </div>
+  <!-- Members by Alliance -->
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div class="card-title" style="margin:0">👥 Registered Members by Alliance</div>
+      <button class="btn btn-ghost btn-sm" onclick="adminLoadMembers()">🔄 Refresh</button>
+    </div>
+    <div id="adminMemberList"><div style="color:var(--text3);font-size:13px">Loading…</div></div>
+  </div>
+  <!-- Gift Code -->
   <div class="card" style="margin-bottom:14px">
     <div class="card-title">🎁 Gift Code Auto-Redemption</div>
-    <p style="color:var(--text2);font-size:12px;margin-bottom:14px">Redeems all active gift codes daily at 08:00 UTC for every registered member. Members register by verifying their Player ID on the landing page.</p>
+    <p style="color:var(--text2);font-size:12px;margin-bottom:14px">Redeems all active gift codes every 30 minutes for registered members.</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
       <button class="btn btn-primary" onclick="adminRedeemNow()">🎁 Redeem Now for All Members</button>
       <button class="btn btn-ghost" onclick="adminLoadGiftLog()">📋 Refresh Log</button>
@@ -2685,6 +3086,7 @@ document.addEventListener('DOMContentLoaded', initApp);
     <div id="giftRedeemStatus" style="font-size:12px;color:var(--text3);margin-bottom:10px"></div>
     <div id="giftRedeemLog" style="font-size:12px;max-height:300px;overflow-y:auto"></div>
   </div>
+  <!-- Reset -->
   <div class="card">
     <div class="card-title">🗑 Reset Data</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -2764,7 +3166,6 @@ document.addEventListener('DOMContentLoaded', initApp);
 </body>
 </html>
 `;
-
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -2783,14 +3184,59 @@ export default {
     // Register verified player
     if (url.pathname==='/register-player' && request.method==='POST') {
       try {
-        const {id,name,kingdom} = await request.json();
+        const {id,name,kingdom,alliance,role} = await request.json();
         if (!id || kingdom!==1057) return json({ok:false},400);
         const raw = await env.SVS_KV.get(PLAYERS_KEY);
         const players = raw ? JSON.parse(raw) : {};
-        players[String(id)] = {id:String(id),name,kingdom};
+        const existing = players[String(id)];
+        players[String(id)] = {
+          id:String(id), name, kingdom,
+          alliance: (existing && existing.alliance) ? existing.alliance : (alliance||null),
+          role: role||'member'
+        };
         await env.SVS_KV.put(PLAYERS_KEY, JSON.stringify(players));
         return json({ok:true});
       } catch(e) { return json({ok:false,error:e.message},400); }
+    }
+
+    // Get stored alliance for a player
+    if (url.pathname==='/player-alliance' && request.method==='GET') {
+      const id = url.searchParams.get('id');
+      if (!id) return json({alliance:null});
+      const raw = await env.SVS_KV.get(PLAYERS_KEY);
+      const players = raw ? JSON.parse(raw) : {};
+      const p = players[String(id)];
+      return json({alliance: p ? (p.alliance||null) : null});
+    }
+
+    // List all players (admin)
+    if (url.pathname==='/player-list' && request.method==='GET') {
+      const raw = await env.SVS_KV.get(PLAYERS_KEY);
+      return json({players: raw ? JSON.parse(raw) : {}});
+    }
+
+    // Update player alliance (admin)
+    if (url.pathname==='/update-player' && request.method==='POST') {
+      try {
+        const {id,alliance} = await request.json();
+        const raw = await env.SVS_KV.get(PLAYERS_KEY);
+        const players = raw ? JSON.parse(raw) : {};
+        if (players[String(id)]) players[String(id)].alliance = alliance;
+        await env.SVS_KV.put(PLAYERS_KEY, JSON.stringify(players));
+        return json({ok:true});
+      } catch(e) { return json({ok:false},400); }
+    }
+
+    // Remove player (admin)
+    if (url.pathname==='/remove-player' && request.method==='POST') {
+      try {
+        const {id} = await request.json();
+        const raw = await env.SVS_KV.get(PLAYERS_KEY);
+        const players = raw ? JSON.parse(raw) : {};
+        delete players[String(id)];
+        await env.SVS_KV.put(PLAYERS_KEY, JSON.stringify(players));
+        return json({ok:true});
+      } catch(e) { return json({ok:false},400); }
     }
 
     // Manual admin redeem (runs full queue)
