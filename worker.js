@@ -24,7 +24,7 @@ const QUEUE_KEY     = "redeem_queue";         // { codes: [...], playerIds: [...
 
 // ── Pure-JS MD5 (no crypto API needed in CF Workers) ──
 function md5(str) {
-  function safeAdd(x,y){const l=(x&0xffff)+(y&0xffff);return(((x>>16)+(y>>16)+(l>>16))<<16)|(l&0xffff);}
+  function safeAdd(x,y){const l=(x&0xffff)+(y&0xffff);return(((x>>16)+(y>>16)+(l>>16))<<16)|(l&0xffff);} 
   function rol(n,c){return(n<<c)|(n>>>(32-c));}
   function cmn(q,a,b,x,s,t){return safeAdd(rol(safeAdd(safeAdd(a,q),safeAdd(x,t)),s),b);}
   function ff(a,b,c,d,x,s,t){return cmn((b&c)|((~b)&d),a,b,x,s,t);}
