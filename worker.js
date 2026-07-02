@@ -12,7 +12,7 @@
  */
 
 const KINGSHOT_API  = "https://kingshot.net/api";
-const GIFTCODE_API  = "https://ks-giftcode.centurygame.com/api"; 
+const GIFTCODE_API  = "https://ks-giftcode.centurygame.com/api";
 const SALT          = "tB87#kPtkxqOS2";
 const BATCH_SIZE    = 5;   // players per cron run — keeps well under 30s CPU limit
 
@@ -24,7 +24,7 @@ const QUEUE_KEY     = "redeem_queue";         // { codes: [...], playerIds: [...
 
 // ── Pure-JS MD5 (no crypto API needed in CF Workers) ──
 function md5(str) {
-  function safeAdd(x,y){const l=(x&0xffff)+(y&0xffff);return(((x>>16)+(y>>16)+(l>>16))<<16)|(l&0xffff);} 
+  function safeAdd(x,y){const l=(x&0xffff)+(y&0xffff);return(((x>>16)+(y>>16)+(l>>16))<<16)|(l&0xffff);}
   function rol(n,c){return(n<<c)|(n>>>(32-c));}
   function cmn(q,a,b,x,s,t){return safeAdd(rol(safeAdd(safeAdd(a,q),safeAdd(x,t)),s),b);}
   function ff(a,b,c,d,x,s,t){return cmn((b&c)|((~b)&d),a,b,x,s,t);}
@@ -1983,8 +1983,9 @@ function msSkipToManual(){
 }
 
 function msParseOCRText(text){
-  // Smart merge: join continuation lines (e.g. "min(s)" on its own line)
-  const UNIT_ONLY = /^\\s*[^0-9]*(?:min|hr|day|sec)[^0-9]*\\s*$/i;
+  // Smart merge: join continuation lines that are just time units (possibly with noise)
+  // e.g. "min(s)" or "eacip min(s)" or ")peedup min(s)" → join to previous line
+  const UNIT_ONLY = /^[^0-9]{0,20}(?:min|hr|day|sec)[^0-9]{0,10}$/i;
   const rawLines = text.split(/\\n/);
   const lines = [];
   rawLines.forEach(line => {
@@ -1998,20 +1999,26 @@ function msParseOCRText(text){
   function normalizeOCR(s) {
     s = s.replace(/(\\d),(\\d{3})/g, '$1$2');
     s = s.replace(/(\\d),(\\d{3})/g, '$1$2');
+    // Fix I/l → 1 when used as a digit (e.g. "I min(s)" → "1 min(s)")
+    s = s.replace(/\\bI\\b(?=\\s*[a-zA-Z\\(])/g, '1');
+    s = s.replace(/(\\d)I(?=\\s)/g, '$11');
     return s;
   }
 
   function parseDurationToHours(s) {
     s = normalizeOCR(s);
     let total = 0, matched = false;
-    const re = /(\\d+(?:\\.\\d+)?)\\s*([a-zA-Z\\(\\)]{1,10})/g;
+    // Match: number followed by optional noise (up to 15 chars) then a time unit word
+    // This handles "49 eacip min(s)" → 49 minutes, and "26 day(s)20 hr(s)49 min(s)"
+    const re = /(\\d+(?:\\.\\d+)?)\\s*[^0-9]{0,15}?(day\\(?s?\\)?|hr\\(?s?\\)?|hour|min\\(?s?\\)?|minute|sec\\(?s?\\)?)/gi;
     let m;
     while ((m = re.exec(s)) !== null) {
       const n = parseFloat(m[1]);
       const u = m[2].toLowerCase();
-      if (/^d/.test(u) && !/h/.test(u)) { total += n*24; matched = true; }
-      else if (/h/.test(u))              { total += n;    matched = true; }
-      else if (/^m/.test(u) && !/h/.test(u)) { total += n/60; matched = true; }
+      if (/^d/.test(u))      { total += n*24; matched = true; }
+      else if (/^h/.test(u)) { total += n;    matched = true; }
+      else if (/^m/.test(u)) { total += n/60; matched = true; }
+      else if (/^s/.test(u)) { total += n/3600; matched = true; }
     }
     return matched ? total : null;
   }
@@ -2847,6 +2854,29 @@ function showPageDirect(p) {
 // ════════════════════════════════════════════════════════
 
 // ── Logout ──
+function showUserBar(player, role) {
+  const bar = document.getElementById('userBar');
+  if (!bar) return;
+  bar.style.display = 'flex';
+  if (player) {
+    const av = document.getElementById('userBarAvatar');
+    if (av && player.avatar) { av.src = player.avatar; av.style.display = 'block'; }
+    const nm = document.getElementById('userBarName');
+    if (nm) nm.textContent = player.name || '';
+    const pid = document.getElementById('userBarPlayerId');
+    if (pid && player.id) pid.textContent = 'ID: ' + player.id;
+    const kg = document.getElementById('userBarKingdom');
+    if (kg) kg.textContent = 'Kingdom ' + (player.kingdom || '1057');
+  }
+  const rl = document.getElementById('userBarRole');
+  if (rl) {
+    if (role === 'admin') { rl.textContent = '⚙️ Admin'; rl.style.background = 'rgba(255,200,0,.15)'; rl.style.color = 'var(--gold)'; }
+    else if (role === 'r4r5') { rl.textContent = '🛡 R4/R5'; rl.style.background = 'rgba(61,142,240,.15)'; rl.style.color = 'var(--accent2)'; }
+    else if (role === 'rallyleader') { rl.textContent = '⚔️ Rally Leader'; rl.style.background = 'rgba(61,142,240,.15)'; rl.style.color = 'var(--accent2)'; }
+    else { rl.textContent = '👤 Member'; rl.style.background = 'rgba(46,204,113,.1)'; rl.style.color = 'var(--green)'; }
+  }
+}
+
 function logOut() {
   if(!confirm('Sign out of Kingdom 1057?')) return;
   // Clear session
