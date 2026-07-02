@@ -1847,111 +1847,80 @@ function msSkipToManual(){
 }
 
 function msParseOCRText(text){
-  // Robust two-strategy parser that handles both OCR layout styles seen in the wild:
-  //   Style A (interleaved): "General Speedup 134 day(s)17 hr(s)13 / min(s) / Soldier Training 88 day(s)..."
-  //   Style B (two blocks): all labels in one cluster, all durations in a separate cluster below, same order
-  // Strategy A: nearest-neighbor — each duration block claims the closest label line (<=2 lines away)
-  // Strategy B (fallback): ordinal — leftover blocks matched to remaining unassigned labels in top-down order
+  // POSITIONAL PARSER — language agnostic, no keyword matching.
+  // The game ALWAYS shows speedups in the same order:
+  //   1. General  2. Soldier Training  3. Construction  4. Research
+  // We just extract all duration values top-to-bottom and assign by position.
+  // This works regardless of language, OCR noise, or label corruption.
 
-  const lines=text.split(/\\n+/).map(l=>l.trim()).filter(Boolean);
+  const lines = text.split(/\\n+/).map(l => l.trim()).filter(Boolean);
 
-  const keywordMap={
-    construction:['construction'],
-    research:['research'],
-    training:['training','soldier training','troop'],
-    general:['general speedup','general']
-  };
-  const boundaryKeywords=['learning speedup','soldier healing','healing speedup'];
-
-  function normalizeOCRDigits(s){
-    // Common OCR digit-letter confusions: I→1 and l→1 when adjacent to digits
-    s=s.replace(/(\\d)[Il](?=\\d|\\b)/g,'$11');
-    s=s.replace(/\\bI(\\d)/g,'1$1');
+  function normalizeOCR(s) {
+    s = s.replace(/(\\d)[Il](?=\\d|\\b)/g, '$11'); // I/l → 1 near digits
+    s = s.replace(/\\bI(\\d)/g, '1$1');
+    s = s.replace(/(\\d),(\\d{3})/g, '$1$2');     // thousands comma: 1,369 → 1369
+    s = s.replace(/(\\d),(\\d{3})/g, '$1$2');     // run twice for 1,000,000
     return s;
   }
 
-  function parseDurationToHours(s){
-    s=normalizeOCRDigits(s);
-    let totalHours=0, matchedAny=false;
-    const re=/(\\d+(?:[.,]\\d+)?)?\\s*(day\\(s\\)|days|day|d\\b|hr\\(s\\)|hrs|hour|hours|h\\b|min\\(s\\)|mins|minute|minutes|m\\b|sec\\(s\\)|secs|second|seconds|s\\b)/gi;
+  // Time unit keywords in all supported languages
+  // English: hr(s), min(s), day(s) — game uses these regardless of UI language
+  // We also accept common OCR corruptions of these words
+  function parseDurationToHours(s) {
+    s = normalizeOCR(s);
+    let total = 0, matched = false;
+    const re = /(\\d+(?:\\.\\d+)?)\\s*(day\\(s\\)|days?|d\\b|hr\\(s\\)|h(?:rs?|ours?)\\b|h\\b|min\\(s\\)|min(?:ute)?s?\\b|m\\b|sec\\(s\\)|sec(?:ond)?s?\\b|s\\b)/gi;
     let m;
-    while((m=re.exec(s))!==null){
-      const hasNum=m[1]!==undefined&&m[1]!=='';
-      const num=hasNum?parseFloat(m[1].replace(',','.')):0;
-      const u=m[2].toLowerCase();
-      let h=0;
-      if(u.startsWith('d')) h=num*24;
-      else if(u.startsWith('h')) h=num;
-      else if(u.startsWith('m')) h=num/60;
-      else if(u.startsWith('s')) h=num/3600;
-      totalHours+=h;
-      if(hasNum) matchedAny=true;
+    while ((m = re.exec(s)) !== null) {
+      const n = parseFloat(m[1]);
+      const u = m[2].toLowerCase();
+      if (u.startsWith('d'))      total += n * 24;
+      else if (u.startsWith('h')) total += n;
+      else if (u.startsWith('m')) total += n / 60;
+      else if (u.startsWith('s')) total += n / 3600;
+      matched = true;
     }
-    return matchedAny?totalHours:null;
+    return matched ? total : null;
   }
 
-  // Find each category's label line (first match, top-down)
-  const allLabels={};
-  MS_CATEGORIES.forEach(cat=>{
-    for(let i=0;i<lines.length;i++){
-      const lower=lines[i].toLowerCase();
-      if(keywordMap[cat].some(k=>lower.includes(k))){ allLabels[i]=cat; break; }
-    }
-  });
-  for(let i=0;i<lines.length;i++){
-    const lower=lines[i].toLowerCase();
-    if(boundaryKeywords.some(k=>lower.includes(k)) && !(i in allLabels)) allLabels[i]='boundary';
-  }
-  const sortedLabelLines=Object.keys(allLabels).map(Number).sort((a,b)=>a-b);
+  // Boundary lines — values below these should be ignored (they're not the 4 speedup types)
+  const BOUNDARY_RE = /learning\\s*speedup|soldier\\s*heal|healing\\s*speedup/i;
 
-  // Build duration-bearing line index
-  const durationForLine={};
-  lines.forEach((line,i)=>{ const h=parseDurationToHours(line); if(h!==null) durationForLine[i]=h; });
-
-  // Merge adjacent lines where the FOLLOWING line has no digit (bare unit continuation like "min(s)")
-  const blocks=[]; // [{start, end, total}]
-  const sortedDurIdxs=Object.keys(durationForLine).map(Number).sort((a,b)=>a-b);
-  let i=0;
-  while(i<sortedDurIdxs.length){
-    const start=sortedDurIdxs[i];
-    let total=durationForLine[start], end=start, j=i+1;
-    while(j<sortedDurIdxs.length && sortedDurIdxs[j]===end+1 && !/\\d/.test(lines[sortedDurIdxs[j]])){
-      end=sortedDurIdxs[j]; total+=durationForLine[end]; j++;
-    }
-    blocks.push({start,end,total}); i=j;
-  }
-
-  // Strategy A: nearest-neighbor (<=2 lines)
-  const assigned={};
-  const unassignedBlocks=[];
-  blocks.forEach(({start,end,total})=>{
-    let bestLabel=null, bestDist=null;
-    sortedLabelLines.forEach(ll=>{ const d=Math.abs(start-ll); if(bestDist===null||d<bestDist){bestDist=d;bestLabel=ll;} });
-    if(bestDist!==null && bestDist<=2 && allLabels[bestLabel]!=='boundary'){
-      const cat=allLabels[bestLabel];
-      if(!(cat in assigned)) assigned[cat]={hours:total,raw:lines.slice(start,end+1).join(' / ')};
-      else unassignedBlocks.push({start,end,total});
+  // Collect all duration blocks in top-to-bottom order, stopping at boundaries
+  const durationBlocks = [];
+  let i = 0;
+  while (i < lines.length) {
+    if (BOUNDARY_RE.test(lines[i])) break; // stop at Learning/Healing section
+    const h = parseDurationToHours(lines[i]);
+    if (h !== null && h > 0) {
+      // Merge with next line if it looks like a continuation (no digit of its own)
+      let raw = lines[i], total = h, j = i + 1;
+      while (j < lines.length && !BOUNDARY_RE.test(lines[j])) {
+        const extra = parseDurationToHours(lines[j]);
+        if (extra !== null && !/\\d/.test(lines[j].replace(/hr\\(s\\)|min\\(s\\)|day\\(s\\)/gi, ''))) {
+          // continuation line (unit-only like "min(s)" with no leading digit)
+          total += extra; raw += ' ' + lines[j]; j++;
+        } else break;
+      }
+      durationBlocks.push({ hours: total, raw });
+      i = j;
     } else {
-      unassignedBlocks.push({start,end,total});
+      i++;
     }
-  });
+  }
 
-  // Strategy B: ordinal fallback for leftover blocks
-  const missingCats=sortedLabelLines.filter(ll=>allLabels[ll]!=='boundary' && !(allLabels[ll] in assigned)).map(ll=>allLabels[ll]);
-  missingCats.forEach((cat,idx)=>{
-    if(idx<unassignedBlocks.length){
-      const {start,end,total}=unassignedBlocks[idx];
-      assigned[cat]={hours:total,raw:lines.slice(start,end+1).join(' / ')};
-    }
-  });
-
-  // Write results
-  MS_CATEGORIES.forEach(cat=>{
-    if(cat in assigned){
-      const {hours,raw}=assigned[cat];
-      MS.draft.verify[cat]={amount:Math.round(hours*100)/100,unit:'hours',hours,ocrAmount:Math.round(hours*100)/100,ocrRaw:raw};
+  // Assign first 4 blocks to categories in order: general, training, construction, research
+  MS_CATEGORIES.forEach((cat, idx) => {
+    if (idx < durationBlocks.length) {
+      const { hours, raw } = durationBlocks[idx];
+      MS.draft.verify[cat] = {
+        amount: Math.round(hours * 100) / 100,
+        unit: 'hours', hours,
+        ocrAmount: Math.round(hours * 100) / 100,
+        ocrRaw: raw
+      };
     } else {
-      MS.draft.verify[cat]={amount:0,unit:'hours',hours:0,ocrAmount:null,ocrRaw:null};
+      MS.draft.verify[cat] = { amount: 0, unit: 'hours', hours: 0, ocrAmount: null, ocrRaw: null };
     }
   });
 }
