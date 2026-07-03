@@ -3926,8 +3926,8 @@ export default {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: body.toString()
         });
-        const data = await res.json();
-        return json({ raw: data });
+        const textBody = await res.text();
+        return json({ status: res.status, body: textBody.slice(0, 500) });
       } catch(e) {
         return json({ error: e.message }, 500);
       }
