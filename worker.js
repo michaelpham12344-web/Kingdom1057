@@ -4065,7 +4065,19 @@ Format exactly: {"general":0,"training":0,"construction":0,"research":0}`;
           temperature: 0.1
         });
 
-        const text = response.response || response.result || '';
+        // Normalize the model output to a string no matter what shape it comes in
+        let text = '';
+        if (typeof response === 'string') {
+          text = response;
+        } else if (response && typeof response.response === 'string') {
+          text = response.response;
+        } else if (response && typeof response.result === 'string') {
+          text = response.result;
+        } else if (response && response.result && typeof response.result.response === 'string') {
+          text = response.result.response;
+        } else {
+          text = JSON.stringify(response);
+        }
 
         // Tolerant parsing: works whether the model returns clean JSON
         // OR a chatty answer that still contains the "hr(s)/min(s)" values.
