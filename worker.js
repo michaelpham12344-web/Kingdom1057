@@ -4052,11 +4052,11 @@ export default {
 
 const prompt = `You are reading a Kingshot mobile game screenshot of the "Overview: Resources & Speedups" popup, Speedups tab.
 Read these 4 rows in this exact order: General Speedup, Soldier Training Speedup, Construction Speedup, Research Speedup.
-Each row shows a time like "26 day(s)20 hr(s)49 min(s)" or "523 hr(s)10 min(s)" or "35 hr(s)".
-Convert each to decimal hours: days*24 + hours + minutes/60. Round to 2 decimals.
+Each row shows a time using some of: day(s), hr(s), min(s). Examples: "26 day(s)20 hr(s)49 min(s)", "523 hr(s)10 min(s)", "35 hr(s)".
+Do NOT do any math. Just report the raw numbers you see for each row.
 Ignore Learning Speedups, Soldier Healing, and everything below them.
-Reply with ONLY one line of raw JSON. No explanation, no steps, no markdown, no code fences. Start with { and end with }.
-Format exactly: {"general":0,"training":0,"construction":0,"research":0}`;
+Reply with ONLY one line of raw JSON, no explanation, no markdown. Use 0 for any unit not shown. Format exactly:
+{"general":{"d":0,"h":0,"m":0},"training":{"d":0,"h":0,"m":0},"construction":{"d":0,"h":0,"m":0},"research":{"d":0,"h":0,"m":0}}`;
 
         const response = await env.AI.run(MODEL, {
           prompt,
@@ -4079,35 +4079,47 @@ Format exactly: {"general":0,"training":0,"construction":0,"research":0}`;
           text = JSON.stringify(response);
         }
 
-        // Tolerant parsing: works whether the model returns clean JSON
-        // OR a chatty answer that still contains the "hr(s)/min(s)" values.
+// Convert raw {d,h,m} to decimal hours — WE do the math, not the AI
+        const dhmToHours = (o) => {
+          if (!o || typeof o !== 'object') return null;
+          const d = Number(o.d) || 0, h = Number(o.h) || 0, m = Number(o.m) || 0;
+          return Math.round((d * 24 + h + m / 60) * 100) / 100;
+        };
+
+        // Fallback: read raw d/h/m straight from the text for one labelled row
         const segToHours = (label) => {
           const re = new RegExp(label + '[^\\n]*', 'i');
-          const m = text.match(re);
-          if (!m) return null;
-          const s = m[0].replace(/,/g, '');
+          const mt = text.match(re);
+          if (!mt) return null;
+          const s = mt[0].replace(/,/g, '');
           const d = s.match(/(\d+)\s*day/i);
           const h = s.match(/(\d+)\s*hr/i);
           const mi = s.match(/(\d+)\s*min/i);
           if (!d && !h && !mi) return null;
-          const days = d ? parseInt(d[1], 10) : 0;
-          const hrs = h ? parseInt(h[1], 10) : 0;
-          const mins = mi ? parseInt(mi[1], 10) : 0;
-          return Math.round((days * 24 + hrs + mins / 60) * 100) / 100;
+          return dhmToHours({ d: d ? d[1] : 0, h: h ? h[1] : 0, m: mi ? mi[1] : 0 });
         };
 
         let values = null;
 
-        // 1) Fast path: a clean JSON object with the right keys
-        const jsonMatch = text.match(/\{[^{}]*general[^{}]*\}/i);
+        // 1) Preferred: parse the {d,h,m} JSON the model returns, then convert
+        const jsonMatch = text.match(/\{[\s\S]*general[\s\S]*\}/i);
         if (jsonMatch) {
           try {
             const p = JSON.parse(jsonMatch[0]);
-            if (typeof p.general === 'number') values = p;
-          } catch (e) { /* fall through to text parsing */ }
+            if (p.general && typeof p.general === 'object') {
+              values = {
+                general: dhmToHours(p.general),
+                training: dhmToHours(p.training),
+                construction: dhmToHours(p.construction),
+                research: dhmToHours(p.research)
+              };
+            } else if (typeof p.general === 'number') {
+              values = p;
+            }
+          } catch (e) { /* fall through */ }
         }
 
-        // 2) Fallback: pull the numbers straight from the readable text
+        // 2) Fallback: scan the readable text row by row
         if (!values) {
           const g = segToHours('General Speedup');
           const t = segToHours('Soldier Training Speedup');
