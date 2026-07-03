@@ -1902,23 +1902,81 @@ async function msRunOCR(){
   const btnEl=document.getElementById('msScanBtn');
 
   wrapEl.style.display='block';
-  statusEl.textContent='Starting…'; statusEl.style.color='var(--text2)';
-  pctEl.textContent='0%'; barEl.style.width='0%';
+  statusEl.textContent='🤖 Reading screenshot with AI…'; statusEl.style.color='var(--text2)';
+  pctEl.textContent=''; barEl.style.width='60%';
   btnEl.disabled=true; btnEl.style.opacity='0.5'; btnEl.style.cursor='not-allowed';
 
-  // If the OCR library failed to load from the CDN (blocked network, ad-blocker,
-  // firewall, offline, etc.) tell the person clearly instead of a silent generic failure.
-  if(typeof Tesseract==='undefined'){
-    wrapEl.style.display='block';
-    statusEl.textContent='⚠ OCR engine failed to load (network/CDN blocked) — please enter values manually below';
-    statusEl.style.color='#ff7070';
-    pctEl.textContent=''; barEl.style.width='100%'; barEl.style.background='var(--enemy)';
-    MS_CATEGORIES.forEach(c=>{ if(!MS.draft.verify[c]) MS.draft.verify[c]={amount:0,unit:'hours',hours:0,ocrAmount:null,ocrRaw:null}; });
-    msMarkStepComplete(1);
-    msGoStep(2);
-    return;
+  try {
+    // ── PRIMARY: Cloudflare Workers AI Vision ──
+    // Convert image file to base64
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(msUploadedImageData);
+    });
+
+    const res = await fetch('/ocr-speedups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: base64 })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.ok && data.values) {
+        // AI returned clean values — fill them directly
+        const { general, training, construction, research } = data.values;
+        const vals = [general, training, construction, research];
+        MS_CATEGORIES.forEach((cat, idx) => {
+          const h = vals[idx] || 0;
+          MS.draft.verify[cat] = {
+            amount: Math.round(h * 100) / 100,
+            unit: 'hours', hours: h,
+            ocrAmount: Math.round(h * 100) / 100,
+            ocrRaw: 'AI Vision'
+          };
+        });
+        statusEl.textContent = '✅ AI scan complete — review the results below';
+        statusEl.style.color = 'var(--green)';
+        pctEl.textContent = '100%'; barEl.style.width = '100%';
+        btnEl.disabled=false; btnEl.style.opacity='1'; btnEl.style.cursor='pointer';
+        msMarkStepComplete(1);
+        msGoStep(2);
+        return;
+      }
+    }
+
+    // ── FALLBACK: Tesseract.js ──
+    statusEl.textContent = 'AI unavailable — falling back to local OCR…';
+    await msRunOCRTesseract(statusEl, pctEl, barEl);
+
+  } catch(err) {
+    // ── FALLBACK on network error ──
+    console.warn('AI OCR failed, falling back to Tesseract:', err.message);
+    statusEl.textContent = 'Falling back to local OCR…';
+    try {
+      await msRunOCRTesseract(statusEl, pctEl, barEl);
+    } catch(err2) {
+      statusEl.textContent = '⚠ OCR failed — please enter values manually on the next step';
+      statusEl.style.color = '#ff7070';
+      barEl.style.background = 'var(--enemy)';
+      MS_CATEGORIES.forEach(c => { if(!MS.draft.verify[c]) MS.draft.verify[c]={amount:0,unit:'hours',hours:0,ocrAmount:null,ocrRaw:null}; });
+    }
   }
 
+  btnEl.disabled=false; btnEl.style.opacity='1'; btnEl.style.cursor='pointer';
+  msMarkStepComplete(1);
+  msGoStep(2);
+}
+
+async function msRunOCRTesseract(statusEl, pctEl, barEl) {
+  if(typeof Tesseract==='undefined'){
+    statusEl.textContent='⚠ OCR engine not available — please enter values manually';
+    statusEl.style.color='#ff7070';
+    MS_CATEGORIES.forEach(c=>{ if(!MS.draft.verify[c]) MS.draft.verify[c]={amount:0,unit:'hours',hours:0,ocrAmount:null,ocrRaw:null}; });
+    return;
+  }
   const stageLabels={
     'loading tesseract core':'Loading OCR engine…',
     'initializing tesseract':'Initializing…',
@@ -1926,51 +1984,32 @@ async function msRunOCR(){
     'initializing api':'Preparing scan…',
     'recognizing text':'Reading screenshot…'
   };
-
-  try{
-    // tesseract.js v4.1.1 API: createWorker takes a SINGLE options object
-    // (the newer v5+ "createWorker(lang, oem, options)" 3-argument form is
-    // NOT supported in v4.1.1 — passing it that way silently breaks worker
-    // path resolution). After creating the worker, loadLanguage + initialize
-    // must be called explicitly before recognize().
-    const worker=await Tesseract.createWorker({
-      workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/worker.min.js',
-      corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@4.0.4',
-      langPath: 'https://tessdata.projectnaptha.com/4.0.0',
-      logger: m => {
-        if(m.status){
-          const label=stageLabels[m.status]||m.status;
-          const pct=Math.round((m.progress||0)*100);
-          statusEl.textContent=label;
-          pctEl.textContent=pct+'%';
-          barEl.style.width=pct+'%';
-        }
+  const worker=await Tesseract.createWorker({
+    workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/worker.min.js',
+    corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@4.0.4',
+    langPath: 'https://tessdata.projectnaptha.com/4.0.0',
+    logger: m => {
+      if(m.status){
+        const label=stageLabels[m.status]||m.status;
+        const pct=Math.round((m.progress||0)*100);
+        statusEl.textContent=label;
+        if(pctEl) pctEl.textContent=pct+'%';
+        if(barEl) barEl.style.width=pct+'%';
       }
-    });
-    await worker.loadLanguage('eng');
-    await worker.initialize('eng');
-    await worker.setParameters({ tessedit_pageseg_mode: '6' });
-    // Pre-process: crop to values column + boost contrast (handles Snapchat/social overlays,
-    // wrapped lines, Day(s) mode, and any language)
-    statusEl.textContent = 'Pre-processing image…';
-    const processedBlob = await msPreprocessImage(msUploadedImageData);
-    const result=await worker.recognize(processedBlob || msUploadedImageData);
-    await worker.terminate();
-    const text=result.data.text||'';
-    msParseOCRText(text);
-    statusEl.textContent='✓ Scan complete — review the results on the next step';
-    statusEl.style.color='var(--green)';
-    pctEl.textContent='100%'; barEl.style.width='100%';
-  }catch(err){
-    console.error('OCR error:', err);
-    statusEl.textContent='⚠ OCR failed: '+(err&&err.message?err.message:'unknown error')+' — please enter values manually on the next step';
-    statusEl.style.color='#ff7070';
-    barEl.style.background='var(--enemy)';
-    MS_CATEGORIES.forEach(c=>{ if(!MS.draft.verify[c]) MS.draft.verify[c]={amount:0,unit:'hours',hours:0,ocrAmount:null,ocrRaw:null}; });
-  }
-  btnEl.disabled=false; btnEl.style.opacity='1'; btnEl.style.cursor='pointer';
-  msMarkStepComplete(1);
-  msGoStep(2);
+    }
+  });
+  await worker.loadLanguage('eng');
+  await worker.initialize('eng');
+  await worker.setParameters({ tessedit_pageseg_mode: '6' });
+  statusEl.textContent = 'Pre-processing image…';
+  const processedBlob = await msPreprocessImage(msUploadedImageData);
+  const result=await worker.recognize(processedBlob || msUploadedImageData);
+  await worker.terminate();
+  msParseOCRText(result.data.text||'');
+  statusEl.textContent='✓ Scan complete — review the results below';
+  statusEl.style.color='var(--green)';
+  if(pctEl) pctEl.textContent='100%';
+  if(barEl) barEl.style.width='100%';
 }
 
 function msSkipToManual(){
@@ -3886,6 +3925,62 @@ export default {
         results: (e.results||[]).map(r=>({name:r.name,ok:r.ok,err:r.err}))
       }));
       return json({log:display});
+    }
+
+    // ── AI Vision OCR for speedup screenshots ──
+    if (url.pathname==='/ocr-speedups' && request.method==='POST') {
+      try {
+        if (!env.AI) return json({ok:false, error:'AI binding not configured'}, 500);
+
+        const body = await request.json();
+        const imageBase64 = body.image; // base64 encoded image
+        if (!imageBase64) return json({ok:false, error:'No image provided'}, 400);
+
+        // Convert base64 to uint8array for the API
+        const imageBytes = Uint8Array.from(atob(imageBase64), c => c.charCodeAt(0));
+
+        const MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
+
+        // Auto-agree to Meta license on first use (stored in KV)
+        const agreedKey = 'llama_vision_agreed';
+        const agreed = await env.SVS_KV.get(agreedKey);
+        if (!agreed) {
+          try {
+            await env.AI.run(MODEL, { prompt: 'agree' });
+            await env.SVS_KV.put(agreedKey, '1');
+          } catch(e) { /* ignore - may already be agreed */ }
+        }
+
+        const prompt = `This is a Kingshot mobile game screenshot showing "Overview: Resources & Speedups" on the Speedups tab.
+Extract ONLY these 4 speedup values and return them as JSON with decimal hours.
+The order in the game is always: General Speedup, Soldier Training Speedup, Construction Speedup, Research Speedup.
+Convert all time to decimal hours. Examples: "26 day(s)20 hr(s)49 min(s)" = 644.82, "523 hr(s)10 min(s)" = 523.17, "22 day(s)9 hr(s)1 min(s)" = 537.02
+Ignore Learning Speedups, Soldier Healing, and anything below them.
+Return ONLY this JSON with no other text: {"general":0,"training":0,"construction":0,"research":0}`;
+
+        const response = await env.AI.run(MODEL, {
+          prompt,
+          image: [...imageBytes],
+          max_tokens: 100,
+          temperature: 0.1
+        });
+
+        // Parse the response
+        const text = response.response || response.result || '';
+        const match = text.match(/\{[^}]+\}/);
+        if (!match) return json({ok:false, error:'Could not parse AI response', raw: text}, 422);
+
+        const values = JSON.parse(match[0]);
+        // Validate all 4 values are numbers
+        const cats = ['general','training','construction','research'];
+        for (const c of cats) {
+          if (typeof values[c] !== 'number') values[c] = 0;
+        }
+
+        return json({ok:true, values});
+      } catch(e) {
+        return json({ok:false, error:e.message}, 500);
+      }
     }
 
     // Shared state
