@@ -534,8 +534,8 @@ document.addEventListener('touchend',function(e){
       </div>
       <!-- OUTAGE BYPASS — hidden unless kingshot.net is down -->
         <div id="bypassBox" style="display:none;margin-top:16px;background:rgba(255,157,77,.08);border:1px solid rgba(255,157,77,.4);border-radius:8px;padding:14px">
-          <div style="font-weight:600;color:#ff9d4d;margin-bottom:4px">⚠ Kingshot.net is currently down</div>
-          <p style="color:var(--text2);font-size:12px;margin-bottom:12px">Player ID verification is temporarily unavailable. Use a backup method below to enter.</p>
+          <div style="font-weight:600;color:#ff9d4d;margin-bottom:4px">⚠ Player ID verification is temporarily unavailable</div>
+          <p style="color:var(--text2);font-size:12px;margin-bottom:12px">Please use our backup method to enter the site.</p>
           <div style="margin-bottom:14px">
             <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px">👤 Members — enter manually</div>
             <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -549,7 +549,7 @@ document.addEventListener('touchend',function(e){
             </div>
           </div>
           <div>
-            <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px">🛡 Rally Leaders / R4/R5 / Admin — password</div>
+            <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px">🛡 R4/R5 — enter your name, alliance & password</div>
             <div style="display:flex;gap:6px">
               <input type="password" id="bypassPwInput" placeholder="Password" style="flex:1" onkeydown="if(event.key==='Enter')bypassCheckPassword()">
               <button class="btn btn-primary btn-sm" onclick="bypassCheckPassword()">Enter</button>
@@ -2776,15 +2776,22 @@ async function bypassCheckPassword() {
   const input = document.getElementById('bypassPwInput');
   const errEl = document.getElementById('bypassPwError');
   if (!input) return;
+
+  // R4/R5, Rally Leaders and Admin must also give name + alliance
+  const name = (document.getElementById('bypassName').value || '').trim();
+  const alliance = document.getElementById('bypassAlliance').value;
+  if (!name) { toast('Enter your in-game name first.'); return; }
+  if (!alliance) { toast('Select your alliance first.'); return; }
+
   const pw = input.value;
   await loadPasswords();
   let role = null;
   if (checkPassword('admin', pw))            role = 'admin';
   else if (checkPassword('r4r5', pw))        role = 'r4r5';
   else if (checkPassword('rallyleader', pw)) role = 'rallyleader';
+
   if (role) {
-    if (!verifiedPlayer) verifiedPlayer = { id: 'bypass_' + role, name: role.toUpperCase(), kingdom: 1057, level: null, avatar: null };
-    const alliance = (role === 'rallyleader' || role === 'admin') ? null : (AUTH.alliance || null);
+    verifiedPlayer = { id: 'bypass_' + role + '_' + Date.now(), name, kingdom: 1057, level: null, avatar: null };
     _registerAndEnter(role, alliance);
   } else {
     if (errEl) { errEl.style.display = 'block'; input.value = ''; input.focus(); setTimeout(() => errEl.style.display = 'none', 3000); }
