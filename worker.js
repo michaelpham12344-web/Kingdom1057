@@ -2748,7 +2748,7 @@ let _ksNetIsDown = false;
 
 async function checkKingshotHealth() {
   try {
-    const res = await fetch('/kingshot-player?id=' + ADMIN_PLAYER_ID, { cache: 'no-store' });
+    const res = await fetch('/kingshot-player?id=158134757', { cache: 'no-store' });
     const data = await res.json();
     if (data && (data.status === 'success' || data.status === 'fail')) { _ksNetIsDown = false; return; }
     _ksNetIsDown = true;
@@ -3063,6 +3063,7 @@ async function initApp() {
   const mn = document.getElementById('mainNav');
   if (lp) lp.style.display = 'flex';
   if (mn) mn.style.display = 'none';
+  checkKingshotHealth();
 }
 
 // ════════════════════════════════════════════════════════
