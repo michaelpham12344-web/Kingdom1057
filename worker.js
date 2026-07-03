@@ -3912,7 +3912,26 @@ export default {
         return json(result);
       } catch(e) { return json({ok:false,message:e.message},500); }
     }
-
+    
+// ── TEMP TEST: check what Century Games player endpoint returns ──
+    if (url.pathname==='/test-cg-player' && request.method==='GET') {
+      const fid = url.searchParams.get('id');
+      if (!fid) return json({error:'add ?id=YOURID'}, 400);
+      const time = Date.now();
+      const sign = signRequest(fid, time);
+      const body = new URLSearchParams({ fid: String(fid), time: String(time), sign });
+      try {
+        const res = await fetch(GIFTCODE_API + '/player', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: body.toString()
+        });
+        const data = await res.json();
+        return json({ raw: data });
+      } catch(e) {
+        return json({ error: e.message }, 500);
+      }
+    }
     // Gift redemption log
     if (url.pathname==='/gift-log' && request.method==='GET') {
       const raw = await env.SVS_KV.get(GIFT_LOG_KEY);
