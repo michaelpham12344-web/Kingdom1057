@@ -1909,12 +1909,7 @@ async function msRunOCR(){
   try {
     // ── PRIMARY: Cloudflare Workers AI Vision ──
     // Convert image file to base64
-    const base64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]);
-      reader.onerror = reject;
-      reader.readAsDataURL(msUploadedImageData);
-    });
+const base64 = msUploadedImageData.split(',')[1];
 
     const res = await fetch('/ocr-speedups', {
       method: 'POST',
