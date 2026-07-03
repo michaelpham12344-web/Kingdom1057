@@ -6,5 +6,8 @@ compatibility_date = "2026-06-01"
 binding = "SVS_KV"
 id = "885986c8129340b18a86126582ad5def"
 
+[ai]
+binding = "AI"
+
 [triggers]
 crons = ["*/30 * * * *"]
