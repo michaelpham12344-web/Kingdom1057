@@ -2038,9 +2038,12 @@ function msParseOCRText(text){
   function normalizeOCR(s) {
     s = s.replace(/(\\d),(\\d{3})/g, '$1$2');
     s = s.replace(/(\\d),(\\d{3})/g, '$1$2');
-    // Fix I/l → 1 when used as a digit (e.g. "I min(s)" → "1 min(s)")
+    // Fix I/l/! → 1 when used as a digit
     s = s.replace(/\\bI\\b(?=\\s*[a-zA-Z\\(])/g, '1');
     s = s.replace(/(\\d)I(?=\\s)/g, '$11');
+    s = s.replace(/(\\d)!(?=\\s)/g, '$11');
+    s = s.replace(/\\)!/g, ')1');              // "day(s)! hr" → "day(s)1 hr"
+    s = s.replace(/!(?=\\s*(?:hr|min|day))/gi, '1'); // "! hr(s)" → "1 hr(s)"
     return s;
   }
 
