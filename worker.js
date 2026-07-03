@@ -4105,7 +4105,8 @@ Reply with ONLY one line of raw JSON, no explanation, no markdown. Use 0 for any
         const jsonMatch = text.match(/\{[\s\S]*general[\s\S]*\}/i);
         if (jsonMatch) {
           try {
-            const p = JSON.parse(jsonMatch[0]);
+            let p = JSON.parse(jsonMatch[0]);
+            if (p.response && typeof p.response === 'object') p = p.response;
             if (p.general && typeof p.general === 'object') {
               values = {
                 general: dhmToHours(p.general),
