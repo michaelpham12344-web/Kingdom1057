@@ -3949,30 +3949,67 @@ export default {
           } catch(e) { /* ignore - may already be agreed */ }
         }
 
-        const prompt = `This is a Kingshot mobile game screenshot showing "Overview: Resources & Speedups" on the Speedups tab.
-Extract ONLY these 4 speedup values and return them as JSON with decimal hours.
-The order in the game is always: General Speedup, Soldier Training Speedup, Construction Speedup, Research Speedup.
-Convert all time to decimal hours. Examples: "26 day(s)20 hr(s)49 min(s)" = 644.82, "523 hr(s)10 min(s)" = 523.17, "22 day(s)9 hr(s)1 min(s)" = 537.02
-Ignore Learning Speedups, Soldier Healing, and anything below them.
-Return ONLY this JSON with no other text: {"general":0,"training":0,"construction":0,"research":0}`;
+const prompt = `You are reading a Kingshot mobile game screenshot of the "Overview: Resources & Speedups" popup, Speedups tab.
+Read these 4 rows in this exact order: General Speedup, Soldier Training Speedup, Construction Speedup, Research Speedup.
+Each row shows a time like "26 day(s)20 hr(s)49 min(s)" or "523 hr(s)10 min(s)" or "35 hr(s)".
+Convert each to decimal hours: days*24 + hours + minutes/60. Round to 2 decimals.
+Ignore Learning Speedups, Soldier Healing, and everything below them.
+Reply with ONLY one line of raw JSON. No explanation, no steps, no markdown, no code fences. Start with { and end with }.
+Format exactly: {"general":0,"training":0,"construction":0,"research":0}`;
 
         const response = await env.AI.run(MODEL, {
           prompt,
           image: [...imageBytes],
-          max_tokens: 100,
+          max_tokens: 400,
           temperature: 0.1
         });
 
-        // Parse the response
         const text = response.response || response.result || '';
-        const match = text.match(/\{[^}]+\}/);
-        if (!match) return json({ok:false, error:'Could not parse AI response', raw: text}, 422);
 
-        const values = JSON.parse(match[0]);
-        // Validate all 4 values are numbers
-        const cats = ['general','training','construction','research'];
-        for (const c of cats) {
-          if (typeof values[c] !== 'number') values[c] = 0;
+        // Tolerant parsing: works whether the model returns clean JSON
+        // OR a chatty answer that still contains the "hr(s)/min(s)" values.
+        const segToHours = (label) => {
+          const re = new RegExp(label + '[^\\n]*', 'i');
+          const m = text.match(re);
+          if (!m) return null;
+          const s = m[0].replace(/,/g, '');
+          const d = s.match(/(\d+)\s*day/i);
+          const h = s.match(/(\d+)\s*hr/i);
+          const mi = s.match(/(\d+)\s*min/i);
+          if (!d && !h && !mi) return null;
+          const days = d ? parseInt(d[1], 10) : 0;
+          const hrs = h ? parseInt(h[1], 10) : 0;
+          const mins = mi ? parseInt(mi[1], 10) : 0;
+          return Math.round((days * 24 + hrs + mins / 60) * 100) / 100;
+        };
+
+        let values = null;
+
+        // 1) Fast path: a clean JSON object with the right keys
+        const jsonMatch = text.match(/\{[^{}]*general[^{}]*\}/i);
+        if (jsonMatch) {
+          try {
+            const p = JSON.parse(jsonMatch[0]);
+            if (typeof p.general === 'number') values = p;
+          } catch (e) { /* fall through to text parsing */ }
+        }
+
+        // 2) Fallback: pull the numbers straight from the readable text
+        if (!values) {
+          const g = segToHours('General Speedup');
+          const t = segToHours('Soldier Training Speedup');
+          const c = segToHours('Construction Speedup');
+          const r = segToHours('Research Speedup');
+          if (g !== null || t !== null || c !== null || r !== null) {
+            values = { general: g, training: t, construction: c, research: r };
+          }
+        }
+
+        if (!values) return json({ok:false, error:'Could not parse AI response', raw: text}, 422);
+
+        // Ensure all 4 are numbers
+        for (const c of ['general','training','construction','research']) {
+          if (typeof values[c] !== 'number' || isNaN(values[c])) values[c] = 0;
         }
 
         return json({ok:true, values});
