@@ -2260,15 +2260,18 @@ function msClearPicks(){
 }
 
 function msFillRangeDropdowns(){
-  const fromSel=document.getElementById('msRangeFrom'), toSel=document.getElementById('msRangeTo');
-  if(!fromSel || !toSel) return;
-  if(fromSel.options.length) return;
-  for(let i=0;i<MS_TOTAL_SLOTS;i++){
-    const t=msSlotLabel(i).split('-')[0];
-    fromSel.add(new Option(t,i));
-    toSel.add(new Option(t,i));
-  }
-  fromSel.value=14; toSel.value=44;
+  try {
+    const fromSel=document.getElementById('msRangeFrom'), toSel=document.getElementById('msRangeTo');
+    if(!fromSel || !toSel) return;
+    if(fromSel.options.length) return;
+    for(let i=0;i<MS_TOTAL_SLOTS;i++){
+      const h=Math.floor((i*30)/60), m=(i*30)%60;
+      const t=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+      fromSel.add(new Option(t,i));
+      toSel.add(new Option(t,i));
+    }
+    fromSel.value=14; toSel.value=44;
+  } catch(e){ console.error('msFillRangeDropdowns failed:', e); }
 }
 
 // ── Deadline management ──
