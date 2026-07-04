@@ -1796,11 +1796,7 @@ function msSlotLabel(i){
       MS._submittedEntry = null;
     }
   }
-  // Also check the shared submissions array for this player's entry
-  if(pid && !MS._submittedEntry) {
-    const fromState = MS.submissions.find(s => s.playerId === pid);
-    if(fromState) { MS._submittedEntry = fromState; lsSet('ms_submitted_' + pid, fromState); }
-  }
+  
   // Auto-fill identity from verified player session
   const vp = verifiedPlayer || (() => { try { const s = sessionStorage.getItem('verifiedPlayer'); return s ? JSON.parse(s) : null; } catch(e) { return null; } })();
   const alliance = (typeof AUTH !== 'undefined' && AUTH.alliance) ? AUTH.alliance : (lsGet ? lsGet('alliance') : null);
@@ -2628,18 +2624,25 @@ function msCopySchedule(){
   copyText(lines.join('\\n'));
   toast('Schedule copied!');
 }
+
 function msClearAllSubs(){
   if(!confirm('Clear all Minister Spots submissions? This cannot be undone.')) return;
   MS.submissions=[];
-  MS.submissionsByPlayer={};   // <-- the missing piece: clear the per-player store too
+  MS.submissionsByPlayer={};
   MS._lastAllocation=null;
-  // Also clear any locally-saved submitted entry so it can't repopulate
   MS._submittedEntry=null;
+  try {
+    for(let i=localStorage.length-1; i>=0; i--){
+      const k=localStorage.key(i);
+      if(k && (k.indexOf('ks1057_ms_submitted_')===0 || k.indexOf('ks1057_ms_progress_')===0)) localStorage.removeItem(k);
+    }
+  } catch(e){}
   msRenderResultsSummary();
   if(typeof msRenderFinalSchedule==='function') msRenderFinalSchedule();
   if(typeof msRenderRejectedList==='function') msRenderRejectedList();
   if(typeof msRenderSlotGrid==='function') msRenderSlotGrid();
-  syncQueuePush();
+  // Save immediately (not debounced) so the clear reaches the backend before any sign-out
+  if(typeof syncPushNow==='function') syncPushNow(); else syncQueuePush();
   if(typeof toast==='function') toast('All submissions cleared.');
 }
 </script>
