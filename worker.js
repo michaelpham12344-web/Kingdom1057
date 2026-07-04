@@ -1781,7 +1781,10 @@ function msSlotLabel(i){
   return \`\${String(h).padStart(2,'0')}:\${String(m).padStart(2,'0')}-\${String(h2).padStart(2,'0')}:\${String(m2).padStart(2,'0')}\`;
 }
 
-// Restore the member's OWN submission for display only.
+function msInit(){
+  if(MS._unlockedStep===undefined) MS._unlockedStep=1;
+  const pid = verifiedPlayer ? String(verifiedPlayer.id) : null;
+  // Restore the member's OWN submission for display only.
   // A local copy must NEVER re-add itself to the shared submissions —
   // otherwise an admin "Clear all" gets undone when members sign back in.
   // The shared backend (synced state) is the single source of truth.
