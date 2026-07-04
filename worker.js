@@ -1816,7 +1816,7 @@ function msInit(){
     if (msIGNEl) msIGNEl.value = vp.name || '';
   }
   // If member has existing submission, show overview directly
-  if(MS._submittedEntry && !msCanAccessResults()) {
+  if(MS._submittedEntry && !msCanAccessResults() && !MS._editing) {
     const tab0 = document.getElementById('msStepTab0');
     if(tab0) tab0.style.display = '';
     msGoStep(0);
@@ -2215,10 +2215,10 @@ function msRenderSlotGrid(){
   }
 
   const groups=[
-    {label:'· 00:00–06:00', start:0, end:12},
-    {label:'· 06:00–12:00', start:12, end:24},
-    {label:'· 12:00–18:00', start:24, end:36},
-    {label:'· 18:00–24:00', start:36, end:48}
+    {label:'· 00:00–06:00 UTC', start:0, end:12},
+    {label:'· 06:00–12:00 UTC', start:12, end:24},
+    {label:'· 12:00–18:00 UTC', start:24, end:36},
+    {label:'· 18:00–24:00 UTC', start:36, end:48}
   ];
 
   grid.innerHTML = groups.map(g=>{
@@ -2395,6 +2395,7 @@ function msShowOverview(entry) {
   const tab0 = document.getElementById('msStepTab0');
   if(tab0) tab0.style.display = '';
   MS._submittedEntry = entry;
+  MS._editing = false;
   MS._unlockedStep = 0; // lock steps 1-4
   msGoStep(0);
   msRenderOverview(entry);
@@ -2418,7 +2419,7 @@ function msRenderOverview(entry) {
     const h = entry.committedHours[cat]||0;
     const pct = entry.commit[cat]||50;
     html += '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:8px 12px;min-width:140px">' +
-      '<div style="font-size:11px;color:var(--text3)">' + MS_CATEGORY_LABELS[MS_CATEGORIES.indexOf(cat)] + '</div>' +
+      '<div style="font-size:11px;color:var(--text3)">' + MS_CATEGORY_LABELS[cat] + '</div>' +
       '<div style="font-weight:600;color:var(--accent2)">' + h.toFixed(1) + 'h</div>' +
       '<div style="font-size:11px;color:var(--text3)">' + pct + '% of ' + (v?v.hours.toFixed(1):0) + 'h total</div>' +
       '</div>';
@@ -2435,18 +2436,25 @@ function msRenderOverview(entry) {
 }
 
 function msEditSubmission() {
-  if(!confirm("This will let you edit your submission. You'll need to go through all steps again. Your current submission stays saved until you submit a new one. Continue?")) return;
-  // Clear draft but keep existing submission intact until they resubmit
-  MS.draft = {alliance:'', ign:'', verify:{}, commit:{}, picks:[]};
-  MS._unlockedStep = 1;
-  MS._submittedEntry = null;
-  // Hide overview tab
+  if(!confirm("This will let you edit your submission. Your current submission stays saved and visible until you submit a new one. Continue?")) return;
+  MS._editing = true;
+  // Pre-fill the draft from the existing submission so nothing is lost
+  const cur = MS._submittedEntry;
+  if(cur){
+    MS.draft = {
+      alliance: cur.alliance||'', ign: cur.ign||'',
+      verify: JSON.parse(JSON.stringify(cur.verify||{})),
+      commit: JSON.parse(JSON.stringify(cur.commit||{})),
+      picks: (cur.picks||[]).slice()
+    };
+  } else {
+    MS.draft = {alliance:'', ign:'', verify:{}, commit:{}, picks:[]};
+  }
+  MS._unlockedStep = 4; // all steps unlocked since they already completed them
+  // Keep the overview tab visible so they can still see their current submission
   const tab0 = document.getElementById('msStepTab0');
-  if(tab0) tab0.style.display = 'none';
-  // Clear localStorage progress
-  const pid = verifiedPlayer ? String(verifiedPlayer.id) : null;
-  if(pid) lsClear('ms_progress_' + pid);
-  msInit();
+  if(tab0) tab0.style.display = '';
+  msRenderStepTabs();
   msGoStep(1);
 }
 
