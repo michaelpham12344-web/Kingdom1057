@@ -2552,7 +2552,7 @@ function msRunAllocation(){
   const rejected = [];
   const unassigned = [];
   remaining.forEach(entry => {
-    if(takenSlots.size >= MS_TOTAL_SLOTS){ rejected.push(entry); return; }
+    if(takenSlots.size >= MS_TOTAL_SLOTS){ entry._rejectReason='all-full'; rejected.push(entry); return; }
     const favs = (entry.favourites||[]).filter(s => !takenSlots.has(s));
     const pick = favs.length ? favs[0] : (entry.picks||[]).find(s => !takenSlots.has(s));
     if(pick !== undefined){ takenSlots.add(pick); assignments.push({entry, slot:pick}); placed.add(entry.ign); }
@@ -2561,7 +2561,7 @@ function msRunAllocation(){
 
 // Philosophy B: you ONLY get a slot you actually picked.
   // If all your picked slots are taken, you are rejected — never assigned a random slot.
-  unassigned.forEach(entry => { rejected.push(entry); });
+  unassigned.forEach(entry => { entry._rejectReason='picks-taken'; rejected.push(entry); });
 
   assignments.sort((a,b) => a.slot - b.slot);
   const winners = assignments.map(a => a.entry);
@@ -2652,20 +2652,33 @@ function msTogglePin(idx) {
   syncQueuePush();
   toast(a.pinned ? 'Slot pinned — protected from re-allocation.' : 'Slot unpinned.');
 }
+
 function msRenderRejectedList(){
   const el=document.getElementById('msRejectedList'); if(!el) return;
   if(!MS._lastAllocation || !MS._lastAllocation.rejected.length){
     el.innerHTML='<div style="color:var(--text3);font-size:13px">—</div>';
     return;
   }
-  el.innerHTML=MS._lastAllocation.rejected.map((entry,i)=>\`
-    <div class="ms-rank-row rejected">
-      <span class="ms-rank-num mono">#\${MS_TOTAL_SLOTS+i+1}</span>
-      <strong>\${entry.ign}</strong>
-      <span style="color:var(--text3);font-size:12px">\${entry.alliance}</span>
-      <span style="margin-left:auto" class="mono">\${entry.committedHours[MS_RANK_CATEGORY].toFixed(1)}h training</span>
-    </div>\`).join('');
+  const canEdit = msCanAccessResults();
+  function reasonFor(entry){
+    const picks=(entry.picks||[]).length;
+    if(picks < MS_MIN_SLOTS_PICKED) return 'Picked fewer than the minimum '+MS_MIN_SLOTS_PICKED+' slots';
+    if(entry._rejectReason==='all-full') return 'All 48 slots were filled before this player could be placed';
+    return 'Every slot this player picked was taken by higher-priority players';
+  }
+  el.innerHTML=MS._lastAllocation.rejected.map(function(entry,i){
+    const reason = reasonFor(entry);
+    const info = canEdit ? '<span title="'+reason.replace(/"/g,'&quot;')+'" style="cursor:help;margin-left:6px;opacity:.7;font-size:12px">ⓘ why</span>' : '';
+    return '<div class="ms-rank-row rejected">'+
+      '<span class="ms-rank-num mono">#'+(MS_TOTAL_SLOTS+i+1)+'</span>'+
+      '<strong>'+entry.ign+'</strong>'+
+      '<span style="color:var(--text3);font-size:12px">'+entry.alliance+'</span>'+
+      '<span style="margin-left:auto" class="mono">'+entry.committedHours[MS_RANK_CATEGORY].toFixed(1)+'h training</span>'+
+      info+
+    '</div>';
+  }).join('');
 }
+
 function msCopySchedule(){
   if(!MS._lastAllocation || !MS._lastAllocation.assignments.length){ toast('Run allocation first!'); return; }
   const lines=['=== Noble Advisor — Day 4 Schedule ===',
