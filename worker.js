@@ -949,8 +949,17 @@ const MS = {
   draft: { alliance:'', ign:'', verify:{}, commit:{}, picks:[], favourites:[] }, // in-progress entry
   submissions: [], // {id, alliance, ign, verify:{cat:{amount,unit,hours}}, commit:{cat:pct}, picks:[slotIdx...], committedHours:{cat:hours}}
   _lastAllocation: null,
+  auditLog: [], // {who, action, when} — last ~25 manual leader changes, shared across leaders
   _currentStep: 1
 };
+
+// Record a leader action to the shared audit log
+function msLogAction(action){
+  var who = (typeof verifiedPlayer!=='undefined' && verifiedPlayer && verifiedPlayer.name) ? verifiedPlayer.name : (AUTH.role||'leader');
+  MS.auditLog = MS.auditLog || [];
+  MS.auditLog.unshift({ who: who, action: action, when: Date.now() });
+  if(MS.auditLog.length > 30) MS.auditLog = MS.auditLog.slice(0, 30);
+}
 
 // ════════════ SHARED SYNC (Cloudflare Worker + KV) ════════════
 // Set this to your deployed Worker URL — see DEPLOY.md
@@ -981,7 +990,8 @@ let syncSerialize = function() {
     msSubmissions: (typeof MS!=='undefined') ? MS.submissions : [],
     msLastAllocation: (typeof MS!=='undefined') ? MS._lastAllocation : null,
     msDeadline: (typeof MS!=='undefined') ? MS.deadline : null,
-    msSubmissionsByPlayer: (typeof MS!=='undefined') ? (MS.submissionsByPlayer||{}) : {}
+    msSubmissionsByPlayer: (typeof MS!=='undefined') ? (MS.submissionsByPlayer||{}) : {},
+    msAuditLog: (typeof MS!=='undefined') ? (MS.auditLog||[]) : []
   });
 }
 
@@ -1006,6 +1016,7 @@ let syncApplyRemote = function(data) {
       MS._lastAllocation = data.msLastAllocation || null;
       MS.deadline = data.msDeadline || null;
       if(data.msSubmissionsByPlayer) { MS.submissionsByPlayer = data.msSubmissionsByPlayer; MS.submissions = Object.values(MS.submissionsByPlayer); }
+      if(data.msAuditLog) { MS.auditLog = data.msAuditLog; }
       if (typeof msRenderResultsSummary==='function') msRenderResultsSummary();
       if (typeof msRenderFinalSchedule==='function') msRenderFinalSchedule();
       if (typeof msRenderRejectedList==='function') msRenderRejectedList();
