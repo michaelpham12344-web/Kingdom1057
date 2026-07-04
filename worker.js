@@ -2215,10 +2215,10 @@ function msRenderSlotGrid(){
   }
 
   const groups=[
-    {label:'🌙 Night · 00:00–06:00', start:0, end:12},
-    {label:'☀️ Morning · 06:00–12:00', start:12, end:24},
-    {label:'🌤 Afternoon · 12:00–18:00', start:24, end:36},
-    {label:'🌆 Evening · 18:00–24:00', start:36, end:48}
+    {label:'· 00:00–06:00', start:0, end:12},
+    {label:'· 06:00–12:00', start:12, end:24},
+    {label:'· 12:00–18:00', start:24, end:36},
+    {label:'· 18:00–24:00', start:36, end:48}
   ];
 
   grid.innerHTML = groups.map(g=>{
@@ -2232,9 +2232,9 @@ function msRenderSlotGrid(){
       else if(taken){ bg='rgba(120,120,120,.25)'; fg='var(--text3)'; bd='1px solid var(--border)'; sub='taken'; }
       else { const c=band(pop); bg=c.bg; fg=c.fg; bd=c.bd; sub=(pop>0?pop+' want':'free'); }
       const click = taken ? '' : 'onclick="msTogglePick('+i+')"';
-      return '<button class="ms-slot-btn" '+click+' style="padding:8px 2px;border-radius:6px;font-family:var(--mono);font-size:11px;line-height:1.3;cursor:'+(taken?'not-allowed':'pointer')+';background:'+bg+';color:'+fg+';border:'+bd+';text-align:center">'+msSlotLabel(i)+'<br><span style="font-size:9px;opacity:.85">'+sub+'</span></button>';
+      return '<button class="ms-slot-btn" '+click+' style="padding:10px 3px;border-radius:6px;font-family:var(--mono);font-size:13px;line-height:1.35;cursor:'+(taken?'not-allowed':'pointer')+';background:'+bg+';color:'+fg+';border:'+bd+';text-align:center">'+msSlotLabel(i)+'<br><span style="font-size:11px;opacity:.85">'+sub+'</span></button>';
     }).join('');
-    return '<div style="font-size:11px;color:var(--text3);margin:10px 0 6px;letter-spacing:.03em">'+g.label+'</div>'+
+    return '<div style="font-size:13px;color:var(--text3);margin:12px 0 6px;letter-spacing:.03em">'+g.label+'</div>'+
            '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px">'+cells+'</div>';
   }).join('');
 
