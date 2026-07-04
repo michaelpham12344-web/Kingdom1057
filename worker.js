@@ -755,7 +755,7 @@ document.addEventListener('touchend',function(e){
     <button class="tab ms-step-tab" id="msStepTab2" onclick="msGoStep(2)">2. Verify</button>
     <button class="tab ms-step-tab" id="msStepTab3" onclick="msGoStep(3)">3. Commitment</button>
     <button class="tab ms-step-tab" id="msStepTab4" onclick="msGoStep(4)">4. Timeslots &amp; Submit</button>
-    <button class="tab ms-step-tab" id="msStepTab5" onclick="msGoStep(5)" style="margin-left:auto;display:none">5. Results &amp; Schedule</button>
+    <button class="tab ms-step-tab" id="msStepTab5" onclick="msGoStep(5)" style="margin-left:auto;display:none;color:var(--gold);border-color:var(--gold)">👑 Manage Spots <span title="Leader controls for Minister Spots. Lock players into specific slots, manually assign or move anyone (even non-submitters), and review who wasn't selected and why." style="cursor:help;opacity:.7;font-size:11px">ⓘ</span></button>
   </div>
 
   <!-- STEP 0: MY SUBMISSION OVERVIEW -->
