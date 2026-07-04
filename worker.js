@@ -865,11 +865,11 @@ document.addEventListener('touchend',function(e){
         <button class="btn btn-sm btn-ghost" onclick="msClearPicks()">Clear all</button>
       </div>
 
-      <div id="msSlotLegend" style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--text2);margin-bottom:12px">
+        <div id="msSlotLegend" style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--text2);margin-bottom:12px">
         <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--bg4);border:1px solid var(--border);vertical-align:-1px"></span> free</span>
-        <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#97C459;vertical-align:-1px"></span> low</span>
-        <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#EF9F27;vertical-align:-1px"></span> filling</span>
-        <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#E24B4A;vertical-align:-1px"></span> contested</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#97C459;vertical-align:-1px"></span> wide open</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#EF9F27;vertical-align:-1px"></span> some interest</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#E24B4A;vertical-align:-1px"></span> high demand</span>
         <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--accent);vertical-align:-1px"></span> your pick</span>
       </div>
 
@@ -2477,53 +2477,74 @@ function msRenderResultsSummary(){
 function msRunAllocation(){
   if(!MS.submissions.length){ toast('No submissions yet.'); return; }
 
-  // Collect pinned slots from previous allocation — these are locked
-  const pinned = new Map(); // slot → entry (preserved from previous run)
+  // Preserve leader-locked (pinned) slots from the previous run
+  const pinned = new Map(); // slot(number) → entry
   if(MS._lastAllocation){
-    MS._lastAllocation.assignments.forEach(a => {
-      if(a.pinned) pinned.set(a.slot, a.entry);
-    });
+    MS._lastAllocation.assignments.forEach(a => { if(a.pinned) pinned.set(a.slot, a.entry); });
   }
-
-  // Rank by committed Training hours, descending
-  const ranked=[...MS.submissions].sort((a,b)=>b.committedHours[MS_RANK_CATEGORY]-a.committedHours[MS_RANK_CATEGORY]);
-
-  // Remove from ranking anyone who is in a pinned slot (they're already placed)
   const pinnedIGNs = new Set([...pinned.values()].map(e => e.ign));
-  const unranked = ranked.filter(e => !pinnedIGNs.has(e.ign));
-
-  const winners = unranked.slice(0, MS_TOTAL_SLOTS - pinned.size);
-  const rejected = unranked.slice(MS_TOTAL_SLOTS - pinned.size);
-
-  // Build taken slots set from pinned
   const takenSlots = new Set(pinned.keys());
   const assignments = [];
+  pinned.forEach((entry, slot) => { assignments.push({entry, slot, pinned:true}); });
 
-  // Place pinned slots first
-  pinned.forEach((entry, slot) => {
-    assignments.push({entry, slot, pinned: true});
+  // Everyone not already locked in is a candidate for the remaining slots
+  const candidates = MS.submissions.filter(e => !pinnedIGNs.has(e.ign));
+
+  const hoursOf = e => (e.committedHours && e.committedHours[MS_RANK_CATEGORY]) || 0;
+  const timeOf  = e => e.submittedAt ? new Date(e.submittedAt).getTime() : 0;
+
+  // ── PASS 1 — protect the constrained ──
+  // Sort by FEWEST picks first. Tie: more hours, then earlier submission.
+  const byConstraint = [...candidates].sort((a,b) => {
+    const pa=(a.picks||[]).length, pb=(b.picks||[]).length;
+    if(pa!==pb) return pa-pb;
+    if(hoursOf(a)!==hoursOf(b)) return hoursOf(b)-hoursOf(a);
+    return timeOf(a)-timeOf(b);
   });
 
-  // Assign remaining winners to free slots
+  const placed = new Set(); // IGNs already given a slot
+  const CONSTRAINED_MAX_PICKS = MS_MIN_SLOTS_PICKED; // only protect people who picked the minimum
+  byConstraint.forEach(entry => {
+    if((entry.picks||[]).length > CONSTRAINED_MAX_PICKS) return; // flexible → pass 2
+    if(takenSlots.size >= MS_TOTAL_SLOTS) return;
+    const pick = (entry.picks||[]).find(s => !takenSlots.has(s));
+    if(pick !== undefined){ takenSlots.add(pick); assignments.push({entry, slot:pick}); placed.add(entry.ign); }
+  });
+
+  // ── PASS 2 — place the flexible by value ──
+  const remaining = candidates
+    .filter(e => !placed.has(e.ign))
+    .sort((a,b) => {
+      if(hoursOf(a)!==hoursOf(b)) return hoursOf(b)-hoursOf(a);
+      return timeOf(a)-timeOf(b);
+    });
+
+  const rejected = [];
   const unassigned = [];
-  winners.forEach(entry => {
-    const pick = entry.picks.find(s => !takenSlots.has(s));
-    if(pick !== undefined){ takenSlots.add(pick); assignments.push({entry, slot:pick}); }
+  remaining.forEach(entry => {
+    if(takenSlots.size >= MS_TOTAL_SLOTS){ rejected.push(entry); return; }
+    const pick = (entry.picks||[]).find(s => !takenSlots.has(s));
+    if(pick !== undefined){ takenSlots.add(pick); assignments.push({entry, slot:pick}); placed.add(entry.ign); }
     else { unassigned.push(entry); }
   });
+
+  // Fallback: picks all taken but slots remain → next free slot
   unassigned.forEach(entry => {
+    if(takenSlots.size >= MS_TOTAL_SLOTS){ rejected.push(entry); return; }
     for(let i=0;i<MS_TOTAL_SLOTS;i++){
-      if(!takenSlots.has(i)){ takenSlots.add(i); assignments.push({entry,slot:i,fallback:true}); break; }
+      if(!takenSlots.has(i)){ takenSlots.add(i); assignments.push({entry, slot:i, fallback:true}); placed.add(entry.ign); break; }
     }
   });
-  assignments.sort((a,b) => a.slot - b.slot);
 
-  MS._lastAllocation = {winners:[...ranked.filter(e=>!rejected.includes(e))], rejected, assignments};
+  assignments.sort((a,b) => a.slot - b.slot);
+  const winners = assignments.map(a => a.entry);
+
+  MS._lastAllocation = {winners, rejected, assignments};
   msRenderResultsSummary();
   msRenderFinalSchedule();
   msRenderRejectedList();
   syncQueuePush();
-  toast(pinned.size ? \`Allocation complete! \${pinned.size} pinned slot(s) preserved.\` : 'Allocation complete!');
+  toast('Allocation complete — '+winners.length+' placed'+(pinned.size?', '+pinned.size+' locked':'')+', '+rejected.length+' not selected.');
 }
 
 function msRenderFinalSchedule(){
