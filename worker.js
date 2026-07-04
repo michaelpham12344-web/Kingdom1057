@@ -3317,8 +3317,13 @@ function msSetMyAlliance(){
   const a = sel.value;
   if(typeof AUTH!=='undefined') AUTH.alliance = a;
   lsSet('alliance', a);
+  // Fill the alliance field
   const msA=document.getElementById('msAlliance'); if(msA) msA.value=a;
-  toast('Your alliance set to '+a+' — you can now submit as a player.');
+  // Also fill the in-game name from the verified player (so validation passes)
+  const vp = verifiedPlayer || (()=>{ try{ const s=sessionStorage.getItem('verifiedPlayer'); return s?JSON.parse(s):null; }catch(e){ return null; } })();
+  const msN=document.getElementById('msIGN');
+  if(msN && !msN.value && vp && vp.name) msN.value = vp.name;
+  toast('Alliance set to '+a+(msN&&msN.value?' · name '+msN.value:'')+' — you can now submit.');
   if(typeof msInit==='function') msInit();
 }
 
