@@ -1866,12 +1866,12 @@ function msRenderStepTabs(){
 function msGoStep(n){
   const isR4 = msCanAccessResults();
   const hasSubmission = !!MS._submittedEntry;
-  const unlocked = isR4 ? 5 : (hasSubmission ? 0 : (MS._unlockedStep||1));
+const unlocked = isR4 ? 5 : ((hasSubmission && !MS._editing) ? 0 : (MS._unlockedStep||1));
 
   // Block step 5 for non-R4/R5
   if(n===5 && !isR4){ toast('Results are only visible to R4/R5.'); return; }
   // If member has submitted, steps 1-4 are locked (they must click Edit)
-  if(!isR4 && hasSubmission && n>=1 && n<=4){ toast('Click "Edit my submission" to make changes.'); n=0; }
+if(!isR4 && hasSubmission && !MS._editing && n>=1 && n<=4){ toast('Click "Edit my submission" to make changes.'); n=0; }
   // Normal step lock
   if(n>1 && n>unlocked && !isR4 && !hasSubmission){ toast('Please complete the previous step first.'); n=unlocked; }
 
