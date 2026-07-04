@@ -2400,6 +2400,7 @@ function msSubmitEntry(){
     verify: JSON.parse(JSON.stringify(MS.draft.verify)),
     commit: JSON.parse(JSON.stringify(MS.draft.commit)),
     picks: [...MS.draft.picks],
+    favourites: [...(MS.draft.favourites||[])],
     committedHours,
     submittedAt: new Date().toISOString()
   };
@@ -2535,7 +2536,8 @@ function msRunAllocation(){
   byConstraint.forEach(entry => {
     if((entry.picks||[]).length > CONSTRAINED_MAX_PICKS) return; // flexible → pass 2
     if(takenSlots.size >= MS_TOTAL_SLOTS) return;
-    const pick = (entry.picks||[]).find(s => !takenSlots.has(s));
+    const favs = (entry.favourites||[]).filter(s => !takenSlots.has(s));
+    const pick = favs.length ? favs[0] : (entry.picks||[]).find(s => !takenSlots.has(s));
     if(pick !== undefined){ takenSlots.add(pick); assignments.push({entry, slot:pick}); placed.add(entry.ign); }
   });
 
@@ -2551,7 +2553,8 @@ function msRunAllocation(){
   const unassigned = [];
   remaining.forEach(entry => {
     if(takenSlots.size >= MS_TOTAL_SLOTS){ rejected.push(entry); return; }
-    const pick = (entry.picks||[]).find(s => !takenSlots.has(s));
+    const favs = (entry.favourites||[]).filter(s => !takenSlots.has(s));
+    const pick = favs.length ? favs[0] : (entry.picks||[]).find(s => !takenSlots.has(s));
     if(pick !== undefined){ takenSlots.add(pick); assignments.push({entry, slot:pick}); placed.add(entry.ign); }
     else { unassigned.push(entry); }
   });
