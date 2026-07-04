@@ -2465,7 +2465,7 @@ function msRenderOverview(entry) {
     }
   } else {
     statusHtml = '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px">'+
-      '<div style="font-size:13px;color:var(--text2)">⏳ Your submission is in. Slot assignments haven\'t been finalised yet — check back later.</div>'+
+      '<div style="font-size:13px;color:var(--text2)">⏳ Your submission is in. Slot assignments are not finalised yet — check back later.</div>'+
     '</div>';
   }
 
