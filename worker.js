@@ -910,6 +910,15 @@ document.addEventListener('touchend',function(e){
         </div>
         <button class="btn btn-gold" onclick="msRunAllocation()">⚙️ Run Allocation (rank + assign slots)</button>
         <button class="btn btn-ghost btn-sm" onclick="msClearAllSubs()" style="margin-left:8px">🗑 Clear all submissions</button>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+          <div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">My alliance (to submit as a player)</div>
+          <select id="msMyAllianceSelect" style="width:130px">
+            <option value="">Select…</option>
+            <option>FIR</option><option>LOC</option><option>LYL</option>
+            <option>KNG</option><option>KOV</option><option>TLA</option>
+          </select></div>
+          <button class="btn btn-sm" onclick="msSetMyAlliance()">Set my alliance</button>
+        </div>
       </div>
     </div>
 
@@ -3300,6 +3309,17 @@ async function adminChangeAlliance(playerId, newAlliance) {
     await fetch('/update-player', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: playerId, alliance: newAlliance }) });
     toast('Alliance updated.');
   } catch(e) { toast('Error updating alliance.'); }
+}
+
+function msSetMyAlliance(){
+  const sel = document.getElementById('msMyAllianceSelect');
+  if(!sel || !sel.value){ toast('Pick an alliance first.'); return; }
+  const a = sel.value;
+  if(typeof AUTH!=='undefined') AUTH.alliance = a;
+  lsSet('alliance', a);
+  const msA=document.getElementById('msAlliance'); if(msA) msA.value=a;
+  toast('Your alliance set to '+a+' — you can now submit as a player.');
+  if(typeof msInit==='function') msInit();
 }
 
 async function adminRemovePlayer(playerId) {
