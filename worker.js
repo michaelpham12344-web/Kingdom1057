@@ -2201,7 +2201,7 @@ function msUpdateSlider(cat){
 // ── STEP 4: TIMESLOTS ──
 function msRenderSlotGrid(){
   const grid=document.getElementById('msSlotGrid'); if(!grid) return;
-  const takenSlots=new Set(MS._lastAllocation?MS._lastAllocation.assignments.map(a=>a.slot):[]);
+  const takenSlots=new Set();
 
 // Flexibility-weighted demand: each player contributes 1 / (slots they picked).
   // Someone who picked only 4 slots pushes hard (0.25 each); someone who picked
