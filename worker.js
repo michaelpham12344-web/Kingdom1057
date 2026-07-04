@@ -745,7 +745,6 @@ document.addEventListener('touchend',function(e){
       2. Set how much of each speedup type you plan to use this KvK using the sliders.<br>
       3. Pick your preferred timeslots (minimum 4) — these are UTC 30-minute windows across a full day.<br>
       4. The leader runs the allocation to rank players and assign slots — highest committed hours gets priority.<br>
-      <span style="color:var(--text3);font-size:12px">48 available slots • Top 48 by committed hours win • Admin password required to manage results</span>
     </div>
   </div>
 
@@ -850,22 +849,34 @@ document.addEventListener('touchend',function(e){
     </div>
   </div>
 
-  <!-- STEP 4: TIMESLOT PICKS -->
+<!-- STEP 4: TIMESLOT PICKS -->
   <div id="msStep4" class="ms-step" style="display:none">
     <div class="card">
       <div class="card-title">🕐 Step 4 — Pick Your Preferred Timeslots</div>
       <p style="color:var(--text2);font-size:12px;margin-bottom:6px">Select at least <strong style="color:var(--text)">4 timeslots</strong> that work best for you (UTC). Your committed Training hours: <span id="msYourTrainingHours" class="mono" style="color:var(--gold)">0h</span></p>
       <div id="msSlotPickCount" style="font-size:12px;color:var(--text3);margin-bottom:10px">0 slots selected</div>
-      <div id="msSlotGrid" style="display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-bottom:8px"></div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:12px;display:flex;align-items:center;gap:10px">
-        <span>Slot popularity:</span>
-        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:rgba(46,204,113,.5);display:inline-block"></span>Few requests</span>
-        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:rgba(224,140,58,.5);display:inline-block"></span>Moderate</span>
-        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:rgba(224,58,58,.5);display:inline-block"></span>High demand</span>
-        <span style="color:var(--text3);font-size:10px">· Number = request count</span>
+
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">
+        <div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">From</div>
+        <select id="msRangeFrom" class="ms-range-sel"></select></div>
+        <div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">To</div>
+        <select id="msRangeTo" class="ms-range-sel"></select></div>
+        <button class="btn btn-sm" onclick="msSelectRange()">Select range</button>
+        <button class="btn btn-sm btn-ghost" onclick="msClearPicks()">Clear all</button>
       </div>
-      <div id="msDeadlineBanner" style="display:none;margin-bottom:10px"></div>
-      <button class="btn btn-primary" id="msSubmitBtn" onclick="msSubmitEntry()">✅ Submit My Entry</button>
+
+      <div id="msSlotLegend" style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--text2);margin-bottom:12px">
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--bg4);border:1px solid var(--border);vertical-align:-1px"></span> free</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#97C459;vertical-align:-1px"></span> low</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#EF9F27;vertical-align:-1px"></span> filling</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#E24B4A;vertical-align:-1px"></span> contested</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--accent);vertical-align:-1px"></span> your pick</span>
+      </div>
+
+      <div id="msSlotGrid"></div>
+
+      <div id="msDeadlineBanner" style="display:none;margin:12px 0"></div>
+      <button class="btn btn-primary" id="msSubmitBtn" onclick="msSubmitEntry()" style="margin-top:4px">✅ Submit My Entry</button>
     </div>
   </div>
 
