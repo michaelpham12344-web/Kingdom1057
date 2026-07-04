@@ -2244,7 +2244,7 @@ grid.innerHTML = groups.map(g=>{
       const i=g.start+k;
       const selected=MS.draft.picks.includes(i);
       const taken=takenSlots.has(i)&&!selected;
- const score=weighted[i];
+      const score=weighted[i];
       let bg,fg,bd,sub;
       if(selected){ const c=band(score); bg='var(--accent)'; fg='#fff'; bd='1px solid var(--accent2)'; sub='you · '+c.label; }
       else if(taken){ bg='rgba(120,120,120,.25)'; fg='var(--text3)'; bd='1px solid var(--border)'; sub='taken'; }
@@ -2253,10 +2253,10 @@ grid.innerHTML = groups.map(g=>{
       const isFav = (MS.draft.favourites||[]).includes(i);
       const starBtn = selected ? '<span onclick="msToggleFav('+i+',event)" style="position:absolute;top:2px;right:4px;font-size:13px;cursor:pointer;line-height:1" title="Star as favourite">'+(isFav?'⭐':'☆')+'</span>' : '';
       return '<button class="ms-slot-btn" '+click+' style="position:relative;padding:10px 3px;border-radius:6px;font-family:var(--mono);font-size:13px;line-height:1.35;cursor:'+(taken?'not-allowed':'pointer')+';background:'+bg+';color:'+fg+';border:'+bd+';text-align:center">'+starBtn+msSlotLabel(i)+'<br><span style="font-size:11px;opacity:.85">'+sub+'</span></button>';
+    }).join('');
     return '<div style="font-size:14px;font-weight:700;color:var(--gold);margin:16px 0 8px;letter-spacing:.05em;border-bottom:1px solid var(--border);padding-bottom:5px">'+g.label+'</div>'+
            '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px">'+cells+'</div>';
   }).join('');
-
   msUpdateSlotCount();
   const trainingHours=(MS.draft.verify.training?MS.draft.verify.training.hours:0)*((MS.draft.commit.training!==undefined?MS.draft.commit.training:50)/100);
   const elH=document.getElementById('msYourTrainingHours'); if(elH) elH.textContent=trainingHours.toFixed(1)+'h';
