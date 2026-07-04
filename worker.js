@@ -2630,11 +2630,16 @@ function msCopySchedule(){
 function msClearAllSubs(){
   if(!confirm('Clear all Minister Spots submissions? This cannot be undone.')) return;
   MS.submissions=[];
+  MS.submissionsByPlayer={};   // <-- the missing piece: clear the per-player store too
   MS._lastAllocation=null;
+  // Also clear any locally-saved submitted entry so it can't repopulate
+  MS._submittedEntry=null;
   msRenderResultsSummary();
-  msRenderFinalSchedule();
-  msRenderRejectedList();
+  if(typeof msRenderFinalSchedule==='function') msRenderFinalSchedule();
+  if(typeof msRenderRejectedList==='function') msRenderRejectedList();
+  if(typeof msRenderSlotGrid==='function') msRenderSlotGrid();
   syncQueuePush();
+  if(typeof toast==='function') toast('All submissions cleared.');
 }
 </script>
 <script id="newSystemsJS">
