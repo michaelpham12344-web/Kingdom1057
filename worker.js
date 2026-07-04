@@ -2203,15 +2203,24 @@ function msRenderSlotGrid(){
   const grid=document.getElementById('msSlotGrid'); if(!grid) return;
   const takenSlots=new Set(MS._lastAllocation?MS._lastAllocation.assignments.map(a=>a.slot):[]);
 
-  const popularity = new Array(MS_TOTAL_SLOTS).fill(0);
-  MS.submissions.forEach(sub => { (sub.picks||[]).forEach(p => { popularity[p]++; }); });
+// Flexibility-weighted demand: each player contributes 1 / (slots they picked).
+  // Someone who picked only 4 slots pushes hard (0.25 each); someone who picked
+  // 24 barely registers (0.04 each). So a slot only "heats up" when constrained
+  // players cluster on it — not just when many flexible people list it.
+  const weighted = new Array(MS_TOTAL_SLOTS).fill(0);
+  MS.submissions.forEach(sub => {
+    const picks = sub.picks || [];
+    const w = picks.length > 0 ? (1 / picks.length) : 0;
+    picks.forEach(p => { weighted[p] += w; });
+  });
 
-  function band(n){
-    if(n===0) return {bg:'var(--bg4)', fg:'var(--text2)', bd:'1px solid var(--border)'};
-    if(n<=2)  return {bg:'#97C459', fg:'#173404', bd:'1px solid #639922'};
-    if(n<=5)  return {bg:'#EF9F27', fg:'#412402', bd:'1px solid #BA7517'};
-    if(n<=8)  return {bg:'#E24B4A', fg:'#fff', bd:'1px solid #A32D2D'};
-    return {bg:'#A32D2D', fg:'#fff', bd:'1px solid #791F1F'};
+  // Map a weighted score to a colour band + honest label.
+  // Thresholds are tuned for a kingdom with contested slots; easy to adjust.
+  function band(score){
+    if(score <= 0)    return {bg:'var(--bg4)', fg:'var(--text2)', bd:'1px solid var(--border)', label:'free'};
+    if(score < 0.75)  return {bg:'#97C459', fg:'#173404', bd:'1px solid #639922', label:'wide open'};
+    if(score < 1.75)  return {bg:'#EF9F27', fg:'#412402', bd:'1px solid #BA7517', label:'some interest'};
+    return {bg:'#E24B4A', fg:'#fff', bd:'1px solid #A32D2D', label:'high demand'};
   }
 
   const groups=[
@@ -2221,16 +2230,16 @@ function msRenderSlotGrid(){
     {label:'· 18:00–24:00 UTC', start:36, end:48}
   ];
 
-  grid.innerHTML = groups.map(g=>{
+grid.innerHTML = groups.map(g=>{
     const cells = Array.from({length:g.end-g.start},(_,k)=>{
       const i=g.start+k;
       const selected=MS.draft.picks.includes(i);
       const taken=takenSlots.has(i)&&!selected;
-      const pop=popularity[i];
+      const score=weighted[i];
       let bg,fg,bd,sub;
-      if(selected){ bg='var(--accent)'; fg='#fff'; bd='1px solid var(--accent2)'; sub='you'+(pop>0?' +'+pop:''); }
+      if(selected){ const c=band(score); bg='var(--accent)'; fg='#fff'; bd='1px solid var(--accent2)'; sub='you · '+c.label; }
       else if(taken){ bg='rgba(120,120,120,.25)'; fg='var(--text3)'; bd='1px solid var(--border)'; sub='taken'; }
-      else { const c=band(pop); bg=c.bg; fg=c.fg; bd=c.bd; sub=(pop>0?pop+' want':'free'); }
+      else { const c=band(score); bg=c.bg; fg=c.fg; bd=c.bd; sub=c.label; }
       const click = taken ? '' : 'onclick="msTogglePick('+i+')"';
       return '<button class="ms-slot-btn" '+click+' style="padding:10px 3px;border-radius:6px;font-family:var(--mono);font-size:13px;line-height:1.35;cursor:'+(taken?'not-allowed':'pointer')+';background:'+bg+';color:'+fg+';border:'+bd+';text-align:center">'+msSlotLabel(i)+'<br><span style="font-size:11px;opacity:.85">'+sub+'</span></button>';
     }).join('');
