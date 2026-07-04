@@ -2591,21 +2591,21 @@ function msRenderFinalSchedule(){
     if(hit){
       const a = hit.a, i = hit.i;
       const pinned = a.pinned ? true : false;
-      const dragAttrs = canEdit ? `draggable="true" ondragstart="msDragStart(event,${i})" ondragover="msDragOver(event)" ondrop="msDrop(event,${i})" ondragleave="msDragLeave(event)"` : '';
-      rows.push(`<div class="ms-rank-row winner" data-idx="${i}" ${dragAttrs} style="cursor:${canEdit?'grab':'default'};user-select:none;transition:opacity .15s">
-        <span class="ms-rank-num mono">${msSlotLabel(a.slot)}</span>
-        <strong>${a.entry.ign}</strong>
-        <span style="color:var(--text3);font-size:12px">${a.entry.alliance}</span>
-        <span style="margin-left:auto" class="mono" style="color:var(--gold)">${a.entry.committedHours[MS_RANK_CATEGORY].toFixed(1)}h</span>
-        ${canEdit?`<button onclick="msTogglePin(${i})" title="${pinned?'Unpin slot':'Pin slot'}" style="margin-left:8px;background:none;border:none;cursor:pointer;font-size:14px;padding:2px">${pinned?'🔒':'🔓'}</button>`:''}
-      </div>`);
+      const dragAttrs = canEdit ? 'draggable="true" ondragstart="msDragStart(event,'+i+')" ondragover="msDragOver(event)" ondrop="msDrop(event,'+i+')" ondragleave="msDragLeave(event)"' : '';
+      rows.push('<div class="ms-rank-row winner" data-idx="'+i+'" '+dragAttrs+' style="cursor:'+(canEdit?'grab':'default')+';user-select:none;transition:opacity .15s">'+
+        '<span class="ms-rank-num mono">'+msSlotLabel(a.slot)+'</span>'+
+        '<strong>'+a.entry.ign+'</strong>'+
+        '<span style="color:var(--text3);font-size:12px">'+a.entry.alliance+'</span>'+
+        '<span style="margin-left:auto" class="mono" style="color:var(--gold)">'+a.entry.committedHours[MS_RANK_CATEGORY].toFixed(1)+'h</span>'+
+        (canEdit?'<button onclick="msTogglePin('+i+')" title="'+(pinned?'Unpin slot':'Pin slot')+'" style="margin-left:8px;background:none;border:none;cursor:pointer;font-size:14px;padding:2px">'+(pinned?'🔒':'🔓')+'</button>':'')+
+      '</div>');
     } else {
       emptyCount++;
-      rows.push(`<div class="ms-rank-row" style="opacity:.55">
-        <span class="ms-rank-num mono">${msSlotLabel(slot)}</span>
-        <span style="color:var(--text3);font-style:italic">— empty (nobody picked this slot) —</span>
-        ${canEdit?`<span style="margin-left:auto;font-size:11px;color:#ff9d4d">assign manually if needed</span>`:''}
-      </div>`);
+      rows.push('<div class="ms-rank-row" style="opacity:.55">'+
+        '<span class="ms-rank-num mono">'+msSlotLabel(slot)+'</span>'+
+        '<span style="color:var(--text3);font-style:italic">— empty (nobody picked this slot) —</span>'+
+        (canEdit?'<span style="margin-left:auto;font-size:11px;color:#ff9d4d">assign manually if needed</span>':'')+
+      '</div>');
     }
   }
 
