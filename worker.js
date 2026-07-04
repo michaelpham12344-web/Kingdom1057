@@ -2242,14 +2242,7 @@ function msRenderSlotGrid(){
   const trainingHours=(MS.draft.verify.training?MS.draft.verify.training.hours:0)*((MS.draft.commit.training!==undefined?MS.draft.commit.training:50)/100);
   const elH=document.getElementById('msYourTrainingHours'); if(elH) elH.textContent=trainingHours.toFixed(1)+'h';
 
-  const fromSel=document.getElementById('msRangeFrom'), toSel=document.getElementById('msRangeTo');
-  if(fromSel && !fromSel.options.length){
-    for(let i=0;i<MS_TOTAL_SLOTS;i++){
-      const t=msSlotLabel(i).split('-')[0];
-      fromSel.add(new Option(t,i)); toSel.add(new Option(t,i));
-    }
-    fromSel.value=14; toSel.value=44;
-  }
+msFillRangeDropdowns();
 }
 
 function msSelectRange(){
@@ -2264,6 +2257,18 @@ function msSelectRange(){
 function msClearPicks(){
   MS.draft.picks=[];
   msRenderSlotGrid();
+}
+
+function msFillRangeDropdowns(){
+  const fromSel=document.getElementById('msRangeFrom'), toSel=document.getElementById('msRangeTo');
+  if(!fromSel || !toSel) return;
+  if(fromSel.options.length) return;
+  for(let i=0;i<MS_TOTAL_SLOTS;i++){
+    const t=msSlotLabel(i).split('-')[0];
+    fromSel.add(new Option(t,i));
+    toSel.add(new Option(t,i));
+  }
+  fromSel.value=14; toSel.value=44;
 }
 
 // ── Deadline management ──
