@@ -2234,7 +2234,7 @@ function msRenderSlotGrid(){
       const click = taken ? '' : 'onclick="msTogglePick('+i+')"';
       return '<button class="ms-slot-btn" '+click+' style="padding:10px 3px;border-radius:6px;font-family:var(--mono);font-size:13px;line-height:1.35;cursor:'+(taken?'not-allowed':'pointer')+';background:'+bg+';color:'+fg+';border:'+bd+';text-align:center">'+msSlotLabel(i)+'<br><span style="font-size:11px;opacity:.85">'+sub+'</span></button>';
     }).join('');
-    return '<div style="font-size:13px;color:var(--text3);margin:12px 0 6px;letter-spacing:.03em">'+g.label+'</div>'+
+    return '<div style="font-size:14px;font-weight:700;color:var(--gold);margin:16px 0 8px;letter-spacing:.05em;border-bottom:1px solid var(--border);padding-bottom:5px">'+g.label+'</div>'+
            '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px">'+cells+'</div>';
   }).join('');
 
