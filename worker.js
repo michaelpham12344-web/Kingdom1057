@@ -2581,19 +2581,38 @@ function msRenderFinalSchedule(){
     return;
   }
   const canEdit = msCanAccessResults();
-  el.innerHTML = (canEdit ? '<div style="font-size:11px;color:var(--text3);margin-bottom:10px">🔒 Pinned slots are preserved when re-running allocation. Drag slots to swap. Click 🔒 to toggle pin.</div>' : '') +
-    MS._lastAllocation.assignments.map((a,i)=>{
+  const bySlot = {};
+  MS._lastAllocation.assignments.forEach((a,i)=>{ bySlot[a.slot] = {a, i}; });
+
+  let emptyCount = 0;
+  const rows = [];
+  for(let slot=0; slot<MS_TOTAL_SLOTS; slot++){
+    const hit = bySlot[slot];
+    if(hit){
+      const a = hit.a, i = hit.i;
       const pinned = a.pinned ? true : false;
-      const dragAttrs = canEdit ? \`draggable="true" ondragstart="msDragStart(event,\${i})" ondragover="msDragOver(event)" ondrop="msDrop(event,\${i})" ondragleave="msDragLeave(event)"\` : '';
-      return \`<div class="ms-rank-row winner" data-idx="\${i}" \${dragAttrs} style="cursor:\${canEdit?'grab':'default'};user-select:none;transition:opacity .15s">
-        <span class="ms-rank-num mono">\${msSlotLabel(a.slot)}</span>
-        <strong>\${a.entry.ign}</strong>
-        <span style="color:var(--text3);font-size:12px">\${a.entry.alliance}</span>
-        <span style="margin-left:auto" class="mono" style="color:var(--gold)">\${a.entry.committedHours[MS_RANK_CATEGORY].toFixed(1)}h</span>
-        \${a.fallback?'<span style="font-size:10px;color:#ff9d4d;margin-left:6px">(backup)</span>':''}
-        \${canEdit?\`<button onclick="msTogglePin(\${i})" title="\${pinned?'Unpin slot':'Pin slot'}" style="margin-left:8px;background:none;border:none;cursor:pointer;font-size:14px;padding:2px">\${pinned?'🔒':'🔓'}</button>\`:''}
-      </div>\`;
-    }).join('');
+      const dragAttrs = canEdit ? `draggable="true" ondragstart="msDragStart(event,${i})" ondragover="msDragOver(event)" ondrop="msDrop(event,${i})" ondragleave="msDragLeave(event)"` : '';
+      rows.push(`<div class="ms-rank-row winner" data-idx="${i}" ${dragAttrs} style="cursor:${canEdit?'grab':'default'};user-select:none;transition:opacity .15s">
+        <span class="ms-rank-num mono">${msSlotLabel(a.slot)}</span>
+        <strong>${a.entry.ign}</strong>
+        <span style="color:var(--text3);font-size:12px">${a.entry.alliance}</span>
+        <span style="margin-left:auto" class="mono" style="color:var(--gold)">${a.entry.committedHours[MS_RANK_CATEGORY].toFixed(1)}h</span>
+        ${canEdit?`<button onclick="msTogglePin(${i})" title="${pinned?'Unpin slot':'Pin slot'}" style="margin-left:8px;background:none;border:none;cursor:pointer;font-size:14px;padding:2px">${pinned?'🔒':'🔓'}</button>`:''}
+      </div>`);
+    } else {
+      emptyCount++;
+      rows.push(`<div class="ms-rank-row" style="opacity:.55">
+        <span class="ms-rank-num mono">${msSlotLabel(slot)}</span>
+        <span style="color:var(--text3);font-style:italic">— empty (nobody picked this slot) —</span>
+        ${canEdit?`<span style="margin-left:auto;font-size:11px;color:#ff9d4d">assign manually if needed</span>`:''}
+      </div>`);
+    }
+  }
+
+  const header = (canEdit ? '<div style="font-size:11px;color:var(--text3);margin-bottom:10px">🔒 Pinned slots are preserved when re-running allocation. Drag slots to swap. Click 🔒 to toggle pin.</div>' : '') +
+    (emptyCount>0 ? '<div style="font-size:12px;color:#ff9d4d;margin-bottom:10px">⚠ '+emptyCount+' slot'+(emptyCount>1?'s are':' is')+' empty — nobody picked '+(emptyCount>1?'them':'it')+'. Left open on purpose.</div>' : '');
+
+  el.innerHTML = header + rows.join('');
 }
 
 let _msDragSrcIdx = null;
