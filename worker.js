@@ -2443,7 +2443,33 @@ function msRenderOverview(entry) {
   const el = document.getElementById('msOverviewContent');
   if(!el || !entry) return;
   const totalH = MS_CATEGORIES.reduce((s,c) => s + (entry.committedHours[c]||0), 0);
-  let html = '<div class="grid2" style="margin-bottom:14px">';
+
+  // Allocation status box (member's own result)
+  let statusHtml = '';
+  if(MS._lastAllocation){
+    const mine = MS._lastAllocation.assignments.find(function(a){ return a.entry.ign===entry.ign && a.entry.alliance===entry.alliance; });
+    if(mine){
+      statusHtml = '<div style="background:rgba(46,204,113,.1);border:1px solid rgba(46,204,113,.4);border-radius:8px;padding:12px 14px;margin-bottom:14px">'+
+        '<div style="font-weight:600;color:var(--green)">✅ You got a slot!</div>'+
+        '<div style="font-size:13px;color:var(--text);margin-top:4px">Your Minister Spot time: <strong class="mono" style="color:var(--gold)">'+msSlotLabel(mine.slot)+' UTC</strong></div>'+
+        '<div style="font-size:11px;color:var(--text3);margin-top:4px">Be online and ready at this time.</div>'+
+      '</div>';
+    } else {
+      const wasRejected = MS._lastAllocation.rejected.some(function(r){ return r.ign===entry.ign && r.alliance===entry.alliance; });
+      if(wasRejected){
+        statusHtml = '<div style="background:rgba(255,157,77,.08);border:1px solid rgba(255,157,77,.35);border-radius:8px;padding:12px 14px;margin-bottom:14px">'+
+          '<div style="font-weight:600;color:#ff9d4d">No slot this round</div>'+
+          '<div style="font-size:13px;color:var(--text2);margin-top:4px">All 48 Minister Spots were filled this round. If you have questions, please reach out to your R4/R5.</div>'+
+        '</div>';
+      }
+    }
+  } else {
+    statusHtml = '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px">'+
+      '<div style="font-size:13px;color:var(--text2)">⏳ Your submission is in. Slot assignments haven\'t been finalised yet — check back later.</div>'+
+    '</div>';
+  }
+
+  let html = statusHtml + '<div class="grid2" style="margin-bottom:14px">';
   html += '<div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">IGN</div><div style="font-weight:600">' + (entry.ign||'—') + '</div></div>';
   html += '<div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">Alliance</div><div style="font-weight:600">' + (entry.alliance||'—') + '</div></div>';
   html += '<div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">Total committed hours</div><div style="font-weight:600;color:var(--gold)">' + totalH.toFixed(1) + 'h</div></div>';
