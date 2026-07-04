@@ -1,7 +1,7 @@
 /**
  * Kingdom 1057 Worker
  * Routes:
- *   GET  /                    → serve website
+ *   GET  /                    → serve website 
  *   GET  /state               → read shared KV state
  *   PUT  /state               → write shared KV state
  *   GET  /kingshot-player?id= → proxy to kingshot.net/api/player-info
