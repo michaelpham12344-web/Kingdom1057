@@ -1781,18 +1781,19 @@ function msSlotLabel(i){
   return \`\${String(h).padStart(2,'0')}:\${String(m).padStart(2,'0')}-\${String(h2).padStart(2,'0')}:\${String(m2).padStart(2,'0')}\`;
 }
 
-function msInit(){
-  if(MS._unlockedStep===undefined) MS._unlockedStep=1;
-  // Restore submission from localStorage if available
-  const pid = verifiedPlayer ? String(verifiedPlayer.id) : null;
+// Restore the member's OWN submission for display only.
+  // A local copy must NEVER re-add itself to the shared submissions —
+  // otherwise an admin "Clear all" gets undone when members sign back in.
+  // The shared backend (synced state) is the single source of truth.
   if(pid && !MS._submittedEntry) {
-    const saved = lsGet('ms_submitted_' + pid);
-    if(saved) {
-      MS._submittedEntry = saved;
-      // Also make sure it's in the submissions array
-      MS.submissionsByPlayer = MS.submissionsByPlayer || {};
-      MS.submissionsByPlayer[pid] = saved;
-      MS.submissions = Object.values(MS.submissionsByPlayer);
+    const fromState = MS.submissions.find(s => String(s.playerId) === pid);
+    if(fromState) {
+      MS._submittedEntry = fromState;
+      lsSet('ms_submitted_' + pid, fromState);
+    } else {
+      const staleLocal = lsGet('ms_submitted_' + pid);
+      if(staleLocal) { lsClear('ms_submitted_' + pid); }
+      MS._submittedEntry = null;
     }
   }
   // Also check the shared submissions array for this player's entry
