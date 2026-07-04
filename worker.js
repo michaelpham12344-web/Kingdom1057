@@ -2203,46 +2203,67 @@ function msRenderSlotGrid(){
   const grid=document.getElementById('msSlotGrid'); if(!grid) return;
   const takenSlots=new Set(MS._lastAllocation?MS._lastAllocation.assignments.map(a=>a.slot):[]);
 
-  // Build popularity map: count how many submissions picked each slot
   const popularity = new Array(MS_TOTAL_SLOTS).fill(0);
   MS.submissions.forEach(sub => { (sub.picks||[]).forEach(p => { popularity[p]++; }); });
-  const maxPop = Math.max(1, ...popularity);
 
-  grid.innerHTML=Array.from({length:MS_TOTAL_SLOTS},(_,i)=>{
-    const selected=MS.draft.picks.includes(i);
-    const taken=takenSlots.has(i)&&!selected;
-    const pop = popularity[i];
+  function band(n){
+    if(n===0) return {bg:'var(--bg4)', fg:'var(--text2)', bd:'1px solid var(--border)'};
+    if(n<=2)  return {bg:'#97C459', fg:'#173404', bd:'1px solid #639922'};
+    if(n<=5)  return {bg:'#EF9F27', fg:'#412402', bd:'1px solid #BA7517'};
+    if(n<=8)  return {bg:'#E24B4A', fg:'#fff', bd:'1px solid #A32D2D'};
+    return {bg:'#A32D2D', fg:'#fff', bd:'1px solid #791F1F'};
+  }
 
-    // Heatmap colour: green (low) → yellow → red (high)
-    let heatStyle = '';
-    if (pop > 0 && !selected && !taken) {
-      const ratio = pop / maxPop;
-      const r = Math.round(46 + (224-46)*ratio);
-      const g = Math.round(204 - (204-58)*ratio);
-      const b = Math.round(113 - 113*ratio);
-      heatStyle = \`box-shadow:inset 0 0 0 2px rgba(\${r},\${g},\${b},0.5);\`;
-    }
+  const groups=[
+    {label:'🌙 Night · 00:00–06:00', start:0, end:12},
+    {label:'☀️ Morning · 06:00–12:00', start:12, end:24},
+    {label:'🌤 Afternoon · 12:00–18:00', start:24, end:36},
+    {label:'🌆 Evening · 18:00–24:00', start:36, end:48}
+  ];
 
-    // Badge showing request count
-    const badge = pop > 0 ? \`<span style="position:absolute;top:-4px;right:-4px;background:rgba(0,0,0,.7);color:#fff;font-size:9px;border-radius:8px;padding:1px 4px;line-height:1.4">\${pop}</span>\` : '';
-
-    return \`<button class="ms-slot-btn \${selected?'selected':''} \${taken?'taken':''}" onclick="\${taken?'':'msTogglePick('+i+')'}" title="\${taken?'Already allocated':pop>0?pop+' request(s) for this slot':''}" style="position:relative;\${heatStyle}">\${msSlotLabel(i)}\${badge}</button>\`;
+  grid.innerHTML = groups.map(g=>{
+    const cells = Array.from({length:g.end-g.start},(_,k)=>{
+      const i=g.start+k;
+      const selected=MS.draft.picks.includes(i);
+      const taken=takenSlots.has(i)&&!selected;
+      const pop=popularity[i];
+      let bg,fg,bd,sub;
+      if(selected){ bg='var(--accent)'; fg='#fff'; bd='1px solid var(--accent2)'; sub='you'+(pop>0?' +'+pop:''); }
+      else if(taken){ bg='rgba(120,120,120,.25)'; fg='var(--text3)'; bd='1px solid var(--border)'; sub='taken'; }
+      else { const c=band(pop); bg=c.bg; fg=c.fg; bd=c.bd; sub=(pop>0?pop+' want':'free'); }
+      const click = taken ? '' : 'onclick="msTogglePick('+i+')"';
+      return '<button class="ms-slot-btn" '+click+' style="padding:8px 2px;border-radius:6px;font-family:var(--mono);font-size:11px;line-height:1.3;cursor:'+(taken?'not-allowed':'pointer')+';background:'+bg+';color:'+fg+';border:'+bd+';text-align:center">'+msSlotLabel(i)+'<br><span style="font-size:9px;opacity:.85">'+sub+'</span></button>';
+    }).join('');
+    return '<div style="font-size:11px;color:var(--text3);margin:10px 0 6px;letter-spacing:.03em">'+g.label+'</div>'+
+           '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px">'+cells+'</div>';
   }).join('');
+
   msUpdateSlotCount();
   const trainingHours=(MS.draft.verify.training?MS.draft.verify.training.hours:0)*((MS.draft.commit.training!==undefined?MS.draft.commit.training:50)/100);
   const elH=document.getElementById('msYourTrainingHours'); if(elH) elH.textContent=trainingHours.toFixed(1)+'h';
+
+  const fromSel=document.getElementById('msRangeFrom'), toSel=document.getElementById('msRangeTo');
+  if(fromSel && !fromSel.options.length){
+    for(let i=0;i<MS_TOTAL_SLOTS;i++){
+      const t=msSlotLabel(i).split('-')[0];
+      fromSel.add(new Option(t,i)); toSel.add(new Option(t,i));
+    }
+    fromSel.value=14; toSel.value=44;
+  }
 }
-function msTogglePick(i){
-  const idx=MS.draft.picks.indexOf(i);
-  if(idx>=0) MS.draft.picks.splice(idx,1);
-  else MS.draft.picks.push(i);
+
+function msSelectRange(){
+  const fromSel=document.getElementById('msRangeFrom'), toSel=document.getElementById('msRangeTo');
+  let a=parseInt(fromSel.value,10), b=parseInt(toSel.value,10);
+  if(isNaN(a)||isNaN(b)) return;
+  if(b<a){ const t=a; a=b; b=t; }
+  for(let i=a;i<=b;i++){ if(!MS.draft.picks.includes(i)) MS.draft.picks.push(i); }
   msRenderSlotGrid();
 }
-function msUpdateSlotCount(){
-  const el=document.getElementById('msSlotPickCount'); if(!el) return;
-  const n=MS.draft.picks.length;
-  el.textContent=\`\${n} slot\${n===1?'':'s'} selected \${n<MS_MIN_SLOTS_PICKED?\`(need at least \${MS_MIN_SLOTS_PICKED})\`:'✓'}\`;
-  el.style.color=n<MS_MIN_SLOTS_PICKED?'#ff9d4d':'var(--green)';
+
+function msClearPicks(){
+  MS.draft.picks=[];
+  msRenderSlotGrid();
 }
 
 // ── Deadline management ──
