@@ -946,7 +946,7 @@ const S = {
 // Minister Spots shared state (declared early so sync functions below can reference it safely)
 const MS = {
   deadline: null,
-  draft: { alliance:'', ign:'', verify:{}, commit:{}, picks:[] }, // in-progress entry
+  draft: { alliance:'', ign:'', verify:{}, commit:{}, picks:[], favourites:[] }, // in-progress entry
   submissions: [], // {id, alliance, ign, verify:{cat:{amount,unit,hours}}, commit:{cat:pct}, picks:[slotIdx...], committedHours:{cat:hours}}
   _lastAllocation: null,
   _currentStep: 1
@@ -2244,14 +2244,15 @@ grid.innerHTML = groups.map(g=>{
       const i=g.start+k;
       const selected=MS.draft.picks.includes(i);
       const taken=takenSlots.has(i)&&!selected;
-      const score=weighted[i];
+ const score=weighted[i];
       let bg,fg,bd,sub;
       if(selected){ const c=band(score); bg='var(--accent)'; fg='#fff'; bd='1px solid var(--accent2)'; sub='you · '+c.label; }
       else if(taken){ bg='rgba(120,120,120,.25)'; fg='var(--text3)'; bd='1px solid var(--border)'; sub='taken'; }
       else { const c=band(score); bg=c.bg; fg=c.fg; bd=c.bd; sub=c.label; }
       const click = taken ? '' : 'onclick="msTogglePick('+i+')"';
-      return '<button class="ms-slot-btn" '+click+' style="padding:10px 3px;border-radius:6px;font-family:var(--mono);font-size:13px;line-height:1.35;cursor:'+(taken?'not-allowed':'pointer')+';background:'+bg+';color:'+fg+';border:'+bd+';text-align:center">'+msSlotLabel(i)+'<br><span style="font-size:11px;opacity:.85">'+sub+'</span></button>';
-    }).join('');
+      const isFav = (MS.draft.favourites||[]).includes(i);
+      const starBtn = selected ? '<span onclick="msToggleFav('+i+',event)" style="position:absolute;top:2px;right:4px;font-size:13px;cursor:pointer;line-height:1" title="Star as favourite">'+(isFav?'⭐':'☆')+'</span>' : '';
+      return '<button class="ms-slot-btn" '+click+' style="position:relative;padding:10px 3px;border-radius:6px;font-family:var(--mono);font-size:13px;line-height:1.35;cursor:'+(taken?'not-allowed':'pointer')+';background:'+bg+';color:'+fg+';border:'+bd+';text-align:center">'+starBtn+msSlotLabel(i)+'<br><span style="font-size:11px;opacity:.85">'+sub+'</span></button>';
     return '<div style="font-size:14px;font-weight:700;color:var(--gold);margin:16px 0 8px;letter-spacing:.05em;border-bottom:1px solid var(--border);padding-bottom:5px">'+g.label+'</div>'+
            '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px">'+cells+'</div>';
   }).join('');
@@ -2279,8 +2280,26 @@ function msClearPicks(){
 
 function msTogglePick(i){
   const idx=MS.draft.picks.indexOf(i);
-  if(idx>=0) MS.draft.picks.splice(idx,1);
-  else MS.draft.picks.push(i);
+  if(idx>=0){
+    MS.draft.picks.splice(idx,1);
+    // if it was starred, unstar it too
+    const f=MS.draft.favourites.indexOf(i); if(f>=0) MS.draft.favourites.splice(f,1);
+  } else {
+    MS.draft.picks.push(i);
+  }
+  msRenderSlotGrid();
+}
+
+function msToggleFav(i, ev){
+  if(ev){ ev.stopPropagation(); }           // don't also toggle the pick
+  if(!MS.draft.picks.includes(i)) return;   // can only star a slot you've picked
+  MS.draft.favourites = MS.draft.favourites || [];
+  const f=MS.draft.favourites.indexOf(i);
+  if(f>=0){ MS.draft.favourites.splice(f,1); }
+  else {
+    if(MS.draft.favourites.length>=2){ toast('You can star up to 2 favourites. Un-star one first.'); return; }
+    MS.draft.favourites.push(i);
+  }
   msRenderSlotGrid();
 }
 
