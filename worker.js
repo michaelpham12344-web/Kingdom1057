@@ -2259,6 +2259,20 @@ function msClearPicks(){
   msRenderSlotGrid();
 }
 
+function msTogglePick(i){
+  const idx=MS.draft.picks.indexOf(i);
+  if(idx>=0) MS.draft.picks.splice(idx,1);
+  else MS.draft.picks.push(i);
+  msRenderSlotGrid();
+}
+
+function msUpdateSlotCount(){
+  const el=document.getElementById('msSlotPickCount'); if(!el) return;
+  const n=MS.draft.picks.length;
+  el.textContent=n+' slot'+(n===1?'':'s')+' selected '+(n<MS_MIN_SLOTS_PICKED?'(need at least '+MS_MIN_SLOTS_PICKED+')':'✓');
+  el.style.color=n<MS_MIN_SLOTS_PICKED?'#ff9d4d':'var(--green)';
+}
+
 function msFillRangeDropdowns(){
   try {
     const fromSel=document.getElementById('msRangeFrom'), toSel=document.getElementById('msRangeTo');
