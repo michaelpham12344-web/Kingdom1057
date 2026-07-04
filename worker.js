@@ -2559,13 +2559,9 @@ function msRunAllocation(){
     else { unassigned.push(entry); }
   });
 
-  // Fallback: picks all taken but slots remain → next free slot
-  unassigned.forEach(entry => {
-    if(takenSlots.size >= MS_TOTAL_SLOTS){ rejected.push(entry); return; }
-    for(let i=0;i<MS_TOTAL_SLOTS;i++){
-      if(!takenSlots.has(i)){ takenSlots.add(i); assignments.push({entry, slot:i, fallback:true}); placed.add(entry.ign); break; }
-    }
-  });
+// Philosophy B: you ONLY get a slot you actually picked.
+  // If all your picked slots are taken, you are rejected — never assigned a random slot.
+  unassigned.forEach(entry => { rejected.push(entry); });
 
   assignments.sort((a,b) => a.slot - b.slot);
   const winners = assignments.map(a => a.entry);
