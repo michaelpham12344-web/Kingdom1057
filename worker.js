@@ -1602,12 +1602,16 @@ function renderPetPlanList(){
     let status;
     if(p.fired) status='<span style="color:#c084fc">✓ Activated</span>';
     else status='<span style="color:var(--gold)">in '+fmtSec(Math.ceil(Math.max(0,p.targetMs-now)/1000))+'</span>';
-    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;margin-bottom:6px">'+
-      '<span style="font-family:var(--mono);color:var(--text);font-size:14px">'+hhmm+' UTC</span>'+
-      '<span style="color:var(--text2);font-size:12px">'+p.leaderIds.length+' leader'+(p.leaderIds.length===1?'':'s')+'</span>'+
-      '<span style="font-size:12px">'+status+'</span>'+
-      '<span style="flex:1"></span>'+
-      '<span onclick="bsRemovePetPlan('+"'"+p.id+"'"+')" style="cursor:pointer;color:var(--text3);font-size:14px" title="Remove">✕</span>'+
+    const names=p.leaderIds.map(function(id){ const l=S.leaders.find(function(x){return x.id===id;}); return l?l.name:'?'; }).join(', ');
+    return '<div style="padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;margin-bottom:6px">'+
+      '<div style="display:flex;align-items:center;gap:10px">'+
+        '<span style="font-family:var(--mono);color:var(--text);font-size:14px">'+hhmm+' UTC</span>'+
+        '<span style="color:var(--text2);font-size:12px">'+p.leaderIds.length+' leader'+(p.leaderIds.length===1?'':'s')+'</span>'+
+        '<span style="font-size:12px">'+status+'</span>'+
+        '<span style="flex:1"></span>'+
+        '<span onclick="bsRemovePetPlan('+"'"+p.id+"'"+')" style="cursor:pointer;color:var(--text3);font-size:14px" title="Remove">✕</span>'+
+      '</div>'+
+      '<div style="color:var(--text3);font-size:11px;margin-top:4px;line-height:1.5">'+names+'</div>'+
     '</div>';
   }).join('');
 }
