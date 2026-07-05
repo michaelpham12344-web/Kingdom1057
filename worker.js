@@ -922,12 +922,6 @@ document.addEventListener('touchend',function(e){
       </div>
     </div>
 
-    <div class="card" style="margin-bottom:14px">
-      <div class="card-title">🏆 Final Schedule (Top 48)</div>
-      <div id="msFinalSchedule"><div style="color:var(--text3);font-size:13px">Run allocation to generate the schedule.</div></div>
-      <button class="btn btn-gold btn-sm" style="margin-top:10px" onclick="msCopySchedule()">📋 Copy schedule for alliance chat</button>
-    </div>
-
     <div class="card" id="msManagePanel" style="margin-bottom:14px;display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px">
         <div class="card-title" style="margin:0">👑 Manage Spots — Assign & Move</div>
@@ -956,11 +950,6 @@ document.addEventListener('touchend',function(e){
         <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">📋 Recent changes</div>
         <div id="msAuditFeed" style="font-size:11px;color:var(--text3)"></div>
       </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">❌ Not Selected</div>
-      <div id="msRejectedList"><div style="color:var(--text3);font-size:13px">—</div></div>
     </div>
   </div>
 
