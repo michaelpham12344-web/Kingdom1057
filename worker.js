@@ -2678,7 +2678,61 @@ function msRenderFinalSchedule(){
   el.innerHTML = header + rows.join('');
 }
 
-function msAddPlayerById(){ alert('Add-by-ID coming in the next step.'); }
+async function msAddPlayerById(){
+  var input = document.getElementById('msAddPlayerId');
+  var hint = document.getElementById('msBoardHint');
+  if(!input) return;
+  var pid = (input.value||'').trim();
+  if(!pid){ if(hint) hint.textContent='Enter a Player ID first.'; return; }
+
+  // Already on the bench or placed?
+  var st = msPanelState();
+  var exists = (MS.submissions||[]).some(function(s){ return String(s.playerId)===pid || String(s.id)===pid; });
+  if(exists){ if(hint) hint.innerHTML='<span style="color:#ff9d4d">That player is already in the system.</span>'; return; }
+
+  if(hint) hint.textContent='Looking up player '+pid+'…';
+  var p = await doPlayerLookup(pid);
+
+  var name, alliance;
+  if(p && p.name){
+    // kingshot.net gave us the player
+    name = p.name;
+    alliance = (p.alliance || prompt('Alliance for '+name+' (FIR/LOC/LYL/KNG/KOV/TLA):','') || '').toUpperCase().trim();
+  } else {
+    // kingshot.net down or player not found → manual fallback
+    name = (prompt('Kingshot.net could not verify this ID. Enter the player IGN manually:','') || '').trim();
+    if(!name){ if(hint) hint.textContent='Cancelled.'; return; }
+    alliance = (prompt('Alliance for '+name+' (FIR/LOC/LYL/KNG/KOV/TLA):','') || '').toUpperCase().trim();
+  }
+  if(!alliance){ if(hint) hint.textContent='Alliance required — cancelled.'; return; }
+
+  // Build a submission-shaped entry with zero picks (leader places manually)
+  var entry = {
+    id: 'manual_'+pid+'_'+Date.now(),
+    playerId: String(pid),
+    alliance: alliance,
+    ign: name,
+    verify: { training:{amount:0,unit:'hours',hours:0} },
+    commit: { training:100 },
+    picks: [],
+    favourites: [],
+    committedHours: { general:0, training:0, construction:0, research:0 },
+    submittedAt: new Date().toISOString(),
+    _addedManually: true
+  };
+
+  MS.submissionsByPlayer = MS.submissionsByPlayer || {};
+  MS.submissionsByPlayer[entry.playerId] = entry;
+  MS.submissions = Object.values(MS.submissionsByPlayer);
+  // Make sure they show as unplaced (on the bench)
+  if(MS._lastAllocation){ MS._lastAllocation.rejected = MS._lastAllocation.rejected || []; MS._lastAllocation.rejected.push(entry); }
+
+  msLogAction('added player '+name+' ('+alliance+') to bench');
+  input.value='';
+  syncQueuePush();
+  msRefreshManagePanel();
+  if(hint) hint.innerHTML='<span style="color:var(--green)">✓ Added '+name+' ('+alliance+') to the bench. Now assign them to a slot.</span>';
+}
 
 // ═══════════ MANAGE SPOTS — interactive leader panel ═══════════
 var _msSelected = null;        // {src:'bench'|'slot', player, slot?}
