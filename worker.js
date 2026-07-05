@@ -937,7 +937,7 @@ document.addEventListener('touchend',function(e){
         </div>
       </div>
       <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Tap a bench player, then tap a slot to place them. Their own picked slots show a blue dot.</div>
-      <div style="display:grid;grid-template-columns:280px 1fr;gap:14px" id="msPanelGrid">
+      <div style="display:grid;grid-template-columns:320px 1fr;gap:14px" id="msPanelGrid">
         <div style="background:var(--bg4);border-radius:10px;padding:12px">
           <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Bench</div>
           <input id="msBenchSearch" placeholder="Search players" style="width:100%;margin-bottom:8px;font-size:13px" oninput="msRenderBench()">
@@ -2780,7 +2780,8 @@ function msRenderBench(){
     }
     var hrs = (p.committedHours && p.committedHours[MS_RANK_CATEGORY]) ? p.committedHours[MS_RANK_CATEGORY].toFixed(0) : '0';
     var reasonTag = reason ? '<span title="'+reasonFull.replace(/"/g,'&quot;')+'" style="cursor:help">'+reason+' ⓘ</span>' : '';
-    html += '<div onclick="msBenchClick('+"'"+encodeURIComponent(p.ign)+"','"+encodeURIComponent(p.alliance)+"'"+')" style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:6px;cursor:pointer;margin-bottom:4px;border:1px solid '+(sel?'var(--accent)':'var(--border)')+';background:'+(sel?'rgba(61,142,240,.12)':'var(--bg3)')+'">'+
+    html += '<div onclick="msBenchClick('+"'"+encodeURIComponent(p.ign)+"','"+encodeURIComponent(p.alliance)+"'"+')" style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:6px;cursor:pointer;min-width:0;border:1px solid
+    '+(sel?'var(--accent)':'var(--border)')+';background:'+(sel?'rgba(61,142,240,.12)':'var(--bg3)')+'">'+
       '<div style="min-width:0;flex:1"><div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.ign+'</div>'+
       '<div style="font-size:10px;color:var(--text3)">'+hrs+'h'+(reasonTag?' · '+reasonTag:'')+'</div></div>'+
       msAllianceChip(p.alliance)+
