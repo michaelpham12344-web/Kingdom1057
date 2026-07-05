@@ -2843,7 +2843,7 @@ function msCopyByAlliance(){
   var dateStr = String(d.getUTCDate()).padStart(2,'0')+'/'+String(d.getUTCMonth()+1).padStart(2,'0')+'/'+d.getUTCFullYear();
   var lines = ['Minister Spots — '+dateStr, 'Alliance: '+(filter||'All'), ''];
   rows.forEach(function(a){ lines.push(msSlotLabel(a.slot).split('-')[0]+' - '+a.entry.ign); });
-  copyText(lines.join('\n'));
+  copyText(lines.join('\\n'));
   var msg = document.getElementById('msCopiedMsg');
   if(msg){ msg.style.opacity='1'; setTimeout(function(){ msg.style.opacity='0'; }, 1500); }
 }
