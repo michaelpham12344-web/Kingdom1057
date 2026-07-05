@@ -1329,8 +1329,9 @@ function tickTimers(){
   });
   if(needsRender) renderLeaderTable();
 
-  // active timers panel
+// active timers panel
   const panel=document.getElementById('activeTimers');
+  if(!panel) return;
   const active=S.leaders.filter(l=>l.timerEnd);
   if(!active.length){panel.innerHTML='<div style="color:var(--text3);font-size:13px">No active rallies.</div>';return;}
   panel.innerHTML=active.map(l=>{
@@ -1536,6 +1537,9 @@ function petResetAll(){
 function tickPets(){
   if(!S.leaders.length) return;
   const now=Date.now();
+  let healed=false;
+  S.leaders.forEach(function(l){ if(l.pet&&l.pet.active&&!l.pet.startMs){ l.pet.active=false; healed=true; } });
+  if(healed){ if(typeof renderBattleStrategy==='function') renderBattleStrategy(); if(typeof syncQueuePush==='function') syncQueuePush(); }
   S.leaders.forEach(l=>{
     if(!l.pet||!l.pet.active||!l.pet.startMs) return;
     const rem=PET_DUR-(now-l.pet.startMs);
@@ -1577,23 +1581,9 @@ function bsAddPetPlan(){
   bsPetSel=[]; renderPetPlans(); toast('Plan added');
 }
 function bsRemovePetPlan(id){ bsPetPlans=bsPetPlans.filter(p=>p.id!==id); renderPetPlans(); }
-// ── TEMP pet plan debug — remove after diagnosing ──
-window.PETDBG = true;
-function petDbg(tag){
-  if(!window.PETDBG) return;
-  const rows = S.leaders.filter(function(l){ return l.pet && (l.pet.active || l.pet.startMs); })
-    .map(function(l){ return l.name+'{a:'+(l.pet.active?1:0)+',s:'+(l.pet.startMs||'null')+'}'; });
-  console.log('['+new Date().toISOString().substr(11,12)+'] '+tag+' | plans:'+bsPetPlans.length+' | active/pending: '+(rows.length?rows.join(' '):'(none)'));
-}
-const _origApplyRemote = syncApplyRemote;
-syncApplyRemote = function(data){
-  var before = (data.leaders||[]).filter(function(l){return l.pet&&l.pet.active;}).map(function(l){return l.name+'(s:'+(l.pet.startMs||'null')+')';});
-  console.log('[SYNC PULL] server says active: '+(before.length?before.join(' '):'(none)'));
-  return _origApplyRemote(data);
-};
+
 function bsFirePetPlans(){
   const now=Date.now(); let changed=false;
-  petDbg('fire-tick');
   bsPetPlans.forEach(function(p){
     if(p.fired||now<p.targetMs) return;
     p.leaderIds.forEach(function(id){ const l=S.leaders.find(function(x){return x.id===id;}); if(l){ if(!l.pet)l.pet={active:false,startMs:null}; if(!l.pet.active){ l.pet.active=true; l.pet.startMs=now; } } });
