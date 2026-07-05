@@ -2777,6 +2777,12 @@ function msRenderBench(){
   el.innerHTML = html;
 }
 
+var MS_ALLIANCE_COLORS = {FIR:'#e0663a', LOC:'#3d8ef0', LYL:'#9b6ef0', KNG:'#e0a53a', KOV:'#2ecc71', TLA:'#e04b6a'};
+function msAllianceChip(a){
+  var c = MS_ALLIANCE_COLORS[a] || '#888';
+  return '<span style="font-size:10px;font-weight:600;color:'+c+';background:'+c+'22;border:1px solid '+c+'55;padding:1px 5px;border-radius:4px;flex-shrink:0">'+(a||'—')+'</span>';
+}
+
 function msRenderBoard(){
   var el = document.getElementById('msBoard'); if(!el) return;
   var st = msPanelState();
@@ -2789,23 +2795,25 @@ function msRenderBoard(){
     var empty = !a;
     var isPick = picks.indexOf(slot)>=0;
     var selecting = !!_msSelected;
-    var border = a && a.pinned ? 'var(--gold)' : (isPick ? 'var(--accent)' : 'var(--border)');
-    var mid;
+    var locked = a && a.pinned;
+    var border = locked ? 'var(--gold)' : (isPick ? 'var(--accent)' : 'var(--border)');
+    var mid, chip='';
     if(empty){
-      mid = '<span style="font-size:11px;color:var(--text3);font-style:italic;flex:1">'+(selecting?(isPick?'their pick — tap':'tap to place'):'empty')+'</span>';
+      mid = '<span style="font-size:12px;color:var(--text3);font-style:italic;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(selecting?(isPick?'their pick — tap':'tap to place'):'empty')+'</span>';
     } else {
-      mid = '<div style="min-width:0;flex:1"><span style="font-size:12px;font-weight:600;color:var(--text)">'+a.entry.ign+'</span> <span style="font-size:10px;color:var(--text3)">'+a.entry.alliance+'</span></div>';
+      mid = '<span style="font-size:13px;font-weight:600;color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+a.entry.ign+'</span>';
+      chip = msAllianceChip(a.entry.alliance);
     }
-    var dot = isPick ? '<span style="width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0"></span>' : '<span style="width:6px;flex-shrink:0"></span>';
-    var lockBtn = '<span onclick="event.stopPropagation();msPanelToggleLock('+slot+')" title="lock" style="cursor:pointer;font-size:13px;flex-shrink:0;color:'+(a&&a.pinned?'var(--gold)':'var(--text3)')+'">'+(a&&a.pinned?'🔒':'🔓')+'</span>';
-    html += '<div onclick="msBoardClick('+slot+')" style="border-radius:7px;padding:7px 9px;border:1px solid '+border+';background:'+(empty?'var(--bg2)':'var(--bg3)')+';display:flex;align-items:center;gap:7px;cursor:'+(selecting?'copy':'default')+';min-height:40px">'+
-      dot+'<span style="font-family:var(--mono);font-size:11px;color:var(--text2);flex-shrink:0">'+msSlotLabel(slot)+'</span>'+mid+lockBtn+
+    var dot = isPick ? '<span style="width:5px;height:5px;border-radius:50%;background:var(--accent);flex-shrink:0"></span>' : '<span style="width:5px;flex-shrink:0"></span>';
+    var lockIcon = locked ? '🔒' : '🔓';
+    var lockBtn = '<span onclick="event.stopPropagation();msPanelToggleLock('+slot+')" title="lock" style="cursor:pointer;font-size:12px;flex-shrink:0;color:'+(locked?'var(--gold)':'var(--text3)')+';opacity:'+(locked?'1':'.3')+'">'+lockIcon+'</span>';
+    html += '<div onclick="msBoardClick('+slot+')" style="border-radius:6px;padding:5px 9px;border:1px solid '+border+';background:'+(empty?'var(--bg2)':'var(--bg3)')+';display:flex;align-items:center;gap:7px;cursor:'+(selecting?'copy':'default')+'">'+
+      dot+'<span style="font-family:var(--mono);font-size:10px;color:var(--text3);flex-shrink:0;min-width:34px">'+msSlotLabel(slot)+'</span>'+mid+chip+lockBtn+
     '</div>';
   }
   el.innerHTML = html;
   msRenderPanelCounter();
 }
-
 function msRenderPanelCounter(){
   var el = document.getElementById('msPanelCounter'); if(!el) return;
   var st = msPanelState();
