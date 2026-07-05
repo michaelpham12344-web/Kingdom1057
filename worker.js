@@ -925,8 +925,14 @@ document.addEventListener('touchend',function(e){
     <div class="card" id="msManagePanel" style="margin-bottom:14px;display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px">
         <div class="card-title" style="margin:0">👑 Manage Spots — Assign & Move</div>
-        <div style="display:flex;gap:8px;align-items:center">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <span id="msPanelCounter" style="font-size:12px;color:var(--text3)"></span>
+          <select id="msCopyFilter" style="font-size:12px;padding:3px 6px">
+            <option value="">Copy: All</option>
+            <option>FIR</option><option>LOC</option><option>LYL</option><option>KNG</option><option>KOV</option><option>TLA</option>
+          </select>
+          <button class="btn btn-sm" onclick="msCopyByAlliance()">📋 Copy</button>
+          <span id="msCopiedMsg" style="font-size:12px;color:var(--green);opacity:0;transition:opacity .2s">Copied ✓</span>
           <button class="btn btn-ghost btn-sm" onclick="msUndoLast()">↩ Undo</button>
         </div>
       </div>
@@ -2762,16 +2768,22 @@ function msRenderBench(){
   if(!list.length){ html = '<div style="font-size:12px;color:var(--text3);padding:6px 0">No unplaced players.</div>'; }
   list.forEach(function(p){
     var sel = _msSelected && _msSelected.src==='bench' && _msSelected.player.ign===p.ign && _msSelected.player.alliance===p.alliance;
-    var reason = '';
-    if(MS._lastAllocation && MS._lastAllocation.rejected){
+    var reason = '', reasonFull = '';
+    if(p._addedManually){ reason='added'; reasonFull='Added manually by a leader — no picks, place anywhere.'; }
+    else if(MS._lastAllocation && MS._lastAllocation.rejected){
       var r = MS._lastAllocation.rejected.find(function(x){ return x.ign===p.ign && x.alliance===p.alliance; });
-      if(r){ reason = (r._rejectReason==='all-full') ? 'all full' : ((p.picks||[]).length < MS_MIN_SLOTS_PICKED ? 'too few picks' : 'picks taken'); }
+      if(r){
+        if((p.picks||[]).length < MS_MIN_SLOTS_PICKED){ reason='too few'; reasonFull='Picked fewer than the minimum '+MS_MIN_SLOTS_PICKED+' slots.'; }
+        else if(r._rejectReason==='all-full'){ reason='all full'; reasonFull='All 48 slots were filled before this player could be placed.'; }
+        else { reason='picks taken'; reasonFull='Every slot this player picked was taken by higher-priority players.'; }
+      }
     }
-    if(p._addedManually) reason = 'added';
     var hrs = (p.committedHours && p.committedHours[MS_RANK_CATEGORY]) ? p.committedHours[MS_RANK_CATEGORY].toFixed(0) : '0';
-    html += '<div onclick="msBenchClick('+"'"+encodeURIComponent(p.ign)+"','"+encodeURIComponent(p.alliance)+"'"+')" style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;cursor:pointer;margin-bottom:5px;border:1px solid '+(sel?'var(--accent)':'var(--border)')+';background:'+(sel?'rgba(61,142,240,.12)':'var(--bg3)')+'">'+
+    var reasonTag = reason ? '<span title="'+reasonFull.replace(/"/g,'&quot;')+'" style="cursor:help">'+reason+' ⓘ</span>' : '';
+    html += '<div onclick="msBenchClick('+"'"+encodeURIComponent(p.ign)+"','"+encodeURIComponent(p.alliance)+"'"+')" style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:6px;cursor:pointer;margin-bottom:4px;border:1px solid '+(sel?'var(--accent)':'var(--border)')+';background:'+(sel?'rgba(61,142,240,.12)':'var(--bg3)')+'">'+
       '<div style="min-width:0;flex:1"><div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.ign+'</div>'+
-      '<div style="font-size:11px;color:var(--text3)">'+p.alliance+' · '+hrs+'h'+(reason?' · '+reason:'')+'</div></div>'+
+      '<div style="font-size:10px;color:var(--text3)">'+hrs+'h'+(reasonTag?' · '+reasonTag:'')+'</div></div>'+
+      msAllianceChip(p.alliance)+
     '</div>';
   });
   el.innerHTML = html;
@@ -2818,6 +2830,22 @@ function msRenderPanelCounter(){
   var el = document.getElementById('msPanelCounter'); if(!el) return;
   var st = msPanelState();
   el.textContent = st.bench.length+' on bench · '+st.assignments.length+'/'+MS_TOTAL_SLOTS+' filled';
+}
+
+function msCopyByAlliance(){
+  if(!MS._lastAllocation || !MS._lastAllocation.assignments.length){ toast('Run allocation first.'); return; }
+  var filter = (document.getElementById('msCopyFilter')||{value:''}).value;
+  var rows = MS._lastAllocation.assignments
+    .filter(function(a){ return !filter || a.entry.alliance===filter; })
+    .sort(function(x,y){ return x.slot - y.slot; });
+  if(!rows.length){ toast('No players in '+filter+'.'); return; }
+  var d = new Date();
+  var dateStr = String(d.getUTCDate()).padStart(2,'0')+'/'+String(d.getUTCMonth()+1).padStart(2,'0')+'/'+d.getUTCFullYear();
+  var lines = ['Minister Spots — '+dateStr, 'Alliance: '+(filter||'All'), ''];
+  rows.forEach(function(a){ lines.push(msSlotLabel(a.slot).split('-')[0]+' - '+a.entry.ign); });
+  copyText(lines.join('\n'));
+  var msg = document.getElementById('msCopiedMsg');
+  if(msg){ msg.style.opacity='1'; setTimeout(function(){ msg.style.opacity='0'; }, 1500); }
 }
 
 function msRenderAuditFeed(){
