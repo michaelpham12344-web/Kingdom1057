@@ -952,6 +952,10 @@ document.addEventListener('touchend',function(e){
           <div id="msBoard" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px"></div>
         </div>
       </div>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+        <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">📋 Recent changes</div>
+        <div id="msAuditFeed" style="font-size:11px;color:var(--text3)"></div>
+      </div>
     </div>
 
     <div class="card">
@@ -2819,6 +2823,27 @@ function msRenderPanelCounter(){
   el.textContent = st.bench.length+' on bench · '+st.assignments.length+'/'+MS_TOTAL_SLOTS+' filled';
 }
 
+function msRenderAuditFeed(){
+  var el = document.getElementById('msAuditFeed'); if(!el) return;
+  var log = MS.auditLog || [];
+  if(!log.length){ el.innerHTML='<div style="color:var(--text3)">No changes yet.</div>'; return; }
+  var now = Date.now();
+  function ago(t){
+    var s = Math.floor((now-t)/1000);
+    if(s<60) return s+'s ago';
+    if(s<3600) return Math.floor(s/60)+'m ago';
+    if(s<86400) return Math.floor(s/3600)+'h ago';
+    return Math.floor(s/86400)+'d ago';
+  }
+  el.innerHTML = log.slice(0,25).map(function(e){
+    return '<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)">'+
+      '<strong style="color:var(--text2)">'+(e.who||'leader')+'</strong> '+
+      '<span style="color:var(--text3)">'+(e.action||'')+'</span> '+
+      '<span style="color:var(--text3);opacity:.7;font-size:10px">· '+ago(e.when||now)+'</span>'+
+    '</div>';
+  }).join('');
+}
+
 function msBenchClick(ignEnc, allEnc){
   var ign = decodeURIComponent(ignEnc), alliance = decodeURIComponent(allEnc);
   var st = msPanelState();
@@ -2910,6 +2935,7 @@ function msUndoLast(){
 function msRefreshManagePanel(){
   msRenderBench();
   msRenderBoard();
+  msRenderAuditFeed();
   if(typeof msRenderFinalSchedule==='function') msRenderFinalSchedule();
   if(typeof msRenderRejectedList==='function') msRenderRejectedList();
   if(typeof msRenderResultsSummary==='function') msRenderResultsSummary();
@@ -2922,6 +2948,7 @@ function msShowManagePanel(){
     panel.style.display = 'block';
     msRenderBench();
     msRenderBoard();
+    msRenderAuditFeed();
   } else {
     panel.style.display = 'none';
   }
