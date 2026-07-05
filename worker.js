@@ -562,6 +562,7 @@ document.addEventListener('touchend',function(e){
   </div>
 </div>
 
+<div id="stickyTop" style="position:sticky;top:0;z-index:100">
 <!-- USER BAR — shown after login -->
 <div id="userBar" style="display:none;background:var(--bg3);border-bottom:1px solid var(--border);padding:6px 16px;align-items:center;gap:10px;font-size:13px">
   <img id="userBarAvatar" src="" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--border2);display:none">
