@@ -589,6 +589,7 @@ document.addEventListener('touchend',function(e){
   <div id="syncStatusNav" style="font-family:var(--head);font-size:11px;font-weight:600;letter-spacing:.04em;margin-right:14px;color:var(--text3);white-space:nowrap;flex-shrink:0"></div>
   <div class="utc-clock" id="utcClock" style="flex-shrink:0">00:00:00</div>
 </nav>
+</div>
 <div id="toast">Copied!</div>
 
 <!-- ══════════════════════ RALLY COORDINATOR ══════════════════════ -->
