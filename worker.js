@@ -401,6 +401,9 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .bs-pet-label.on{color:#c084fc;}
 .bs-pet-label.warn{color:var(--gold);}
 .bs-pet-label.off{color:#ff7070;}
+.team-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;}
+.team-dot.free{background:var(--green);}
+.team-dot.rallying{background:#ff5555;box-shadow:0 0 6px rgba(255,85,85,.7);}
 
 /* MINISTER SPOTS */
 .ms-slot-btn{font-family:var(--mono);font-size:11px;padding:8px 4px;border-radius:5px;border:1px solid var(--border2);background:var(--bg4);color:var(--text2);cursor:pointer;transition:all .15s;text-align:center;}
@@ -693,6 +696,10 @@ document.addEventListener('touchend',function(e){
     <div class="card-title">📋 Final Calculation</div>
     <p style="color:var(--text2);font-size:12px;margin-bottom:12px">Click a team below to calculate launch times for its leaders, based on the offset selected above.</p>
     <div id="bsTeamButtons" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
+    <div style="display:flex;gap:14px;align-items:center;margin-bottom:10px;font-size:11px;color:var(--text3)">
+      <span><span class="team-dot free"></span>Free</span>
+      <span><span class="team-dot rallying"></span>Rallying</span>
+    </div>
     <div id="bsFinalResult">
       <div style="color:var(--text3);font-size:13px">Select an offset, then click a team to see the schedule.</div>
     </div>
@@ -1830,6 +1837,9 @@ function bsSetOffset(sec){
   else toast(\`Offset set to +\${sec<60?sec+'s':Math.floor(sec/60)+'m'} — now click a team\`);
 }
 
+// Per-team rally state (transient, not synced — driven by the land timer in the rally flow)
+let bsTeamRally = {};
+function bsTeamRallying(id){ return !!(bsTeamRally[id] && bsTeamRally[id].landEnd && bsTeamRally[id].landEnd>Date.now()); }
 function bsRenderTeamButtons(){
   const el=document.getElementById('bsTeamButtons'); if(!el) return;
   if(!S.teams.length){
@@ -1840,7 +1850,8 @@ function bsRenderTeamButtons(){
     const allianceColor=t.alliance==='garrison'?'btn-garrison':t.alliance==='attack'?'btn-attack':'btn-ghost';
     const selected=BS_CALC.selectedTeamId===t.id?'outline:2px solid var(--accent2)':'';
     const leaderCount=S.leaders.filter(l=>l.bsSlot&&l.bsSlot.slotType==='team'&&l.bsSlot.slotId===t.id).length;
-    return \`<button class="btn \${allianceColor}" style="\${selected}" onclick="bsSelectTeam('\${t.id}')">\${t.name} <span style="opacity:.6;font-size:11px">(\${leaderCount})</span></button>\`;
+    const dot='<span class="team-dot '+(bsTeamRallying(t.id)?'rallying':'free')+'"></span>';
+    return \`<button class="btn \${allianceColor}" style="\${selected}" onclick="bsSelectTeam('\${t.id}')">\${dot}\${t.name} <span style="opacity:.6;font-size:11px">(\${leaderCount})</span></button>\`;
   }).join('');
 }
 
