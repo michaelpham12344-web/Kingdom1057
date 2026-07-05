@@ -587,7 +587,8 @@ document.addEventListener('touchend',function(e){
   <div class="tab" id="tabTrialliance" onclick="showPage('trialliance')" style="display:none">Tri Alliance</div>
   <div class="tab" id="tabAdmin" onclick="showPage('admin')" style="display:none">⚙️ Admin</div>
   <div id="syncStatusNav" style="font-family:var(--head);font-size:11px;font-weight:600;letter-spacing:.04em;margin-right:14px;color:var(--text3);white-space:nowrap;flex-shrink:0"></div>
-  <div class="utc-clock" id="utcClock" style="flex-shrink:0">00:00:00</div>
+  <div id="kvkTimer" style="flex-shrink:0;display:flex;align-items:center;gap:6px;margin-left:auto;font-family:var(--head);font-size:12px;font-weight:600;letter-spacing:.04em;background:var(--bg3);border:1px solid var(--border);border-radius:16px;padding:4px 12px;margin-right:12px;white-space:nowrap"><span style="color:var(--text3)">⚔️ Next KvK</span><span id="kvkCountdown" style="color:#6ab0ff;font-family:var(--mono)">—</span></div>
+  <div class="utc-clock" id="utcClock" style="flex-shrink:0;margin-left:0">00:00:00</div>
 </nav>
 </div>
 <div id="toast">Copied!</div>
@@ -1137,6 +1138,21 @@ function updateClock(){
   const n=new Date();
   document.getElementById('utcClock').textContent=
     String(n.getUTCHours()).padStart(2,'0')+':'+String(n.getUTCMinutes()).padStart(2,'0')+':'+String(n.getUTCSeconds()).padStart(2,'0')+' UTC';
+  updateKvK();
+}
+// KvK countdown — next KvK begins at 00:00 UTC on the anchor date, then repeats every 28 days.
+// To change it: set KVK_ANCHOR_UTC to any known KvK start (00:00 UTC). Month is 0-based: 6 = July.
+const KVK_ANCHOR_UTC = Date.UTC(2026,6,13,0,0,0);
+const KVK_CYCLE_MS = 28*24*60*60*1000;
+function nextKvKStart(now){ let t=KVK_ANCHOR_UTC; if(now>=t){ t += Math.ceil((now-t+1)/KVK_CYCLE_MS)*KVK_CYCLE_MS; } return t; }
+function updateKvK(){
+  const el=document.getElementById('kvkCountdown'); if(!el) return;
+  let diff=Math.max(0,nextKvKStart(Date.now())-Date.now());
+  const d=Math.floor(diff/86400000); diff%=86400000;
+  const h=Math.floor(diff/3600000); diff%=3600000;
+  const m=Math.floor(diff/60000); diff%=60000;
+  const s=Math.floor(diff/1000);
+  el.textContent=d+'d '+String(h).padStart(2,'0')+'h '+String(m).padStart(2,'0')+'m '+String(s).padStart(2,'0')+'s';
 }
 setInterval(updateClock,1000); updateClock();
 
