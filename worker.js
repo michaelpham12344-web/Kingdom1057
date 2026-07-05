@@ -1023,7 +1023,7 @@ let syncSerialize = function() {
   return JSON.stringify({
     leaders: S.leaders.map(l => ({
       id: l.id, name: l.name, march: l.march, tier: l.tier, dur: l.dur,
-      teamId: l.teamId, pet: l.pet ? { active: !!l.pet.active } : { active: false },
+      teamId: l.teamId, pet: l.pet ? { active: !!l.pet.active, startMs: l.pet.startMs || null } : { active: false, startMs: null },
       bsSlot: l.bsSlot || { slotType: 'pool', slotId: null }
     })),
     teams: S.teams.map(t => ({ id: t.id, name: t.name, alliance: t.alliance })),
