@@ -2776,34 +2776,62 @@ function msBenchClick(ignEnc, allEnc){
 }
 
 function msBoardClick(slot){
-  if(!_msSelected) return;
   var st = msPanelState();
   var bySlot = {}; st.assignments.forEach(function(a){ bySlot[a.slot]=a; });
+
+  // Nothing selected yet: if this slot has a player, pick them up (select them)
+  if(!_msSelected){
+    if(bySlot[slot]){
+      _msSelected = { src:'slot', player: bySlot[slot].entry, fromSlot: slot };
+      msRenderBench(); msRenderBoard();
+      var h0 = document.getElementById('msBoardHint');
+      if(h0) h0.innerHTML = '<span style="color:var(--accent)">Selected '+bySlot[slot].entry.ign+' from '+msSlotLabel(slot)+' — tap another slot to move or swap.</span>';
+    }
+    return;
+  }
+
   var moving = _msSelected.player;
+  var fromSlot = _msSelected.src==='slot' ? _msSelected.fromSlot : null;
+
+  // Tapping the same slot again = deselect
+  if(fromSlot===slot){ _msSelected=null; msRenderBench(); msRenderBoard(); return; }
+
   var mismatch = moving.picks && moving.picks.length>0 && moving.picks.indexOf(slot)<0;
   if(mismatch){
     if(!confirm(moving.ign+' did NOT pick '+msSlotLabel(slot)+' — they may be unavailable then. Place anyway?')) return;
   }
+
   msSnapshot();
   if(!MS._lastAllocation) MS._lastAllocation = {assignments:[], rejected:[]};
   var A = MS._lastAllocation;
-  // Remove moving from any existing assignment
-  A.assignments = A.assignments.filter(function(a){ return !(a.entry.ign===moving.ign && a.entry.alliance===moving.alliance); });
-  // Remove moving from rejected
-  A.rejected = (A.rejected||[]).filter(function(r){ return !(r.ign===moving.ign && r.alliance===moving.alliance); });
-  // If target slot occupied, bump that person to rejected (bench)
   var occ = bySlot[slot];
+
+  // Remove moving from its current assignment + from rejected
+  A.assignments = A.assignments.filter(function(a){ return !(a.entry.ign===moving.ign && a.entry.alliance===moving.alliance); });
+  A.rejected = (A.rejected||[]).filter(function(r){ return !(r.ign===moving.ign && r.alliance===moving.alliance); });
+
   if(occ){
+    // Remove the occupant from the target slot
     A.assignments = A.assignments.filter(function(a){ return a.slot!==slot; });
-    A.rejected.push(occ.entry);
+    if(fromSlot!==null){
+      // SLOT → SLOT: swap — put the occupant into the slot 'moving' came from
+      A.assignments.push({ entry: occ.entry, slot: fromSlot, pinned: true });
+      msLogAction('swapped '+moving.ign+' ('+msSlotLabel(slot)+') with '+occ.entry.ign+' ('+msSlotLabel(fromSlot)+')');
+    } else {
+      // BENCH → occupied slot: bump occupant to bench
+      A.rejected.push(occ.entry);
+      msLogAction('assigned '+moving.ign+' → '+msSlotLabel(slot)+' (bumped '+occ.entry.ign+')');
+    }
+  } else {
+    msLogAction((fromSlot!==null?'moved ':'assigned ')+moving.ign+' → '+msSlotLabel(slot)+(mismatch?' (not their pick)':''));
   }
+
   A.assignments.push({ entry: moving, slot: slot, pinned: true });
-  msLogAction('assigned '+moving.ign+' → '+msSlotLabel(slot)+(mismatch?' (not their pick)':''));
   _msSelected = null;
   syncQueuePush();
   msRefreshManagePanel();
   var hint = document.getElementById('msBoardHint');
-  if(hint) hint.innerHTML = (mismatch?'<span style="color:#ff9d4d">⚠ ':'<span style="color:var(--green)">✓ ')+'Assigned '+moving.ign+' to '+msSlotLabel(slot)+'.</span>';
+  if(hint) hint.innerHTML = (mismatch?'<span style="color:#ff9d4d">⚠ ':'<span style="color:var(--green)">✓ ')+'Done: '+moving.ign+' → '+msSlotLabel(slot)+'.</span>';
 }
 
 function msPanelToggleLock(slot){
