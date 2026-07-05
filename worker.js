@@ -937,7 +937,7 @@ document.addEventListener('touchend',function(e){
         </div>
       </div>
       <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Tap a bench player, then tap a slot to place them. Their own picked slots show a blue dot.</div>
-      <div style="display:grid;grid-template-columns:180px 1fr;gap:14px" id="msPanelGrid">
+      <div style="display:grid;grid-template-columns:280px 1fr;gap:14px" id="msPanelGrid">
         <div style="background:var(--bg4);border-radius:10px;padding:12px">
           <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Bench</div>
           <input id="msBenchSearch" placeholder="Search players" style="width:100%;margin-bottom:8px;font-size:13px" oninput="msRenderBench()">
@@ -945,7 +945,7 @@ document.addEventListener('touchend',function(e){
             <input id="msAddPlayerId" placeholder="Add by Player ID" style="flex:1;font-size:12px;min-width:0">
             <button class="btn btn-sm" onclick="msAddPlayerById()">+</button>
           </div>
-          <div id="msBenchList"></div>
+          <div id="msBenchList" style="display:grid;grid-template-columns:1fr 1fr;gap:4px"></div>
         </div>
         <div style="background:var(--bg4);border-radius:10px;padding:12px">
           <div id="msBoardHint" style="font-size:12px;color:var(--text3);margin-bottom:10px">Select a bench player to begin.</div>
