@@ -1932,7 +1932,7 @@ if(!isR4 && hasSubmission && !MS._editing && n>=1 && n<=4){ toast('Click "Edit m
   if(n===2) msRenderVerifyGrid();
   if(n===3) msRenderSliderGrid();
   if(n===4) msRenderSlotGrid();
-  if(n===5){ msRenderResultsSummary(); msInitResultsTab(); }
+  if(n===5){ msRenderResultsSummary(); msInitResultsTab(); if(typeof msShowManagePanel==='function') msShowManagePanel(); }
   msRenderStepTabs();
 }
 
@@ -2676,6 +2676,173 @@ function msRenderFinalSchedule(){
     (emptyCount>0 ? '<div style="font-size:12px;color:#ff9d4d;margin-bottom:10px">⚠ '+emptyCount+' slot'+(emptyCount>1?'s are':' is')+' empty — nobody picked '+(emptyCount>1?'them':'it')+'. Left open on purpose.</div>' : '');
 
   el.innerHTML = header + rows.join('');
+}
+
+function msAddPlayerById(){ alert('Add-by-ID coming in the next step.'); }
+
+// ═══════════ MANAGE SPOTS — interactive leader panel ═══════════
+var _msSelected = null;        // {src:'bench'|'slot', player, slot?}
+var _msUndoStack = [];
+
+function msPanelState(){
+  // Returns {assignments:[{slot,entry,pinned}], bench:[entries]} derived from allocation + submissions
+  var alloc = MS._lastAllocation || {assignments:[], rejected:[]};
+  var placedIgns = {};
+  alloc.assignments.forEach(function(a){ placedIgns[a.entry.ign+'|'+a.entry.alliance]=true; });
+  // Bench = everyone not currently placed (rejected + any submission not assigned + manually added)
+  var bench = [];
+  (MS.submissions||[]).forEach(function(s){
+    if(!placedIgns[s.ign+'|'+s.alliance]) bench.push(s);
+  });
+  return { assignments: alloc.assignments, bench: bench };
+}
+
+function msSnapshot(){
+  _msUndoStack.push(JSON.stringify(MS._lastAllocation||{assignments:[],rejected:[]}));
+  if(_msUndoStack.length>30) _msUndoStack.shift();
+}
+
+function msSelectedPicks(){
+  return (_msSelected && _msSelected.player && _msSelected.player.picks) ? _msSelected.player.picks : [];
+}
+
+function msRenderBench(){
+  var el = document.getElementById('msBenchList'); if(!el) return;
+  var st = msPanelState();
+  var q = (document.getElementById('msBenchSearch')||{value:''}).value.toLowerCase();
+  var list = st.bench.filter(function(p){ return p.ign.toLowerCase().indexOf(q)>=0; });
+  var html = '';
+  if(!list.length){ html = '<div style="font-size:12px;color:var(--text3);padding:6px 0">No unplaced players.</div>'; }
+  list.forEach(function(p){
+    var sel = _msSelected && _msSelected.src==='bench' && _msSelected.player.ign===p.ign && _msSelected.player.alliance===p.alliance;
+    var reason = '';
+    if(MS._lastAllocation && MS._lastAllocation.rejected){
+      var r = MS._lastAllocation.rejected.find(function(x){ return x.ign===p.ign && x.alliance===p.alliance; });
+      if(r){ reason = (r._rejectReason==='all-full') ? 'all full' : ((p.picks||[]).length < MS_MIN_SLOTS_PICKED ? 'too few picks' : 'picks taken'); }
+    }
+    if(p._addedManually) reason = 'added';
+    var hrs = (p.committedHours && p.committedHours[MS_RANK_CATEGORY]) ? p.committedHours[MS_RANK_CATEGORY].toFixed(0) : '0';
+    html += '<div onclick="msBenchClick('+"'"+encodeURIComponent(p.ign)+"','"+encodeURIComponent(p.alliance)+"'"+')" style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;cursor:pointer;margin-bottom:5px;border:1px solid '+(sel?'var(--accent)':'var(--border)')+';background:'+(sel?'rgba(61,142,240,.12)':'var(--bg3)')+'">'+
+      '<div style="min-width:0;flex:1"><div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.ign+'</div>'+
+      '<div style="font-size:11px;color:var(--text3)">'+p.alliance+' · '+hrs+'h'+(reason?' · '+reason:'')+'</div></div>'+
+    '</div>';
+  });
+  el.innerHTML = html;
+}
+
+function msRenderBoard(){
+  var el = document.getElementById('msBoard'); if(!el) return;
+  var st = msPanelState();
+  var bySlot = {};
+  st.assignments.forEach(function(a){ bySlot[a.slot]=a; });
+  var picks = msSelectedPicks();
+  var html = '';
+  for(var slot=0; slot<MS_TOTAL_SLOTS; slot++){
+    var a = bySlot[slot];
+    var empty = !a;
+    var isPick = picks.indexOf(slot)>=0;
+    var selecting = !!_msSelected;
+    var border = a && a.pinned ? 'var(--gold)' : (isPick ? 'var(--accent)' : 'var(--border)');
+    var mid;
+    if(empty){
+      mid = '<span style="font-size:11px;color:var(--text3);font-style:italic;flex:1">'+(selecting?(isPick?'their pick — tap':'tap to place'):'empty')+'</span>';
+    } else {
+      mid = '<div style="min-width:0;flex:1"><span style="font-size:12px;font-weight:600;color:var(--text)">'+a.entry.ign+'</span> <span style="font-size:10px;color:var(--text3)">'+a.entry.alliance+'</span></div>';
+    }
+    var dot = isPick ? '<span style="width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0"></span>' : '<span style="width:6px;flex-shrink:0"></span>';
+    var lockBtn = '<span onclick="event.stopPropagation();msPanelToggleLock('+slot+')" title="lock" style="cursor:pointer;font-size:13px;flex-shrink:0;color:'+(a&&a.pinned?'var(--gold)':'var(--text3)')+'">'+(a&&a.pinned?'🔒':'🔓')+'</span>';
+    html += '<div onclick="msBoardClick('+slot+')" style="border-radius:7px;padding:7px 9px;border:1px solid '+border+';background:'+(empty?'var(--bg2)':'var(--bg3)')+';display:flex;align-items:center;gap:7px;cursor:'+(selecting?'copy':'default')+';min-height:40px">'+
+      dot+'<span style="font-family:var(--mono);font-size:11px;color:var(--text2);flex-shrink:0">'+msSlotLabel(slot)+'</span>'+mid+lockBtn+
+    '</div>';
+  }
+  el.innerHTML = html;
+  msRenderPanelCounter();
+}
+
+function msRenderPanelCounter(){
+  var el = document.getElementById('msPanelCounter'); if(!el) return;
+  var st = msPanelState();
+  el.textContent = st.bench.length+' on bench · '+st.assignments.length+'/'+MS_TOTAL_SLOTS+' filled';
+}
+
+function msBenchClick(ignEnc, allEnc){
+  var ign = decodeURIComponent(ignEnc), alliance = decodeURIComponent(allEnc);
+  var st = msPanelState();
+  var p = st.bench.find(function(x){ return x.ign===ign && x.alliance===alliance; });
+  if(!p) return;
+  if(_msSelected && _msSelected.src==='bench' && _msSelected.player.ign===ign && _msSelected.player.alliance===alliance){ _msSelected=null; }
+  else { _msSelected = {src:'bench', player:p}; }
+  msRenderBench(); msRenderBoard();
+}
+
+function msBoardClick(slot){
+  if(!_msSelected) return;
+  var st = msPanelState();
+  var bySlot = {}; st.assignments.forEach(function(a){ bySlot[a.slot]=a; });
+  var moving = _msSelected.player;
+  var mismatch = moving.picks && moving.picks.length>0 && moving.picks.indexOf(slot)<0;
+  if(mismatch){
+    if(!confirm(moving.ign+' did NOT pick '+msSlotLabel(slot)+' — they may be unavailable then. Place anyway?')) return;
+  }
+  msSnapshot();
+  if(!MS._lastAllocation) MS._lastAllocation = {assignments:[], rejected:[]};
+  var A = MS._lastAllocation;
+  // Remove moving from any existing assignment
+  A.assignments = A.assignments.filter(function(a){ return !(a.entry.ign===moving.ign && a.entry.alliance===moving.alliance); });
+  // Remove moving from rejected
+  A.rejected = (A.rejected||[]).filter(function(r){ return !(r.ign===moving.ign && r.alliance===moving.alliance); });
+  // If target slot occupied, bump that person to rejected (bench)
+  var occ = bySlot[slot];
+  if(occ){
+    A.assignments = A.assignments.filter(function(a){ return a.slot!==slot; });
+    A.rejected.push(occ.entry);
+  }
+  A.assignments.push({ entry: moving, slot: slot, pinned: true });
+  msLogAction('assigned '+moving.ign+' → '+msSlotLabel(slot)+(mismatch?' (not their pick)':''));
+  _msSelected = null;
+  syncQueuePush();
+  msRefreshManagePanel();
+  var hint = document.getElementById('msBoardHint');
+  if(hint) hint.innerHTML = (mismatch?'<span style="color:#ff9d4d">⚠ ':'<span style="color:var(--green)">✓ ')+'Assigned '+moving.ign+' to '+msSlotLabel(slot)+'.</span>';
+}
+
+function msPanelToggleLock(slot){
+  if(!MS._lastAllocation) return;
+  var a = MS._lastAllocation.assignments.find(function(x){ return x.slot===slot; });
+  if(!a) return;
+  msSnapshot();
+  a.pinned = !a.pinned;
+  msLogAction((a.pinned?'locked ':'unlocked ')+msSlotLabel(slot)+' ('+a.entry.ign+')');
+  syncQueuePush();
+  msRefreshManagePanel();
+}
+
+function msUndoLast(){
+  if(!_msUndoStack.length){ var h=document.getElementById('msBoardHint'); if(h) h.textContent='Nothing to undo.'; return; }
+  MS._lastAllocation = JSON.parse(_msUndoStack.pop());
+  msLogAction('undid last change');
+  syncQueuePush();
+  msRefreshManagePanel();
+}
+
+function msRefreshManagePanel(){
+  msRenderBench();
+  msRenderBoard();
+  if(typeof msRenderFinalSchedule==='function') msRenderFinalSchedule();
+  if(typeof msRenderRejectedList==='function') msRenderRejectedList();
+  if(typeof msRenderResultsSummary==='function') msRenderResultsSummary();
+}
+
+function msShowManagePanel(){
+  var panel = document.getElementById('msManagePanel');
+  if(!panel) return;
+  if(msCanAccessResults()){
+    panel.style.display = 'block';
+    msRenderBench();
+    msRenderBoard();
+  } else {
+    panel.style.display = 'none';
+  }
 }
 
 let _msDragSrcIdx = null;
