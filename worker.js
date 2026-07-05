@@ -394,10 +394,12 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .bs-leader-meta{font-size:11px;color:var(--text3);margin-bottom:6px;}
 .bs-pet-bar{height:6px;border-radius:99px;overflow:hidden;background:var(--bg2);}
 .bs-pet-bar-fill{height:100%;border-radius:99px;transition:background .2s;}
-.bs-pet-bar-fill.on{background:var(--green);}
+.bs-pet-bar-fill.on{background:#a855f7;}
+.bs-pet-bar-fill.warn{background:var(--gold);}
 .bs-pet-bar-fill.off{background:var(--enemy);}
 .bs-pet-label{font-size:10px;text-align:center;margin-top:3px;letter-spacing:.04em;font-family:var(--head);font-weight:600;}
-.bs-pet-label.on{color:var(--green);}
+.bs-pet-label.on{color:#c084fc;}
+.bs-pet-label.warn{color:var(--gold);}
 .bs-pet-label.off{color:#ff7070;}
 
 /* MINISTER SPOTS */
@@ -1525,20 +1527,24 @@ function tickPets(){
   S.leaders.forEach(l=>{
     if(!l.pet||!l.pet.active||!l.pet.startMs) return;
     const rem=PET_DUR-(now-l.pet.startMs);
+    const expired=rem<=0;
+    if(expired){ l.pet.active=false; l.pet.startMs=null; }
+    const expiring=!expired&&rem<=WARN_MS;
+    const txt=expired?'EXPIRED':fmtSec(Math.ceil(rem/1000));
+    // Pet Planner card
     const timerEl=document.getElementById('pettimer-'+l.id);
-    const cardEl=document.getElementById('petcard-'+l.id);
-    const btnEl=cardEl?cardEl.querySelector('.pet-toggle'):null;
-    if(!timerEl) return;
-    if(rem<=0){
-      l.pet.active=false; l.pet.startMs=null;
-      timerEl.textContent='EXPIRED'; timerEl.className='pet-timer expired';
-      if(cardEl){ cardEl.className='pet-card expired'; }
-      if(btnEl){ btnEl.textContent='▶ Activate'; btnEl.className='pet-toggle off'; }
-    } else {
-      timerEl.textContent=fmtSec(Math.ceil(rem/1000));
-      const expiring=rem<=WARN_MS;
-      timerEl.className='pet-timer '+(expiring?'expiring':'active');
-      if(cardEl) cardEl.className='pet-card '+(expiring?'expiring':'active');
+    if(timerEl){
+      const cardEl=document.getElementById('petcard-'+l.id);
+      const btnEl=cardEl?cardEl.querySelector('.pet-toggle'):null;
+      if(expired){ timerEl.textContent='EXPIRED'; timerEl.className='pet-timer expired'; if(cardEl)cardEl.className='pet-card expired'; if(btnEl){ btnEl.textContent='▶ Activate'; btnEl.className='pet-toggle off'; } }
+      else { timerEl.textContent=txt; timerEl.className='pet-timer '+(expiring?'expiring':'active'); if(cardEl)cardEl.className='pet-card '+(expiring?'expiring':'active'); }
+    }
+    // Battle Strategy card
+    const bsFill=document.getElementById('bspetfill-'+l.id);
+    const bsLabel=document.getElementById('bspetlabel-'+l.id);
+    if(bsFill&&bsLabel){
+      if(expired){ bsFill.className='bs-pet-bar-fill off'; bsFill.style.width='0%'; bsLabel.className='bs-pet-label off'; bsLabel.textContent='No pet — tap'; }
+      else { const cls=expiring?'warn':'on'; bsFill.className='bs-pet-bar-fill '+cls; bsFill.style.width=Math.max(0,Math.min(100,rem/PET_DUR*100))+'%'; bsLabel.className='bs-pet-label '+cls; bsLabel.textContent=txt; }
     }
   });
 }
@@ -1556,14 +1562,19 @@ function bsGetAssignment(leaderId){
 }
 
 function bsLeaderCardHTML(l){
-  const pet=l.pet&&l.pet.active;
+  const p=l.pet||{active:false,startMs:null};
+  let petCls='off',petTxt='No pet — tap',petPct=0;
+  if(p.active&&p.startMs){
+    const rem=PET_DUR-(Date.now()-p.startMs);
+    if(rem>0){ petCls=(rem<=WARN_MS)?'warn':'on'; petTxt=fmtSec(Math.ceil(rem/1000)); petPct=Math.max(0,Math.min(100,rem/PET_DUR*100)); }
+  }
   const team=S.teams.find(t=>t.id===l.teamId);
   return \`<div class="bs-leader-card" draggable="true" id="bsleader-\${l.id}"
     ondragstart="bsOnDragStart(event,'\${l.id}')" ondragend="bsOnDragEnd(event)">
     <div class="bs-leader-name">\${l.name} <span class="badge badge-\${l.tier.toLowerCase()}" style="margin-left:3px">\${l.tier}</span></div>
     <div class="bs-leader-meta">\${team?team.name:'No team'} · \${l.march}s march</div>
-    <div class="bs-pet-bar" style="cursor:pointer" onclick="bsTogglePet(event,'\${l.id}')" title="Click to toggle pet buff"><div class="bs-pet-bar-fill \${pet?'on':'off'}" style="width:100%"></div></div>
-    <div class="bs-pet-label \${pet?'on':'off'}" style="cursor:pointer" onclick="bsTogglePet(event,'\${l.id}')">\${pet?'PET ACTIVE':'NO PET — CLICK'}</div>
+    <div class="bs-pet-bar" style="cursor:pointer" onclick="bsTogglePet(event,'\${l.id}')" title="Click to toggle 2.5h pet buff"><div class="bs-pet-bar-fill \${petCls}" id="bspetfill-\${l.id}" style="width:\${petPct}%"></div></div>
+    <div class="bs-pet-label \${petCls}" id="bspetlabel-\${l.id}" style="cursor:pointer" onclick="bsTogglePet(event,'\${l.id}')">\${petTxt}</div>
   </div>\`;
 }
 
