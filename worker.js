@@ -698,6 +698,18 @@ document.addEventListener('touchend',function(e){
     </div>
   </div>
 
+<!-- PET ACTIVATION PLAN -->
+  <div class="card">
+    <div class="card-title">🐾 Pet Activation Plan</div>
+    <p style="color:var(--text2);font-size:12px;margin-bottom:10px">Select leaders, pick a UTC time, and add a plan. At that time their 2.5h pet buff auto-activates for everyone in the plan.</p>
+    <div id="bsPetSelChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
+    <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <div class="field" style="margin:0"><label>Activation time (UTC)</label><input type="time" id="bsPetPlanTime" step="60" style="width:130px"></div>
+      <button class="btn btn-primary" onclick="bsAddPetPlan()">+ Add Plan</button>
+    </div>
+    <div id="bsPetPlanList"></div>
+  </div>
+
   <div class="card">
     <div class="card-title">👥 Rally Leader Pool</div>
     <p style="color:var(--text2);font-size:12px;margin-bottom:12px">Drag a leader card into a turret or team slot above. Drag back here to unassign.</p>
@@ -1549,6 +1561,58 @@ function tickPets(){
   });
 }
 setInterval(tickPets, 1000);
+
+// ── Pet Activation Plan (Battle Strategy) — arm a batch of leaders to auto-activate at a UTC time ──
+let bsPetPlans=[]; let bsPetSel=[];
+function bsPetSelToggle(id){ const i=bsPetSel.indexOf(id); if(i>=0)bsPetSel.splice(i,1); else bsPetSel.push(id); renderPetPlanChips(); }
+function bsAddPetPlan(){
+  const inp=document.getElementById('bsPetPlanTime'); if(!inp) return;
+  const v=inp.value; if(!v){ toast('Pick a UTC time'); return; }
+  if(!bsPetSel.length){ toast('Select at least one leader'); return; }
+  const parts=v.split(':'); const hh=parseInt(parts[0],10), mm=parseInt(parts[1],10);
+  const now=new Date();
+  let t=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate(),hh,mm,0);
+  if(t<=Date.now()) t+=86400000;
+  bsPetPlans.push({id:'pp'+Date.now(),targetMs:t,hh:hh,mm:mm,leaderIds:bsPetSel.slice(),fired:false});
+  bsPetSel=[]; renderPetPlans(); toast('Plan added');
+}
+function bsRemovePetPlan(id){ bsPetPlans=bsPetPlans.filter(p=>p.id!==id); renderPetPlans(); }
+function bsFirePetPlans(){
+  const now=Date.now(); let changed=false;
+  bsPetPlans.forEach(function(p){
+    if(p.fired||now<p.targetMs) return;
+    p.leaderIds.forEach(function(id){ const l=S.leaders.find(function(x){return x.id===id;}); if(l){ if(!l.pet)l.pet={active:false,startMs:null}; if(!l.pet.active){ l.pet.active=true; l.pet.startMs=now; } } });
+    p.fired=true; changed=true;
+  });
+  if(changed){ if(typeof renderBattleStrategy==='function') renderBattleStrategy(); if(typeof syncQueuePush==='function') syncQueuePush(); toast('Pets activated by plan'); }
+}
+function renderPetPlanChips(){
+  const el=document.getElementById('bsPetSelChips'); if(!el) return;
+  el.innerHTML = S.leaders.length ? S.leaders.map(function(l){
+    const on=bsPetSel.indexOf(l.id)>=0;
+    return '<span onclick="bsPetSelToggle('+"'"+l.id+"'"+')" style="cursor:pointer;user-select:none;font-size:12px;padding:4px 10px;border-radius:14px;border:1px solid '+(on?'var(--accent)':'var(--border)')+';background:'+(on?'rgba(61,142,240,.15)':'var(--bg3)')+';color:'+(on?'var(--accent2)':'var(--text2)')+'">'+l.name+'</span>';
+  }).join('') : '<span style="color:var(--text3);font-size:12px">No leaders yet.</span>';
+}
+function renderPetPlanList(){
+  const el=document.getElementById('bsPetPlanList'); if(!el) return;
+  if(!bsPetPlans.length){ el.innerHTML='<div style="color:var(--text3);font-size:12px">No plans yet. Select leaders, pick a UTC time, and add a plan.</div>'; return; }
+  const now=Date.now();
+  el.innerHTML=bsPetPlans.map(function(p){
+    const hhmm=String(p.hh).padStart(2,'0')+':'+String(p.mm).padStart(2,'0');
+    let status;
+    if(p.fired) status='<span style="color:#c084fc">✓ Activated</span>';
+    else status='<span style="color:var(--gold)">in '+fmtSec(Math.ceil(Math.max(0,p.targetMs-now)/1000))+'</span>';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;margin-bottom:6px">'+
+      '<span style="font-family:var(--mono);color:var(--text);font-size:14px">'+hhmm+' UTC</span>'+
+      '<span style="color:var(--text2);font-size:12px">'+p.leaderIds.length+' leader'+(p.leaderIds.length===1?'':'s')+'</span>'+
+      '<span style="font-size:12px">'+status+'</span>'+
+      '<span style="flex:1"></span>'+
+      '<span onclick="bsRemovePetPlan('+"'"+p.id+"'"+')" style="cursor:pointer;color:var(--text3);font-size:14px" title="Remove">✕</span>'+
+    '</div>';
+  }).join('');
+}
+function renderPetPlans(){ renderPetPlanChips(); renderPetPlanList(); }
+setInterval(function(){ bsFirePetPlans(); renderPetPlanList(); },1000);
 renderPetGrid();
 
 // ════════════ BATTLE STRATEGY ════════════
@@ -1716,7 +1780,8 @@ function renderBattleStrategy(){
     poolEl.innerHTML=poolLeaders.length?poolLeaders.map(l=>bsLeaderCardHTML(l)).join(''):'<div style="color:var(--text3);font-size:12px">All leaders assigned. Drag a card here to unassign.</div>';
   }
 
-  bsRenderTeamButtons();
+bsRenderTeamButtons();
+  if(typeof renderPetPlans==='function') renderPetPlans();
 }
 renderBattleStrategy();
 
