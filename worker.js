@@ -1528,7 +1528,7 @@ setInterval(tickPets, 1000);
 renderPetGrid();
 
 // ════════════ BATTLE STRATEGY ════════════
-const BS_TURRETS = [{name:'Turret 1'},{name:'Turret 2'},{name:'Turret 3'},{name:'Turret 4'}];
+const BS_TURRETS = [{name:'North'},{name:'East'},{name:'South'},{name:'West'}];
 // assignment state per leader: {slotType:'pool'|'turret'|'team', slotId: turretIndex|teamId|null}
 function bsGetAssignment(leaderId){
   const l=S.leaders.find(x=>x.id===leaderId);
