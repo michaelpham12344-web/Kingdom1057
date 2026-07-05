@@ -1803,6 +1803,7 @@ renderBattleStrategy();
 
 // ════════════ BATTLE STRATEGY — SHARED SETUP & FINAL CALCULATION ════════════
 const BS_CALC = { offsetSec: null, selectedTeamId: null };
+const BS_MARKER_SEC = 45; // marker/buffer seconds added to each team's land timer
 
 function bsTickClock(){
   const hh=document.getElementById('bsClockHH');
@@ -1846,14 +1847,16 @@ function bsRenderTeamButtons(){
     el.innerHTML='<div style="color:var(--text3);font-size:13px">No teams created yet. Add teams in Team Setup.</div>';
     return;
   }
-  el.innerHTML=S.teams.map(t=>{
+el.innerHTML=S.teams.map(t=>{
     const allianceColor=t.alliance==='garrison'?'btn-garrison':t.alliance==='attack'?'btn-attack':'btn-ghost';
     const selected=BS_CALC.selectedTeamId===t.id?'outline:2px solid var(--accent2)':'';
     const leaderCount=S.leaders.filter(l=>l.bsSlot&&l.bsSlot.slotType==='team'&&l.bsSlot.slotId===t.id).length;
-    const dot='<span class="team-dot '+(bsTeamRallying(t.id)?'rallying':'free')+'"></span>';
-    return \`<button class="btn \${allianceColor}" style="\${selected}" onclick="bsSelectTeam('\${t.id}')">\${dot}\${t.name} <span style="opacity:.6;font-size:11px">(\${leaderCount})</span></button>\`;
+    const rallying=bsTeamRallying(t.id);
+    const dot='<span class="team-dot '+(rallying?'rallying':'free')+'"></span>';
+    let meta='<span style="opacity:.6;font-size:11px">('+leaderCount+')</span>';
+    if(rallying){ const rem=(bsTeamRally[t.id].landEnd-Date.now())/1000; meta='<span class="mono" style="color:#ff7070;font-size:12px;margin-left:2px">lands '+bsFmtLand(rem)+'</span>'; }
+    return \`<button class="btn \${allianceColor}" style="\${selected}" onclick="bsSelectTeam('\${t.id}')">\${dot}\${t.name} \${meta}</button>\`;
   }).join('');
-}
 
 function bsSelectTeam(teamId){
   BS_CALC.selectedTeamId=teamId;
@@ -1903,7 +1906,7 @@ function bsCalcTeam(teamId, offsetSec, logToast){
   </div>
   <button class="btn btn-gold" style="margin-top:10px" onclick="bsCopyTeamResult('\${t.id}')">📋 Copy for in-game chat</button>\`;
 
-  t._bsLastCalc={header,results,dur,landSec};
+  t._bsLastCalc={header,results,dur,landSec,maxMarch};
   // Show the persistent quick-copy button above the result
 
   if(logToast) toast(\`\${t.name} — rally times calculated!\`);
@@ -1920,8 +1923,19 @@ function bsCopyTeamResult(teamId){
   const {results}=t._bsLastCalc;
   const lines=[t.name, ...results.map(r=>\`\${r.name} | Time: \${s2hms(r.launchSec)}\`)];
   copyText(lines.join('\\n'));
-  toast('Copied!');
+  // Start (or reset) this team's land timer: rally duration + longest march + marker
+  const dur=t._bsLastCalc.dur||300, mm=t._bsLastCalc.maxMarch||0;
+  bsTeamRally[teamId]={landEnd:Date.now()+(dur+mm+BS_MARKER_SEC)*1000};
+  if(typeof bsRenderTeamButtons==='function') bsRenderTeamButtons();
+  toast('Copied — '+t.name+' rallying');
 }
+function bsFmtLand(sec){ sec=Math.max(0,Math.ceil(sec)); if(sec>=60){ const m=Math.floor(sec/60), s=sec%60; return m+':'+String(s).padStart(2,'0'); } return sec+'s'; }
+function bsTickRally(){
+  const now=Date.now(); let changed=false;
+  Object.keys(bsTeamRally).forEach(function(id){ if(bsTeamRally[id]&&bsTeamRally[id].landEnd&&bsTeamRally[id].landEnd<=now){ delete bsTeamRally[id]; changed=true; } });
+  if(changed || Object.keys(bsTeamRally).length){ if(typeof bsRenderTeamButtons==='function') bsRenderTeamButtons(); }
+}
+setInterval(bsTickRally,1000);
 
 // ════════════ MINISTER SPOTS ════════════
 const MS_CATEGORIES = ['general','training','construction','research'];
