@@ -1867,7 +1867,7 @@ el.innerHTML=S.teams.map(t=>{
     if(rallying){ const rem=(bsTeamRally[t.id].landEnd-Date.now())/1000; meta='<span class="mono" style="color:#ff7070;font-size:12px;margin-left:2px">lands '+bsFmtLand(rem)+'</span>'; }
     return \`<button class="btn \${allianceColor}" style="\${selected}" onclick="bsSelectTeam('\${t.id}')">\${dot}\${t.name} \${meta}</button>\`;
   }).join('');
-
+}
 function bsSelectTeam(teamId){
   BS_CALC.selectedTeamId=teamId;
   bsRenderTeamButtons();
