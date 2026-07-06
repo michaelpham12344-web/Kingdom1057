@@ -602,8 +602,7 @@ document.addEventListener('touchend',function(e){
 
 <nav class="nav" id="mainNav" style="display:none">
   <div class="nav-logo">KINGDOM<span>·</span>1057</div>
-  <div class="tab" onclick="showPage('setup')">Team Setup</div>
-  <div class="tab active" onclick="showPage('strategy')">Battle Strategy</div>
+<div class="tab active" onclick="showPage('strategy')">Battle Strategy</div>
   <div class="tab" onclick="showPage('minister')">Minister Spots</div>
   <div class="tab" id="tabSwordland" onclick="showPage('swordland')" style="display:none">Swordland</div>
   <div class="tab" id="tabTrialliance" onclick="showPage('trialliance')" style="display:none">Tri Alliance</div>
@@ -1416,8 +1415,11 @@ function assignTeam(teamId,alliance){
   syncQueuePush();
 }
 function updateAllianceNames(){
-  const gn=document.getElementById('garrisonAllianceName').value;
-  const an=document.getElementById('attackAllianceName').value;
+  const gIn=document.getElementById('garrisonAllianceName');
+  const aIn=document.getElementById('attackAllianceName');
+  if(!gIn||!aIn) return;
+  const gn=gIn.value;
+  const an=aIn.value;
   ['garrisonName','attackName'].forEach((id,i)=>{
     const el=document.getElementById(id); if(el) el.textContent=(i===0?gn:an)?'('+(i===0?gn:an)+')':'';
   });
@@ -1450,6 +1452,7 @@ function onDragLeave(e){ e.currentTarget.classList.remove('drag-over'); }
 
 function renderSetup(){
   const gList=document.getElementById('garrisonTeamList');
+  if(!gList) return;
   const aList=document.getElementById('attackTeamList');
   const tList=document.getElementById('teamsList');
   if(!tList) return;
