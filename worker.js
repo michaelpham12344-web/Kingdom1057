@@ -420,6 +420,8 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .bs-sidebar .side-brand{padding:14px 16px;border-bottom:1px solid var(--border);}
 .bs-main{flex:1;min-width:0;}
 @media(max-width:900px){.bs-layout{flex-direction:column;}.bs-sidebar{width:100%;position:static;max-height:none;margin-right:0;margin-bottom:16px;}}
+.bs-sidebar .side-sec{padding:14px 16px;border-bottom:1px solid var(--border);}
+.bs-sidebar .side-sec h3{font-family:var(--head);font-weight:600;letter-spacing:.05em;text-transform:uppercase;font-size:12px;color:var(--accent2);margin:0 0 10px;display:flex;align-items:center;gap:7px;}
 
 /* MINISTER SPOTS */
 .ms-slot-btn{font-family:var(--mono);font-size:11px;padding:8px 4px;border-radius:5px;border:1px solid var(--border2);background:var(--bg4);color:var(--text2);cursor:pointer;transition:all .15s;text-align:center;}
@@ -655,11 +657,6 @@ document.addEventListener('touchend',function(e){
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px" id="bsTurretGrid"></div>
   </div>
 
-<div style="display:flex;align-items:flex-end;gap:8px;margin-bottom:12px">
-    <div class="field" style="margin:0"><label>New team name</label><input id="bsNewTeamName" placeholder="e.g. Team 5" style="width:160px" onkeydown="if(event.key==='Enter')bsAddTeam()"></div>
-    <button class="btn btn-primary btn-sm" onclick="bsAddTeam()">+ Add Team</button>
-  </div>
-
   <div class="grid2" style="margin-bottom:18px">
     <div class="card" style="margin-bottom:0">
       <div class="card-title">🏰 <span id="bsGarrisonTitle">Garrison Alliance</span></div>
@@ -729,20 +726,6 @@ document.addEventListener('touchend',function(e){
     <div id="bsFinalResult">
       <div style="color:var(--text3);font-size:13px">Select an offset, then click a team to see the schedule.</div>
     </div>
-  </div>
-
-<!-- ADD RALLY LEADER (by Player ID) -->
-  <div class="card">
-    <div class="card-title">➕ Add Rally Leader</div>
-    <p style="color:var(--text2);font-size:12px;margin-bottom:10px">Enter a Player ID to pull their name and picture, set a march time, and add them.</p>
-    <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-      <div class="field" style="margin:0"><label>Player ID</label><input id="bsAddPlayerId" placeholder="e.g. 158134757" style="width:150px" onkeydown="if(event.key==='Enter')bsLookupPlayer()"></div>
-      <button class="btn btn-ghost btn-sm" onclick="bsLookupPlayer()">Look up</button>
-      <div class="field" style="margin:0"><label>March (sec)</label><input type="number" id="bsAddMarch" min="0" placeholder="35" style="width:90px"></div>
-      <button class="btn btn-primary" onclick="bsAddLeaderById()">+ Add Leader</button>
-    </div>
-    <div id="bsAddPreview" style="margin-bottom:6px"></div>
-    <div id="bsLeaderOverview" style="margin-top:8px"></div>
   </div>
 
 <!-- PET ACTIVATION PLAN -->
@@ -1862,6 +1845,21 @@ function bsAddTeam(){
   syncQueuePush();
   toast('Team added');
 }
+function renderBsSidebar(){
+  const el=document.getElementById('bsSidebar'); if(!el) return;
+  if(document.getElementById('bsAddPlayerId')) return;
+  el.innerHTML=
+    '<div class="side-brand"><div style="font-family:var(--head);font-weight:700;letter-spacing:.06em;font-size:16px;color:var(--accent2)">KINGDOM·1057</div><div style="font-size:11px;color:var(--text3)">Battle Strategy</div></div>'+
+    '<div class="side-sec"><h3>➕ Add Rally Leader</h3>'+
+      '<div style="margin-bottom:8px"><label style="display:block;font-size:10px;color:var(--text2);margin-bottom:3px">Player ID</label><div style="display:flex;gap:6px"><input id="bsAddPlayerId" placeholder="158134757" style="flex:1"><button class="btn btn-ghost btn-sm" onclick="bsLookupPlayer()">Look up</button></div></div>'+
+      '<div id="bsAddPreview" style="margin-bottom:8px"></div>'+
+      '<div style="display:flex;gap:6px;align-items:flex-end"><div style="width:80px"><label style="display:block;font-size:10px;color:var(--text2);margin-bottom:3px">March (s)</label><input type="number" id="bsAddMarch" min="0" placeholder="35" style="width:100%"></div><button class="btn btn-primary btn-sm" style="flex:1" onclick="bsAddLeaderById()">+ Add Leader</button></div>'+
+    '</div>'+
+    '<div class="side-sec"><h3>🛡️ Add Team</h3>'+
+      '<div style="display:flex;gap:6px;align-items:flex-end"><div style="flex:1"><label style="display:block;font-size:10px;color:var(--text2);margin-bottom:3px">Team name</label><input id="bsNewTeamName" placeholder="e.g. Team 5" style="width:100%"></div><button class="btn btn-primary btn-sm" onclick="bsAddTeam()">+ Add</button></div>'+
+    '</div>'+
+    '<div class="side-sec"><h3>👥 Rally Leaders</h3><div id="bsLeaderOverview"></div></div>';
+}
 function bsOnDrop(e,slotType,slotId){
   e.preventDefault();
   document.querySelectorAll('.bs-slot,.bs-team-zone,#bsLeaderPool').forEach(z=>z.classList.remove('drag-over'));
@@ -1987,6 +1985,7 @@ function renderBattleStrategy(){
 
 bsRenderTeamButtons();
 if(typeof renderPetPlans==='function') renderPetPlans();
+  if(typeof renderBsSidebar==='function') renderBsSidebar();
   if(typeof renderBsLeaderOverview==='function') renderBsLeaderOverview();
 }
 renderBattleStrategy();
