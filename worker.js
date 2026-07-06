@@ -415,6 +415,11 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .ally-pill{font-size:10px;padding:2px 9px;border-radius:10px;cursor:pointer;border:1px solid var(--border);color:var(--text3);background:var(--bg2);user-select:none;}
 .ally-pill.garrison.active{background:rgba(42,127,255,.2);color:#6ab0ff;border-color:rgba(42,127,255,.5);}
 .ally-pill.attack.active{background:rgba(46,204,113,.2);color:#5ddb8a;border-color:rgba(46,204,113,.5);}
+.bs-layout{display:flex;align-items:flex-start;}
+.bs-sidebar{width:290px;flex-shrink:0;background:var(--bg2);border:1px solid var(--border);border-radius:12px;position:sticky;top:90px;max-height:calc(100vh - 110px);overflow-y:auto;margin-right:16px;}
+.bs-sidebar .side-brand{padding:14px 16px;border-bottom:1px solid var(--border);}
+.bs-main{flex:1;min-width:0;}
+@media(max-width:900px){.bs-layout{flex-direction:column;}.bs-sidebar{width:100%;position:static;max-height:none;margin-right:0;margin-bottom:16px;}}
 
 /* MINISTER SPOTS */
 .ms-slot-btn{font-family:var(--mono);font-size:11px;padding:8px 4px;border-radius:5px;border:1px solid var(--border2);background:var(--bg4);color:var(--text2);cursor:pointer;transition:all .15s;text-align:center;}
@@ -636,6 +641,9 @@ document.addEventListener('touchend',function(e){
 
 <!-- BATTLE STRATEGY PAGE -->
 <div id="page-strategy" class="page">
+  <div class="bs-layout">
+  <aside class="bs-sidebar" id="bsSidebar"><div class="side-brand"><div style="font-family:var(--head);font-weight:700;letter-spacing:.06em;font-size:16px;color:var(--accent2)">KINGDOM·1057</div><div style="font-size:11px;color:var(--text3)">Battle Strategy</div></div></aside>
+  <div class="bs-main">
   <div class="card" style="margin-bottom:14px">
     <div class="sim-info" style="margin:0">
       <strong style="color:var(--text)">How to use:</strong> Drag rally leaders from the pool onto turret slots or team slots. A leader can only occupy one slot at a time. The green/red bar shows whether that leader currently has pets active.
@@ -752,9 +760,11 @@ document.addEventListener('touchend',function(e){
   <div class="card">
     <div class="card-title">👥 Rally Leader Pool</div>
     <p style="color:var(--text2);font-size:12px;margin-bottom:12px">Drag a leader card into a turret or team slot above. Drag back here to unassign.</p>
-    <div id="bsLeaderPool" ondragover="bsOnDragOver(event)" ondragleave="bsOnDragLeave(event)" ondrop="bsOnDrop(event,'pool',null)"
+ <div id="bsLeaderPool" ondragover="bsOnDragOver(event)" ondragleave="bsOnDragLeave(event)" ondrop="bsOnDrop(event,'pool',null)"
       style="display:flex;flex-wrap:wrap;gap:10px;min-height:70px;border:2px dashed var(--border);border-radius:8px;padding:12px">
     </div>
+  </div>
+  </div>
   </div>
 </div>
 
