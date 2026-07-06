@@ -1655,7 +1655,8 @@ setInterval(function(){ bsFirePetPlans(); renderPetPlanList(); },1000);
 renderPetGrid();
 
 // ════════════ BATTLE STRATEGY ════════════
-const BS_TURRETS = [{name:'North'},{name:'East'},{name:'South'},{name:'West'}];
+const BS_TURRETS = [{name:'North'},{name:'East'},{name:'So
+uth'},{name:'West'}];
 // assignment state per leader: {slotType:'pool'|'turret'|'team', slotId: turretIndex|teamId|null}
 function bsGetAssignment(leaderId){
   const l=S.leaders.find(x=>x.id===leaderId);
@@ -1674,7 +1675,7 @@ function bsLeaderCardHTML(l){
   const team=S.teams.find(t=>t.id===l.teamId);
   return \`<div class="bs-leader-card" draggable="true" id="bsleader-\${l.id}"
     ondragstart="bsOnDragStart(event,'\${l.id}')" ondragend="bsOnDragEnd(event)">
-    <div class="bs-leader-name">\${l.name} <span class="badge badge-\${l.tier.toLowerCase()}" style="margin-left:3px">\${l.tier}</span></div>
+    <div class="bs-leader-name" style="display:flex;align-items:center;gap:4px"><span style="flex:1">\${l.name} <span class="badge badge-\${l.tier.toLowerCase()}" style="margin-left:3px">\${l.tier}</span></span><span onclick="event.stopPropagation();bsOpenMoveModal('\${l.id}')" title="Move" style="cursor:pointer;color:var(--text3);font-size:13px;padding:0 2px">⇄</span></div>
     <div class="bs-leader-meta">\${team?team.name:'No team'} · \${l.march}s march</div>
     <div class="bs-pet-bar" style="cursor:pointer" onclick="bsTogglePet(event,'\${l.id}')" title="Click to toggle 2.5h pet buff"><div class="bs-pet-bar-fill \${petCls}" id="bspetfill-\${l.id}" style="width:\${petPct}%"></div></div>
     <div class="bs-pet-label \${petCls}" id="bspetlabel-\${l.id}" style="cursor:pointer" onclick="bsTogglePet(event,'\${l.id}')">\${petTxt}</div>
@@ -1735,6 +1736,35 @@ function bsAddToTeam(leaderId){
   renderBattleStrategy();
   syncQueuePush();
   bsRenderAddModal();
+}
+let bsMoveLeaderId=null;
+function bsOpenMoveModal(leaderId){
+  bsMoveLeaderId=leaderId;
+  let ov=document.getElementById('bsMoveOverlay');
+  if(!ov){ ov=document.createElement('div'); ov.id='bsMoveOverlay'; ov.className='bs-modal-overlay'; ov.onclick=function(e){ if(e.target===ov) bsCloseMoveModal(); }; document.body.appendChild(ov); }
+  ov.style.display='flex'; bsRenderMoveModal();
+}
+function bsCloseMoveModal(){ const ov=document.getElementById('bsMoveOverlay'); if(ov) ov.style.display='none'; bsMoveLeaderId=null; }
+function bsMoveTo(slotType,slotId){
+  const l=S.leaders.find(function(x){return x.id===bsMoveLeaderId;}); if(!l) return;
+  if(slotType==='turret'){ const occ=S.leaders.find(function(x){return x.bsSlot&&x.bsSlot.slotType==='turret'&&x.bsSlot.slotId===slotId&&x.id!==l.id;}); if(occ) occ.bsSlot={slotType:'pool',slotId:null}; }
+  l.bsSlot={slotType:slotType,slotId:slotId};
+  renderBattleStrategy(); syncQueuePush(); bsCloseMoveModal();
+}
+function bsRenderMoveModal(){
+  const ov=document.getElementById('bsMoveOverlay'); if(!ov||!bsMoveLeaderId) return;
+  const l=S.leaders.find(function(x){return x.id===bsMoveLeaderId;}); if(!l){ bsCloseMoveModal(); return; }
+  const cur=l.bsSlot||{slotType:'pool',slotId:null};
+  function row(label,type,id,active){
+    let arg;
+    if(id===null) arg='null'; else if(typeof id==='number') arg=String(id); else arg="'"+id+"'";
+    const click=active?'':' onclick="bsMoveTo('+"'"+type+"'"+','+arg+')"';
+    return '<div class="bs-add-row'+(active?' here':'')+'"'+click+'><span style="flex:1;font-size:13px;color:var(--text)">'+label+'</span>'+(active?'<span style="color:var(--green);font-size:14px">✓ here</span>':'<span style="color:var(--accent2);font-size:12px">move</span>')+'</div>';
+  }
+  let rows=row('Rally Leader Pool','pool',null,cur.slotType==='pool');
+  BS_TURRETS.forEach(function(t,i){ rows+=row('🗼 '+t.name,'turret',i,cur.slotType==='turret'&&cur.slotId===i); });
+  S.teams.forEach(function(t){ const an=t.alliance?(' · '+bsAllianceName(t.alliance)):''; rows+=row(t.name+an,'team',t.id,cur.slotType==='team'&&cur.slotId===t.id); });
+  ov.innerHTML='<div class="bs-modal"><div class="bs-modal-head"><span style="font-family:var(--head);font-weight:600;letter-spacing:.04em;color:var(--accent2);flex:1">Move '+l.name+'</span><span onclick="bsCloseMoveModal()" style="cursor:pointer;color:var(--text3);font-size:18px">✕</span></div><div class="bs-modal-list">'+rows+'</div></div>';
 }
 function bsAllianceName(which){
   const el=document.getElementById(which==='garrison'?'garrisonAllianceName':'attackAllianceName');
