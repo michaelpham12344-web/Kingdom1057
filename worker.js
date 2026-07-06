@@ -602,9 +602,8 @@ document.addEventListener('touchend',function(e){
 
 <nav class="nav" id="mainNav" style="display:none">
   <div class="nav-logo">KINGDOM<span>·</span>1057</div>
-  <div class="tab active" onclick="showPage('coordinator')">Rally Leaders</div>
   <div class="tab" onclick="showPage('setup')">Team Setup</div>
-  <div class="tab" onclick="showPage('strategy')">Battle Strategy</div>
+  <div class="tab active" onclick="showPage('strategy')">Battle Strategy</div>
   <div class="tab" onclick="showPage('minister')">Minister Spots</div>
   <div class="tab" id="tabSwordland" onclick="showPage('swordland')" style="display:none">Swordland</div>
   <div class="tab" id="tabTrialliance" onclick="showPage('trialliance')" style="display:none">Tri Alliance</div>
@@ -1306,6 +1305,7 @@ function stopTimer(id){
 function renderLeaderTable(){
   // update team dropdown
   const sel=document.getElementById('rlTeam');
+  if(!sel) return;
   const cur=sel.value;
   sel.innerHTML='<option value="">No team</option>'+S.teams.map(t=>\`<option value="\${t.id}">\${t.name}</option>\`).join('');
   if(cur) sel.value=cur;
@@ -3798,9 +3798,8 @@ function enterApp(role) {
   showUserBar(stored, role);
 
   // Default page by role
-  if(isMemberOnly) showPageDirect('minister');
-  else if(isRally) showPageDirect('coordinator');
-  else showPageDirect('coordinator');
+if(isMemberOnly) showPageDirect('minister');
+  else showPageDirect('strategy');
 }
 
 function showPage(p) { showPageDirect(p); }
