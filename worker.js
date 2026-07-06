@@ -686,6 +686,8 @@ document.addEventListener('touchend',function(e){
           <button class="btn btn-gold btn-sm" onclick="bsSetOffset(120)">+2m</button>
           <button class="btn btn-gold btn-sm" onclick="bsSetOffset(180)">+3m</button>
           <button class="btn btn-gold btn-sm" onclick="bsSetOffset(240)">+4m</button>
+          <input type="number" id="bsOffsetManual" min="0" placeholder="custom s" style="width:90px" onkeydown="if(event.key==='Enter')bsSetOffsetManual()">
+          <button class="btn btn-primary btn-sm" onclick="bsSetOffsetManual()">Set</button>
         </div>
       </div>
     </div>
@@ -1803,7 +1805,6 @@ renderBattleStrategy();
 
 // ════════════ BATTLE STRATEGY — SHARED SETUP & FINAL CALCULATION ════════════
 const BS_CALC = { offsetSec: null, selectedTeamId: null };
-const BS_MARKER_SEC = 45; // marker/buffer seconds added to each team's land timer
 
 function bsTickClock(){
   const hh=document.getElementById('bsClockHH');
@@ -1829,6 +1830,15 @@ function s2hms(totalSec){
   return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(ss).padStart(2,'0');
 }
 
+function bsSetOffsetManual(){
+  const el=document.getElementById('bsOffsetManual'); if(!el) return;
+  const v=parseInt(el.value,10);
+  if(isNaN(v)||v<0){ toast('Enter seconds (0 or more)'); return; }
+  BS_CALC.offsetSec=v;
+  document.querySelectorAll('#page-strategy .btn-gold').forEach(b=>b.style.outline='');
+  if(BS_CALC.selectedTeamId!==null) bsCalcTeam(BS_CALC.selectedTeamId, v, true);
+  else toast('Offset set to '+(v<60?v+'s':Math.floor(v/60)+'m'+(v%60?' '+(v%60)+'s':''))+' — now click a team');
+}
 function bsSetOffset(sec){
   BS_CALC.offsetSec=sec;
   // highlight selected offset button
@@ -1923,9 +1933,10 @@ function bsCopyTeamResult(teamId){
   const {results}=t._bsLastCalc;
   const lines=[t.name, ...results.map(r=>\`\${r.name} | Time: \${s2hms(r.launchSec)}\`)];
   copyText(lines.join('\\n'));
-  // Start (or reset) this team's land timer: rally duration + longest march + marker
-  const dur=t._bsLastCalc.dur||300, mm=t._bsLastCalc.maxMarch||0;
-  bsTeamRally[teamId]={landEnd:Date.now()+(dur+mm+BS_MARKER_SEC)*1000};
+  
+  // Start (or reset) this team's land timer: rally duration + longest march + marker (= selected offset)
+  const dur=t._bsLastCalc.dur||300, mm=t._bsLastCalc.maxMarch||0, mk=(BS_CALC.offsetSec!=null?BS_CALC.offsetSec:0);
+  bsTeamRally[teamId]={landEnd:Date.now()+(dur+mm+mk)*1000};
   if(typeof bsRenderTeamButtons==='function') bsRenderTeamButtons();
   toast('Copied — '+t.name+' rallying');
 }
