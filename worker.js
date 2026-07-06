@@ -4742,9 +4742,15 @@ export default {
       const sign = signRequest(fid, time);
       const body = new URLSearchParams({ fid: String(fid), time: String(time), sign });
       try {
-        const res = await fetch(GIFTCODE_API + '/player', {
+      const res = await fetch(GIFTCODE_API + '/player', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json, text/plain, */*',
+            'Origin': 'https://ks-giftcode.centurygame.com',
+            'Referer': 'https://ks-giftcode.centurygame.com/',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          },
           body: body.toString()
         });
         const textBody = await res.text();
