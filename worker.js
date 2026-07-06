@@ -1194,11 +1194,21 @@ function toast(msg){
   const t=document.getElementById('toast'); t.textContent=msg||'Copied!'; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),1800);
 }
-function copyText(text){
-  navigator.clipboard?.writeText(text).then(()=>toast('Copied!')).catch(()=>{
-    const el=document.createElement('textarea'); el.value=text; document.body.appendChild(el); el.select();
-    document.execCommand('copy'); document.body.removeChild(el); toast('Copied!');
-  });
+function copyText(text, silent){
+  const done=()=>{ if(!silent) toast('Copied!'); };
+  const fallback=()=>{
+    try{
+      const el=document.createElement('textarea'); el.value=text; el.style.position='fixed'; el.style.opacity='0';
+      document.body.appendChild(el); el.select();
+      const ok=document.execCommand('copy'); document.body.removeChild(el);
+      if(ok){ done(); return Promise.resolve(); }
+      return Promise.reject(new Error('copy failed'));
+    }catch(e){ return Promise.reject(e); }
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    return navigator.clipboard.writeText(text).then(()=>{ done(); }).catch(()=>fallback());
+  }
+  return fallback();
 }
 function uid(){return Math.random().toString(36).slice(2,8);}
 
@@ -1914,7 +1924,7 @@ function bsCalcTeam(teamId, offsetSec, logToast){
         <span style="font-size:10px;color:var(--text3)">click to copy</span>
       </div>\`).join('')}
   </div>
-  <button class="btn btn-gold" style="margin-top:10px" onclick="bsCopyTeamResult('\${t.id}')">📋 Copy for in-game chat</button>\`;
+  <button class="btn btn-gold" style="margin-top:10px" onclick="bsCopyTeamResult('\${t.id}')">📋 Copy for in-game chat</button><span id="bsCopyMsg" style="margin-left:10px;font-size:12px;font-weight:600"></span>\`;
 
   t._bsLastCalc={header,results,dur,landSec,maxMarch};
   // Show the persistent quick-copy button above the result
@@ -1932,13 +1942,18 @@ function bsCopyTeamResult(teamId){
   if(!t||!t._bsLastCalc){ toast('Calculate a team first!'); return; }
   const {results}=t._bsLastCalc;
   const lines=[t.name, ...results.map(r=>\`\${r.name} | Time: \${s2hms(r.launchSec)}\`)];
-  copyText(lines.join('\\n'));
+  copyText(lines.join('\\n'), true).then(function(){ bsCopyFeedback(true); }).catch(function(){ bsCopyFeedback(false); });
   
   // Start (or reset) this team's land timer: rally duration + longest march + marker (= selected offset)
   const dur=t._bsLastCalc.dur||300, mm=t._bsLastCalc.maxMarch||0, mk=(BS_CALC.offsetSec!=null?BS_CALC.offsetSec:0);
   bsTeamRally[teamId]={landEnd:Date.now()+(dur+mm+mk)*1000};
   if(typeof bsRenderTeamButtons==='function') bsRenderTeamButtons();
-  toast('Copied — '+t.name+' rallying');
+}
+function bsCopyFeedback(ok){
+  const el=document.getElementById('bsCopyMsg'); if(!el) return;
+  el.textContent=ok?'Copied ✓':'Copy failed ✗';
+  el.style.color=ok?'var(--green)':'#ff7070';
+  clearTimeout(el._t); el._t=setTimeout(function(){ el.textContent=''; },2000);
 }
 function bsFmtLand(sec){ sec=Math.max(0,Math.ceil(sec)); if(sec>=60){ const m=Math.floor(sec/60), s=sec%60; return m+':'+String(s).padStart(2,'0'); } return sec+'s'; }
 function bsTickRally(){
