@@ -647,6 +647,11 @@ document.addEventListener('touchend',function(e){
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px" id="bsTurretGrid"></div>
   </div>
 
+<div style="display:flex;align-items:flex-end;gap:8px;margin-bottom:12px">
+    <div class="field" style="margin:0"><label>New team name</label><input id="bsNewTeamName" placeholder="e.g. Team 5" style="width:160px" onkeydown="if(event.key==='Enter')bsAddTeam()"></div>
+    <button class="btn btn-primary btn-sm" onclick="bsAddTeam()">+ Add Team</button>
+  </div>
+
   <div class="grid2" style="margin-bottom:18px">
     <div class="card" style="margin-bottom:0">
       <div class="card-title">🏰 <span id="bsGarrisonTitle">Garrison Alliance</span></div>
@@ -1836,6 +1841,16 @@ function renderBsLeaderOverview(){
       '<span onclick="bsRemoveLeaderOverview('+"'"+l.id+"'"+')" style="cursor:pointer;color:var(--text3);font-size:14px" title="Remove leader">✕</span>'+
     '</div>';
   }).join('');
+}
+function bsAddTeam(){
+  const el=document.getElementById('bsNewTeamName'); if(!el) return;
+  const name=(el.value||'').trim(); if(!name){ toast('Enter a team name'); return; }
+  S.teams.push({id:uid(),name:name,alliance:null});
+  el.value='';
+  if(typeof renderSetup==='function') renderSetup();
+  renderBattleStrategy();
+  syncQueuePush();
+  toast('Team added');
 }
 function bsOnDrop(e,slotType,slotId){
   e.preventDefault();
