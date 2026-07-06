@@ -404,6 +404,14 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .team-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;}
 .team-dot.free{background:var(--green);}
 .team-dot.rallying{background:#ff5555;box-shadow:0 0 6px rgba(255,85,85,.7);}
+.bs-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;}
+.bs-modal{background:var(--bg2);border:1px solid var(--border2);border-radius:12px;max-width:380px;width:100%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;}
+.bs-modal-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);}
+.bs-modal-list{overflow-y:auto;padding:8px;}
+.bs-add-row{display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:7px;border:1px solid var(--border);background:var(--bg3);margin-bottom:6px;cursor:pointer;}
+.bs-add-row:hover{border-color:var(--accent);}
+.bs-add-row.here{opacity:.55;cursor:default;}
+.bs-add-row.here:hover{border-color:var(--border);}
 
 /* MINISTER SPOTS */
 .ms-slot-btn{font-family:var(--mono);font-size:11px;padding:8px 4px;border-radius:5px;border:1px solid var(--border2);background:var(--bg4);color:var(--text2);cursor:pointer;transition:all .15s;text-align:center;}
@@ -1691,6 +1699,40 @@ function bsOnDragEnd(e){
 }
 function bsOnDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
 function bsOnDragLeave(e){ e.currentTarget.classList.remove('drag-over'); }
+let bsAddModalTeamId=null;
+function bsOpenAddModal(teamId){
+  bsAddModalTeamId=teamId;
+  let ov=document.getElementById('bsAddOverlay');
+  if(!ov){ ov=document.createElement('div'); ov.id='bsAddOverlay'; ov.className='bs-modal-overlay'; ov.onclick=function(e){ if(e.target===ov) bsCloseAddModal(); }; document.body.appendChild(ov); }
+  ov.style.display='flex';
+  bsRenderAddModal();
+}
+function bsCloseAddModal(){ const ov=document.getElementById('bsAddOverlay'); if(ov) ov.style.display='none'; bsAddModalTeamId=null; }
+function bsRenderAddModal(){
+  const ov=document.getElementById('bsAddOverlay'); if(!ov||!bsAddModalTeamId) return;
+  const team=S.teams.find(function(t){return t.id===bsAddModalTeamId;}); if(!team){ bsCloseAddModal(); return; }
+  const rows=S.leaders.map(function(l){
+    const onTeam=l.bsSlot&&l.bsSlot.slotType==='team';
+    const onThis=onTeam&&l.bsSlot.slotId===team.id;
+    let where='';
+    if(onTeam){ const ot=S.teams.find(function(x){return x.id===l.bsSlot.slotId;}); where=onThis?'on this team':('on '+(ot?ot.name:'a team')); }
+    else if(l.bsSlot&&l.bsSlot.slotType==='turret'){ where='on a turret'; }
+    const badge = onTeam
+      ? '<span style="font-size:10px;color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:1px 5px">'+where+'</span>'
+      : (where?'<span style="font-size:10px;color:var(--text3)">'+where+'</span>':'');
+    const action = onThis ? '<span style="color:var(--green);font-size:14px">✓</span>' : '<span style="color:var(--accent2);font-size:12px">+ add</span>';
+    const click = onThis ? '' : ' onclick="bsAddToTeam('+"'"+l.id+"'"+')"';
+    return '<div class="bs-add-row'+(onThis?' here':'')+'"'+click+'><span style="flex:1;font-size:13px;color:var(--text)">'+l.name+' <span style="color:var(--text3);font-size:11px">'+l.tier+'</span></span>'+badge+action+'</div>';
+  }).join('');
+  ov.innerHTML='<div class="bs-modal"><div class="bs-modal-head"><span style="font-family:var(--head);font-weight:600;letter-spacing:.04em;color:var(--accent2);flex:1">Add to '+team.name+'</span><span onclick="bsCloseAddModal()" style="cursor:pointer;color:var(--text3);font-size:18px">✕</span></div><div class="bs-modal-list">'+(S.leaders.length?rows:'<div style="color:var(--text3);font-size:12px;padding:10px">No leaders yet.</div>')+'</div></div>';
+}
+function bsAddToTeam(leaderId){
+  const l=S.leaders.find(function(x){return x.id===leaderId;}); if(!l||!bsAddModalTeamId) return;
+  l.bsSlot={slotType:'team',slotId:bsAddModalTeamId};
+  renderBattleStrategy();
+  syncQueuePush();
+  bsRenderAddModal();
+}
 function bsOnDrop(e,slotType,slotId){
   e.preventDefault();
   document.querySelectorAll('.bs-slot,.bs-team-zone,#bsLeaderPool').forEach(z=>z.classList.remove('drag-over'));
@@ -1786,7 +1828,7 @@ function renderBattleStrategy(){
     return \`<div class="bs-team-box" draggable="true" id="bsteam-\${t.id}"
       ondragstart="bsTeamDragStart(event,'\${t.id}')" ondragend="bsTeamDragEnd(event)"
       style="background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px;cursor:grab">
-      <div class="bs-team-header" style="display:flex;align-items:center;gap:6px"><span style="color:var(--text3);font-size:13px">⠿</span>\${t.name}</div>
+      <div class="bs-team-header" style="display:flex;align-items:center;gap:6px"><span style="color:var(--text3);font-size:13px">⠿</span><span style="flex:1">\${t.name}</span><button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation();bsOpenAddModal('\${t.id}')">+ Add</button></div>
       <div class="bs-team-zone" ondragover="bsOnDragOver(event)" ondragleave="bsOnDragLeave(event)" ondrop="bsOnDrop(event,'team','\${t.id}')">
         \${occupants.length?occupants.map(o=>bsLeaderCardHTML(o)).join(''):'<div style="color:var(--text3);font-size:12px;padding:8px">Drop leaders here</div>'}
       </div>
