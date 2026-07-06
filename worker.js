@@ -718,6 +718,20 @@ document.addEventListener('touchend',function(e){
     </div>
   </div>
 
+<!-- ADD RALLY LEADER (by Player ID) -->
+  <div class="card">
+    <div class="card-title">➕ Add Rally Leader</div>
+    <p style="color:var(--text2);font-size:12px;margin-bottom:10px">Enter a Player ID to pull their name and picture, set a march time, and add them.</p>
+    <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <div class="field" style="margin:0"><label>Player ID</label><input id="bsAddPlayerId" placeholder="e.g. 158134757" style="width:150px" onkeydown="if(event.key==='Enter')bsLookupPlayer()"></div>
+      <button class="btn btn-ghost btn-sm" onclick="bsLookupPlayer()">Look up</button>
+      <div class="field" style="margin:0"><label>March (sec)</label><input type="number" id="bsAddMarch" min="0" placeholder="35" style="width:90px"></div>
+      <button class="btn btn-primary" onclick="bsAddLeaderById()">+ Add Leader</button>
+    </div>
+    <div id="bsAddPreview" style="margin-bottom:6px"></div>
+    <div id="bsLeaderOverview" style="margin-top:8px"></div>
+  </div>
+
 <!-- PET ACTIVATION PLAN -->
   <div class="card">
     <div class="card-title">🐾 Pet Activation Plan</div>
@@ -1777,6 +1791,53 @@ function bsSetTeamAlliance(teamId, alliance){
   renderBattleStrategy();
   syncQueuePush();
 }
+let bsPendingPlayer=null;
+async function bsLookupPlayer(){
+  const idEl=document.getElementById('bsAddPlayerId'); const pid=(idEl&&idEl.value||'').trim();
+  const prev=document.getElementById('bsAddPreview'); if(!prev) return;
+  if(!pid){ toast('Enter a Player ID'); return; }
+  prev.innerHTML='<span style="color:var(--text3);font-size:12px">Looking up…</span>';
+  const p=await doPlayerLookup(pid);
+  if(!p){ bsPendingPlayer=null; prev.innerHTML='<span style="color:var(--enemy);font-size:12px">⚠ Player not found. Check the ID.</span>'; return; }
+  bsPendingPlayer={ playerId:p.playerId, name:p.name, avatar:p.profilePhoto||null };
+  prev.innerHTML='<div style="display:flex;align-items:center;gap:10px;background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:8px 10px">'+(p.profilePhoto?'<img src="'+p.profilePhoto+'" style="width:36px;height:36px;border-radius:50%;flex-shrink:0">':'')+'<div><div style="font-weight:700">'+p.name+'</div><div style="font-size:11px;color:var(--text3)">ID: '+p.playerId+'</div></div></div>';
+}
+function bsAddLeaderById(){
+  const march=parseInt((document.getElementById('bsAddMarch')||{}).value,10);
+  if(!bsPendingPlayer){ toast('Look up a Player ID first'); return; }
+  if(isNaN(march)||march<0){ toast('Enter a march time'); return; }
+  S.leaders.push({id:uid(),name:bsPendingPlayer.name,march:march,tier:'TG5',dur:300,teamId:null,status:'free',timerEnd:null,launchTimeStr:null,landTimeStr:null,avatar:bsPendingPlayer.avatar,playerId:bsPendingPlayer.playerId,bsSlot:{slotType:'pool',slotId:null},pet:{active:false,startMs:null}});
+  bsPendingPlayer=null;
+  const a=document.getElementById('bsAddPlayerId'); if(a)a.value='';
+  const b=document.getElementById('bsAddMarch'); if(b)b.value='';
+  const c=document.getElementById('bsAddPreview'); if(c)c.innerHTML='';
+  if(typeof renderLeaderTable==='function') renderLeaderTable();
+  renderBattleStrategy();
+  syncQueuePush();
+  toast('Leader added');
+}
+function bsEditMarch(leaderId,val){
+  const l=S.leaders.find(function(x){return x.id===leaderId;}); if(!l) return;
+  const m=parseInt(val,10); if(isNaN(m)||m<0) return;
+  l.march=m; syncQueuePush(); if(typeof renderLeaderTable==='function') renderLeaderTable();
+}
+function bsRemoveLeaderOverview(leaderId){
+  S.leaders=S.leaders.filter(function(x){return x.id!==leaderId;});
+  renderBattleStrategy(); if(typeof renderLeaderTable==='function') renderLeaderTable(); syncQueuePush();
+}
+function renderBsLeaderOverview(){
+  const el=document.getElementById('bsLeaderOverview'); if(!el) return;
+  if(!S.leaders.length){ el.innerHTML='<div style="color:var(--text3);font-size:12px">No rally leaders yet.</div>'; return; }
+  el.innerHTML='<div style="font-size:11px;color:var(--text3);margin-bottom:5px">'+S.leaders.length+' rally leader'+(S.leaders.length===1?'':'s')+'</div>'+S.leaders.map(function(l){
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;margin-bottom:5px">'+
+      (l.avatar?'<img src="'+l.avatar+'" style="width:26px;height:26px;border-radius:50%;flex-shrink:0">':'<span style="width:26px;height:26px;border-radius:50%;background:var(--bg4);display:inline-block;flex-shrink:0"></span>')+
+      '<span style="flex:1;font-size:13px;color:var(--text)">'+l.name+'</span>'+
+      '<span style="font-size:11px;color:var(--text3)">march</span>'+
+      '<input type="number" min="0" value="'+l.march+'" onchange="bsEditMarch('+"'"+l.id+"'"+',this.value)" style="width:60px;font-size:12px">'+
+      '<span onclick="bsRemoveLeaderOverview('+"'"+l.id+"'"+')" style="cursor:pointer;color:var(--text3);font-size:14px" title="Remove leader">✕</span>'+
+    '</div>';
+  }).join('');
+}
 function bsOnDrop(e,slotType,slotId){
   e.preventDefault();
   document.querySelectorAll('.bs-slot,.bs-team-zone,#bsLeaderPool').forEach(z=>z.classList.remove('drag-over'));
@@ -1901,7 +1962,8 @@ function renderBattleStrategy(){
   }
 
 bsRenderTeamButtons();
-  if(typeof renderPetPlans==='function') renderPetPlans();
+if(typeof renderPetPlans==='function') renderPetPlans();
+  if(typeof renderBsLeaderOverview==='function') renderBsLeaderOverview();
 }
 renderBattleStrategy();
 
