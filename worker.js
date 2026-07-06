@@ -412,6 +412,9 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .bs-add-row:hover{border-color:var(--accent);}
 .bs-add-row.here{opacity:.55;cursor:default;}
 .bs-add-row.here:hover{border-color:var(--border);}
+.ally-pill{font-size:10px;padding:2px 9px;border-radius:10px;cursor:pointer;border:1px solid var(--border);color:var(--text3);background:var(--bg2);user-select:none;}
+.ally-pill.garrison.active{background:rgba(42,127,255,.2);color:#6ab0ff;border-color:rgba(42,127,255,.5);}
+.ally-pill.attack.active{background:rgba(46,204,113,.2);color:#5ddb8a;border-color:rgba(46,204,113,.5);}
 
 /* MINISTER SPOTS */
 .ms-slot-btn{font-family:var(--mono);font-size:11px;padding:8px 4px;border-radius:5px;border:1px solid var(--border2);background:var(--bg4);color:var(--text2);cursor:pointer;transition:all .15s;text-align:center;}
@@ -1733,6 +1736,17 @@ function bsAddToTeam(leaderId){
   syncQueuePush();
   bsRenderAddModal();
 }
+function bsAllianceName(which){
+  const el=document.getElementById(which==='garrison'?'garrisonAllianceName':'attackAllianceName');
+  return (el&&el.value)?el.value:(which==='garrison'?'Garrison':'Attacking');
+}
+function bsSetTeamAlliance(teamId, alliance){
+  const t=S.teams.find(function(x){return x.id===teamId;}); if(!t) return;
+  if(t.alliance===alliance) return;
+  t.alliance=alliance;
+  renderBattleStrategy();
+  syncQueuePush();
+}
 function bsOnDrop(e,slotType,slotId){
   e.preventDefault();
   document.querySelectorAll('.bs-slot,.bs-team-zone,#bsLeaderPool').forEach(z=>z.classList.remove('drag-over'));
@@ -1825,10 +1839,16 @@ function renderBattleStrategy(){
 
   function teamBoxHTML(t){
     const occupants=S.leaders.filter(l=>l.bsSlot.slotType==='team'&&l.bsSlot.slotId===t.id);
+   const gName=bsAllianceName('garrison'), aName=bsAllianceName('attack');
+    const gActive=t.alliance==='garrison'?' active':'', aActive=t.alliance==='attack'?' active':'';
     return \`<div class="bs-team-box" draggable="true" id="bsteam-\${t.id}"
       ondragstart="bsTeamDragStart(event,'\${t.id}')" ondragend="bsTeamDragEnd(event)"
       style="background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px;cursor:grab">
       <div class="bs-team-header" style="display:flex;align-items:center;gap:6px"><span style="color:var(--text3);font-size:13px">⠿</span><span style="flex:1">\${t.name}</span><button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation();bsOpenAddModal('\${t.id}')">+ Add</button></div>
+      <div class="bs-alliance-toggle" style="display:flex;gap:5px;margin:6px 0 8px">
+        <span class="ally-pill garrison\${gActive}" onclick="event.stopPropagation();bsSetTeamAlliance('\${t.id}','garrison')">\${gName}</span>
+        <span class="ally-pill attack\${aActive}" onclick="event.stopPropagation();bsSetTeamAlliance('\${t.id}','attack')">\${aName}</span>
+      </div>
       <div class="bs-team-zone" ondragover="bsOnDragOver(event)" ondragleave="bsOnDragLeave(event)" ondrop="bsOnDrop(event,'team','\${t.id}')">
         \${occupants.length?occupants.map(o=>bsLeaderCardHTML(o)).join(''):'<div style="color:var(--text3);font-size:12px;padding:8px">Drop leaders here</div>'}
       </div>
