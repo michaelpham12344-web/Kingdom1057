@@ -1669,8 +1669,7 @@ setInterval(function(){ bsFirePetPlans(); renderPetPlanList(); },1000);
 renderPetGrid();
 
 // ════════════ BATTLE STRATEGY ════════════
-const BS_TURRETS = [{name:'North'},{name:'East'},{name:'So
-uth'},{name:'West'}];
+const BS_TURRETS = [{name:'North'},{name:'East'},{name:'South'},{name:'West'}];
 // assignment state per leader: {slotType:'pool'|'turret'|'team', slotId: turretIndex|teamId|null}
 function bsGetAssignment(leaderId){
   const l=S.leaders.find(x=>x.id===leaderId);
