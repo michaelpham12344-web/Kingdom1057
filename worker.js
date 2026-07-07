@@ -2224,6 +2224,28 @@ const MS_MIN_SLOTS_PICKED = 4;
 const MS_POSITION_ID = 'noble_advisor_day4';
 const MS_RANK_CATEGORY = 'training'; // Noble Advisor ranks by Training hours only
 
+// ── 3-BOARD MINISTER SPOTS ──
+const MS_BOARDS = ['buildings','research','troops'];
+const MS_BOARD_META = {
+  buildings: { label:'Buildings', icon:'🏛️', color:'#6ab0ff', unit:'pts', blurb:'Construction speedups + TrueGold', cats:['construction','general'], hasTG:true },
+  research:  { label:'Research',  icon:'🔬', color:'#c084fc', unit:'pts', blurb:'Research speedups + TrueGold Dust', cats:['research','general'], hasDust:true },
+  troops:    { label:'Troops',    icon:'⚔️', color:'#f5b833', unit:'h',   blurb:'Training speedups', cats:['training','general'] }
+};
+const MS_PTS = { perMin: 30, truegold: 2000, dust: 1000 }; // 1 min speedup = 30pts; 1 TG = 2000; 1 Dust = 1000
+// commit c = { construction, research, training, general (MINUTES), truegold, dust (counts) }
+// returns board ranking score: points for buildings/research, minutes for troops (hours = /60)
+function msBoardScore(board, c){
+  c = c || {};
+  if(board==='buildings') return (c.construction||0)*MS_PTS.perMin + (c.general||0)*MS_PTS.perMin + (c.truegold||0)*MS_PTS.truegold;
+  if(board==='research')  return (c.research||0)*MS_PTS.perMin + (c.general||0)*MS_PTS.perMin + (c.dust||0)*MS_PTS.dust;
+  if(board==='troops')    return (c.training||0) + (c.general||0); // minutes
+  return 0;
+}
+function msBoardScoreLabel(board, score){
+  if(board==='troops') return (score/60).toFixed(1)+'h';
+  return score.toLocaleString()+' pts';
+}
+
 const MS_UNIT_TO_HOURS = { seconds:1/3600, minutes:1/60, hours:1, days:24 };
 
 function msSlotLabel(i){
