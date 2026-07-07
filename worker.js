@@ -602,7 +602,7 @@ document.addEventListener('touchend',function(e){
 
 <nav class="nav" id="mainNav" style="display:none">
   <div class="nav-logo">KINGDOM<span>·</span>1057</div>
-<div class="tab active" onclick="showPage('strategy')">Battle Strategy</div>
+  <div class="tab active" onclick="showPage('strategy')">Battle Strategy</div>
   <div class="tab" onclick="showPage('minister')">Minister Spots</div>
   <div class="tab" id="tabSwordland" onclick="showPage('swordland')" style="display:none">Swordland</div>
   <div class="tab" id="tabTrialliance" onclick="showPage('trialliance')" style="display:none">Tri Alliance</div>
@@ -776,6 +776,14 @@ document.addEventListener('touchend',function(e){
     </div>
   </div>
 
+  <!-- BOARD PICK GATE -->
+  <div id="msBoardPick" class="card" style="display:none;margin-bottom:18px">
+    <div class="card-title">👑 Which minister spots are you applying for?</div>
+    <p style="color:var(--text2);font-size:12px;margin-bottom:14px">Pick one or more. The rest of the signup only asks for what each one needs.</p>
+    <div id="msBoardPickGrid" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px"></div>
+    <button class="btn btn-primary" onclick="msBoardPickContinue()">Continue →</button>
+  </div>
+
   <!-- STEP TABS -->
   <div class="phase-tabs" style="margin-bottom:18px">
     <button class="tab ms-step-tab" id="msStepTab0" onclick="msGoStep(0)" style="display:none">📋 My Submission</button>
@@ -806,7 +814,7 @@ document.addEventListener('touchend',function(e){
   <!-- STEP 1: UPLOAD -->
   <div id="msStep1" class="ms-step">
     <div class="card">
-      <div class="card-title">📸 Step 1 — Identify &amp; Upload</div>
+      <div class="card-title" style="display:flex;align-items:center;gap:10px">📸 Step 1 — Identify &amp; Upload <span onclick="msChangeBoards()" style="margin-left:auto;font-size:11px;font-weight:400;color:var(--accent2);cursor:pointer;letter-spacing:0;text-transform:none">← Change minister spots</span></div>
       <div class="row">
         <div id="msIdentityDisplay" style="background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:10px 14px;display:flex;align-items:center;gap:12px">
           <img id="msIdentityAvatar" src="" style="width:36px;height:36px;border-radius:50%;border:2px solid var(--border2);display:none">
@@ -2232,8 +2240,8 @@ const MS_BOARD_META = {
   troops:    { label:'Troops',    icon:'⚔️', color:'#f5b833', unit:'h',   blurb:'Training speedups', cats:['training','general'] }
 };
 const MS_PTS = { perMin: 30, truegold: 2000, dust: 1000 }; // 1 min speedup = 30pts; 1 TG = 2000; 1 Dust = 1000
-// commit c = { construction, research, training, general (MINUTES), truegold, dust (counts) }
-// returns board ranking score: points for buildings/research, minutes for troops (hours = /60)
+// commit c = { construction, research, training, general (all in MINUTES), truegold, dust (counts) }
+// returns the board's ranking score: points for buildings/research, minutes for troops (hours = /60)
 function msBoardScore(board, c){
   c = c || {};
   if(board==='buildings') return (c.construction||0)*MS_PTS.perMin + (c.general||0)*MS_PTS.perMin + (c.truegold||0)*MS_PTS.truegold;
@@ -2245,6 +2253,7 @@ function msBoardScoreLabel(board, score){
   if(board==='troops') return (score/60).toFixed(1)+'h';
   return score.toLocaleString()+' pts';
 }
+
 
 const MS_UNIT_TO_HOURS = { seconds:1/3600, minutes:1/60, hours:1, days:24 };
 
@@ -2295,6 +2304,13 @@ function msInit(){
     if(tab0) tab0.style.display = '';
     msGoStep(0);
     msRenderOverview(MS._submittedEntry);
+    msRenderStepTabs();
+    msUpdateDeadlineBanners();
+    return;
+  }
+  // Board-pick gate: members applying fresh must choose boards first
+  if(!msCanAccessResults() && !MS._editing && !(MS.draft && MS.draft.boards && MS.draft.boards.length)){
+    msShowBoardPick();
     msRenderStepTabs();
     msUpdateDeadlineBanners();
     return;
@@ -2610,10 +2626,51 @@ async function msPreprocessImage(file) {
 }
 
 // ── STEP 2: VERIFY ──
+function msActiveCats(){
+  var boards=(MS.draft&&MS.draft.boards&&MS.draft.boards.length)?MS.draft.boards:MS_BOARDS;
+  var set={};
+  boards.forEach(function(b){ (MS_BOARD_META[b]&&MS_BOARD_META[b].cats||[]).forEach(function(c){ set[c]=1; }); });
+  return MS_CATEGORIES.filter(function(c){ return set[c]; });
+}
+function msShowBoardPick(){
+  MS.draft = MS.draft || {alliance:'',ign:'',verify:{},commit:{},picks:[],boards:[]};
+  MS.draft.boards = MS.draft.boards || [];
+  var pt=document.querySelector('#page-minister .phase-tabs'); if(pt) pt.style.display='none';
+  document.querySelectorAll('#page-minister .ms-step').forEach(function(el){ el.style.display='none'; });
+  var bp=document.getElementById('msBoardPick'); if(bp) bp.style.display='block';
+  msRenderBoardPick();
+}
+function msRenderBoardPick(){
+  var el=document.getElementById('msBoardPickGrid'); if(!el) return;
+  MS.draft.boards = MS.draft.boards || [];
+  el.innerHTML=MS_BOARDS.map(function(b){
+    var m=MS_BOARD_META[b]; var on=MS.draft.boards.indexOf(b)>=0;
+    return '<div onclick="msToggleBoardPick('+"'"+b+"'"+')" style="cursor:pointer;border:2px solid '+(on?m.color:'var(--border)')+';background:'+(on?'rgba(61,142,240,.06)':'var(--bg3)')+';border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px">'+
+      '<div style="font-size:26px">'+m.icon+'</div>'+
+      '<div style="flex:1"><div style="font-family:var(--head);font-weight:600;font-size:16px;color:'+(on?m.color:'var(--text)')+'">'+m.label+'</div><div style="font-size:12px;color:var(--text3)">'+m.blurb+'</div></div>'+
+      '<div style="font-size:18px;color:'+(on?m.color:'var(--text3)')+'">'+(on?'✓':'○')+'</div>'+
+    '</div>';
+  }).join('');
+}
+function msToggleBoardPick(b){
+  MS.draft = MS.draft || {}; MS.draft.boards = MS.draft.boards || [];
+  var i=MS.draft.boards.indexOf(b);
+  if(i>=0) MS.draft.boards.splice(i,1); else MS.draft.boards.push(b);
+  msRenderBoardPick();
+}
+function msBoardPickContinue(){
+  var picked=(MS.draft&&MS.draft.boards)?MS.draft.boards:[];
+  if(!picked.length){ toast('Pick at least one minister spot'); return; }
+  var bp=document.getElementById('msBoardPick'); if(bp) bp.style.display='none';
+  var pt=document.querySelector('#page-minister .phase-tabs'); if(pt) pt.style.display='';
+  msGoStep(1);
+}
+function msChangeBoards(){ msShowBoardPick(); }
 function msRenderVerifyGrid(){
   const grid=document.getElementById('msVerifyGrid'); if(!grid) return;
-  MS_CATEGORIES.forEach(c=>{ if(!MS.draft.verify[c]) MS.draft.verify[c]={amount:0,unit:'hours',hours:0,ocrAmount:null,ocrRaw:null}; });
-  grid.innerHTML=MS_CATEGORIES.map(cat=>{
+  const CATS=msActiveCats();
+  CATS.forEach(c=>{ if(!MS.draft.verify[c]) MS.draft.verify[c]={amount:0,unit:'hours',hours:0,ocrAmount:null,ocrRaw:null}; });
+  grid.innerHTML=CATS.map(cat=>{
     const v=MS.draft.verify[cat];
     const flagged=v.ocrAmount!==null && v.amount>0 && Math.abs(v.amount-v.ocrAmount)/Math.max(v.ocrAmount,1)>0.2;
     return \`<div class="ms-verify-field">
@@ -2645,7 +2702,7 @@ function msUpdateVerify(cat){
 // ── STEP 3: COMMITMENT SLIDERS ──
 function msRenderSliderGrid(){
   const grid=document.getElementById('msSliderGrid'); if(!grid) return;
-  grid.innerHTML=MS_CATEGORIES.map(cat=>{
+  grid.innerHTML=msActiveCats().map(cat=>{
     const hours=MS.draft.verify[cat]?MS.draft.verify[cat].hours:0;
     const pct=MS.draft.commit[cat]!==undefined?MS.draft.commit[cat]:50;
     const committedHours=hours*pct/100;
@@ -2974,10 +3031,11 @@ function msEditSubmission() {
       alliance: cur.alliance||'', ign: cur.ign||'',
       verify: JSON.parse(JSON.stringify(cur.verify||{})),
       commit: JSON.parse(JSON.stringify(cur.commit||{})),
-      picks: (cur.picks||[]).slice()
+      picks: (cur.picks||[]).slice(),
+      boards: (cur.boards||[]).slice()
     };
   } else {
-    MS.draft = {alliance:'', ign:'', verify:{}, commit:{}, picks:[]};
+    MS.draft = {alliance:'', ign:'', verify:{}, commit:{}, picks:[], boards:[]};
   }
   MS._unlockedStep = 4; // all steps unlocked since they already completed them
   // Keep the overview tab visible so they can still see their current submission
