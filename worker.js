@@ -2715,11 +2715,18 @@ function msRenderSliderGrid(){
       <input type="range" min="0" max="100" value="\${pct}" id="msSlider-\${cat}" oninput="msUpdateSlider('\${cat}')">
       <div style="display:flex;justify-content:space-between;font-size:12px">
         <span class="mono" style="color:var(--accent2)" id="msSliderPct-\${cat}">\${pct}%</span>
-        <span class="mono" style="color:var(--gold)" id="msSliderDays-\${cat}">\${committedDays.toFixed(1)} days (\${committedHours.toFixed(1)}h)</span>
+<span class="mono" style="color:var(--gold)" id="msSliderDays-\${cat}">\${committedDays.toFixed(1)} days (\${committedHours.toFixed(1)}h)</span>
       </div>
     </div>\`;
   }).join('');
+  var _b=(MS.draft&&MS.draft.boards)?MS.draft.boards:[];
+  var _extra='';
+  if(_b.indexOf('buildings')>=0) _extra+='<div class="ms-slider-row" style="display:flex;align-items:center;gap:12px;justify-content:space-between"><strong style="font-size:14px">🟨 TrueGold to use</strong><input type="number" min="0" value="'+(MS.draft.truegold||0)+'" style="width:100px" oninput="msUpdateTG(this.value)"></div>';
+  if(_b.indexOf('research')>=0) _extra+='<div class="ms-slider-row" style="display:flex;align-items:center;gap:12px;justify-content:space-between"><strong style="font-size:14px">🔺 TrueGold Dust to use</strong><input type="number" min="0" value="'+(MS.draft.dust||0)+'" style="width:100px" oninput="msUpdateDust(this.value)"></div>';
+  if(_extra) grid.innerHTML += _extra;
 }
+function msUpdateTG(v){ MS.draft=MS.draft||{}; var n=parseInt(v,10); MS.draft.truegold=(isNaN(n)||n<0)?0:n; }
+function msUpdateDust(v){ MS.draft=MS.draft||{}; var n=parseInt(v,10); MS.draft.dust=(isNaN(n)||n<0)?0:n; }
 function msUpdateSlider(cat){
   const pct=parseInt(document.getElementById('msSlider-'+cat).value);
   MS.draft.commit[cat]=pct;
@@ -2924,6 +2931,13 @@ function msSubmitEntry(){
     picks: [...MS.draft.picks],
     favourites: [...(MS.draft.favourites||[])],
     committedHours,
+    boards: [...(MS.draft.boards||[])],
+    truegold: MS.draft.truegold||0,
+    dust: MS.draft.dust||0,
+    scores: (function(){
+      var cm={construction:(committedHours.construction||0)*60,research:(committedHours.research||0)*60,training:(committedHours.training||0)*60,general:(committedHours.general||0)*60,truegold:MS.draft.truegold||0,dust:MS.draft.dust||0};
+      var s={}; (MS.draft.boards||[]).forEach(function(b){ s[b]=msBoardScore(b,cm); }); return s;
+    })(),
     submittedAt: new Date().toISOString()
   };
 
@@ -2997,6 +3011,20 @@ function msRenderOverview(entry) {
   html += '<div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">Total committed hours</div><div style="font-weight:600;color:var(--gold)">' + totalH.toFixed(1) + 'h</div></div>';
   html += '<div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">Submitted</div><div style="font-size:12px">' + (entry.submittedAt ? new Date(entry.submittedAt).toLocaleString() : '—') + '</div></div>';
   html += '</div>';
+  // Minister spots applied for + computed score
+  if(entry.boards && entry.boards.length){
+    html += '<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text)">Minister Spots Applied For</div><div style="display:flex;flex-direction:column;gap:8px">';
+    entry.boards.forEach(function(b){
+      var m=MS_BOARD_META[b]; if(!m) return;
+      var sc=(entry.scores&&entry.scores[b]!==undefined)?entry.scores[b]:0;
+      html += '<div style="display:flex;align-items:center;gap:10px;background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:9px 12px">'+
+        '<span style="font-size:18px">'+m.icon+'</span>'+
+        '<span style="flex:1;font-weight:600;color:'+m.color+'">'+m.label+'</span>'+
+        '<span class="mono" style="color:var(--gold)">'+msBoardScoreLabel(b,sc)+'</span>'+
+      '</div>';
+    });
+    html += '</div></div>';
+  }
   // Speedup breakdown
   html += '<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text)">Speedup Commitment</div>';
   html += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
@@ -3032,10 +3060,11 @@ function msEditSubmission() {
       verify: JSON.parse(JSON.stringify(cur.verify||{})),
       commit: JSON.parse(JSON.stringify(cur.commit||{})),
       picks: (cur.picks||[]).slice(),
-      boards: (cur.boards||[]).slice()
+      boards: (cur.boards||[]).slice(),
+      truegold: cur.truegold||0, dust: cur.dust||0
     };
   } else {
-    MS.draft = {alliance:'', ign:'', verify:{}, commit:{}, picks:[], boards:[]};
+    MS.draft = {alliance:'', ign:'', verify:{}, commit:{}, picks:[], boards:[], truegold:0, dust:0}; 
   }
   MS._unlockedStep = 4; // all steps unlocked since they already completed them
   // Keep the overview tab visible so they can still see their current submission
