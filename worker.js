@@ -888,8 +888,11 @@ document.addEventListener('touchend',function(e){
 <!-- STEP 4: TIMESLOT PICKS -->
   <div id="msStep4" class="ms-step" style="display:none">
     <div class="card">
-      <div class="card-title">🕐 Step 4 — Pick Your Preferred Timeslots</div>
-      <p style="color:var(--text2);font-size:12px;margin-bottom:6px">Select at least <strong style="color:var(--text)">4 timeslots</strong> that work best for you (UTC). Your committed Training hours: <span id="msYourTrainingHours" class="mono" style="color:var(--gold)">0h</span></p>
+      <div class="card-title" style="display:flex;align-items:center;gap:10px">🕐 Step 4 — Signup <span onclick="msGoStep(3)" style="margin-left:auto;font-size:11px;font-weight:400;color:var(--accent2);cursor:pointer;letter-spacing:0;text-transform:none">← Back</span></div>
+      <div id="msSignupSummary" style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px"></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);cursor:pointer;margin-bottom:10px"><input type="checkbox" id="msApplyAllChk" checked onchange="msToggleApplyAll()"> Use the same timeslots for all my boards</label>
+      <div id="msBoardSwitcher" style="display:none;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
+      <p style="color:var(--text2);font-size:12px;margin-bottom:6px">Select at least <strong style="color:var(--text)">4 timeslots</strong> that work best for you (UTC).</p>
       <div id="msSlotPickCount" style="font-size:12px;color:var(--text3);margin-bottom:10px">0 slots selected</div>
 
       <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">
@@ -2715,7 +2718,7 @@ function msRenderSliderGrid(){
       <input type="range" min="0" max="100" value="\${pct}" id="msSlider-\${cat}" oninput="msUpdateSlider('\${cat}')">
       <div style="display:flex;justify-content:space-between;font-size:12px">
         <span class="mono" style="color:var(--accent2)" id="msSliderPct-\${cat}">\${pct}%</span>
-<span class="mono" style="color:var(--gold)" id="msSliderDays-\${cat}">\${committedDays.toFixed(1)} days (\${committedHours.toFixed(1)}h)</span>
+        <span class="mono" style="color:var(--gold)" id="msSliderDays-\${cat}">\${committedDays.toFixed(1)} days (\${committedHours.toFixed(1)}h)</span>
       </div>
     </div>\`;
   }).join('');
@@ -2737,6 +2740,36 @@ function msUpdateSlider(cat){
 }
 
 // ── STEP 4: TIMESLOTS ──
+function msAppliedBoardsList(){ var b=(MS.draft&&MS.draft.boards&&MS.draft.boards.length)?MS.draft.boards:MS_BOARDS; return b.slice(); }
+function msActiveBoard(){ MS.draft=MS.draft||{}; var b=msAppliedBoardsList(); if(!MS.draft._activeBoard||b.indexOf(MS.draft._activeBoard)<0) MS.draft._activeBoard=b[0]; return MS.draft._activeBoard; }
+function msPicks(){ MS.draft.picksByBoard=MS.draft.picksByBoard||{}; var ab=msActiveBoard(); if(!MS.draft.picksByBoard[ab]) MS.draft.picksByBoard[ab]=[]; return MS.draft.picksByBoard[ab]; }
+function msFavs(){ MS.draft.favByBoard=MS.draft.favByBoard||{}; var ab=msActiveBoard(); if(!MS.draft.favByBoard[ab]) MS.draft.favByBoard[ab]=[]; return MS.draft.favByBoard[ab]; }
+function msApplyAllSync(){ if(!MS.draft.applyAll) return; var p=msPicks().slice(), f=msFavs().slice(); msAppliedBoardsList().forEach(function(b){ MS.draft.picksByBoard[b]=p.slice(); MS.draft.favByBoard[b]=f.slice(); }); }
+function msSwitchBoard(b){ MS.draft._activeBoard=b; msRenderSlotGrid(); }
+function msToggleApplyAll(){ MS.draft.applyAll=!MS.draft.applyAll; if(MS.draft.applyAll) msApplyAllSync(); msRenderSlotGrid(); }
+function msRenderBoardSwitcher(){
+  var chk=document.getElementById('msApplyAllChk'); if(chk) chk.checked=!!MS.draft.applyAll;
+  var el=document.getElementById('msBoardSwitcher'); if(!el) return;
+  var boards=msAppliedBoardsList(), ab=msActiveBoard();
+  if(MS.draft.applyAll || boards.length<2){ el.style.display='none'; return; }
+  el.style.display='flex';
+  el.innerHTML=boards.map(function(b){ var m=MS_BOARD_META[b]; var on=b===ab;
+    return '<button class="btn btn-sm'+(on?'':' btn-ghost')+'" onclick="msSwitchBoard('+"'"+b+"'"+')" style="'+(on?'border-color:'+m.color+';color:'+m.color:'')+'">'+m.icon+' '+m.label+'</button>';
+  }).join('');
+}
+function msRenderSignupSummary(){
+  var el=document.getElementById('msSignupSummary'); if(!el) return;
+  var rows=msActiveCats().map(function(c){
+    var v=MS.draft.verify[c]?MS.draft.verify[c].hours:0;
+    var pct=MS.draft.commit[c]!==undefined?MS.draft.commit[c]:50;
+    var committed=v*pct/100, left=v-committed;
+    return '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:var(--text2)">'+MS_CATEGORY_LABELS[c]+'</span><span class="mono"><span style="color:var(--gold)">'+committed.toFixed(1)+'h</span> committed · <span style="color:var(--text3)">'+left.toFixed(1)+'h left</span></span></div>';
+  }).join('');
+  var b=msAppliedBoardsList();
+  if(b.indexOf('buildings')>=0) rows+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:var(--text2)">🟨 TrueGold</span><span class="mono" style="color:var(--gold)">'+(MS.draft.truegold||0)+'</span></div>';
+  if(b.indexOf('research')>=0) rows+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:var(--text2)">🔺 TrueGold Dust</span><span class="mono" style="color:var(--gold)">'+(MS.draft.dust||0)+'</span></div>';
+  el.innerHTML='<div style="font-size:11px;color:var(--text3);margin-bottom:6px;font-weight:600">Your commitment</div>'+rows;
+}
 function msRenderSlotGrid(){
   const grid=document.getElementById('msSlotGrid'); if(!grid) return;
   const takenSlots=new Set();
@@ -2771,7 +2804,7 @@ function msRenderSlotGrid(){
 grid.innerHTML = groups.map(g=>{
     const cells = Array.from({length:g.end-g.start},(_,k)=>{
       const i=g.start+k;
-      const selected=MS.draft.picks.includes(i);
+      const selected=msPicks().includes(i);
       const taken=takenSlots.has(i)&&!selected;
       const score=weighted[i];
       let bg,fg,bd,sub;
@@ -2779,7 +2812,7 @@ grid.innerHTML = groups.map(g=>{
       else if(taken){ bg='rgba(120,120,120,.25)'; fg='var(--text3)'; bd='1px solid var(--border)'; sub='taken'; }
       else { const c=band(score); bg=c.bg; fg=c.fg; bd=c.bd; sub=c.label; }
       const click = taken ? '' : 'onclick="msTogglePick('+i+')"';
-      const isFav = (MS.draft.favourites||[]).includes(i);
+      const isFav = msFavs().includes(i);
       const starBtn = selected ? '<span onclick="msToggleFav('+i+',event)" style="position:absolute;top:2px;right:4px;font-size:13px;cursor:pointer;line-height:1" title="Star as favourite">'+(isFav?'⭐':'☆')+'</span>' : '';
       return '<button class="ms-slot-btn" '+click+' style="position:relative;padding:10px 3px;border-radius:6px;font-family:var(--mono);font-size:13px;line-height:1.35;cursor:'+(taken?'not-allowed':'pointer')+';background:'+bg+';color:'+fg+';border:'+bd+';text-align:center">'+starBtn+msSlotLabel(i)+'<br><span style="font-size:11px;opacity:.85">'+sub+'</span></button>';
     }).join('');
@@ -2787,6 +2820,8 @@ grid.innerHTML = groups.map(g=>{
            '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px">'+cells+'</div>';
   }).join('');
   msUpdateSlotCount();
+  msRenderBoardSwitcher();
+  msRenderSignupSummary();
   const trainingHours=(MS.draft.verify.training?MS.draft.verify.training.hours:0)*((MS.draft.commit.training!==undefined?MS.draft.commit.training:50)/100);
   const elH=document.getElementById('msYourTrainingHours'); if(elH) elH.textContent=trainingHours.toFixed(1)+'h';
 
@@ -2798,43 +2833,49 @@ function msSelectRange(){
   let a=parseInt(fromSel.value,10), b=parseInt(toSel.value,10);
   if(isNaN(a)||isNaN(b)) return;
   if(b<a){ const t=a; a=b; b=t; }
-  for(let i=a;i<=b;i++){ if(!MS.draft.picks.includes(i)) MS.draft.picks.push(i); }
+  const P=msPicks();
+  for(let i=a;i<=b;i++){ if(!P.includes(i)) P.push(i); }
+  msApplyAllSync();
   msRenderSlotGrid();
 }
 
 function msClearPicks(){
-  MS.draft.picks=[];
+  const P=msPicks(); P.length=0;
+  const F=msFavs(); F.length=0;
+  msApplyAllSync();
   msRenderSlotGrid();
 }
 
 function msTogglePick(i){
-  const idx=MS.draft.picks.indexOf(i);
+  const P=msPicks();
+  const idx=P.indexOf(i);
   if(idx>=0){
-    MS.draft.picks.splice(idx,1);
-    // if it was starred, unstar it too
-    const f=MS.draft.favourites.indexOf(i); if(f>=0) MS.draft.favourites.splice(f,1);
+    P.splice(idx,1);
+    const F=msFavs(); const fi=F.indexOf(i); if(fi>=0) F.splice(fi,1);
   } else {
-    MS.draft.picks.push(i);
+    P.push(i);
   }
+  msApplyAllSync();
   msRenderSlotGrid();
 }
 
 function msToggleFav(i, ev){
-  if(ev){ ev.stopPropagation(); }           // don't also toggle the pick
-  if(!MS.draft.picks.includes(i)) return;   // can only star a slot you've picked
-  MS.draft.favourites = MS.draft.favourites || [];
-  const f=MS.draft.favourites.indexOf(i);
-  if(f>=0){ MS.draft.favourites.splice(f,1); }
+  if(ev){ ev.stopPropagation(); }
+  if(!msPicks().includes(i)) return;
+  const F=msFavs();
+  const f=F.indexOf(i);
+  if(f>=0){ F.splice(f,1); }
   else {
-    if(MS.draft.favourites.length>=2){ toast('You can star up to 2 favourites. Un-star one first.'); return; }
-    MS.draft.favourites.push(i);
+    if(F.length>=2){ toast('You can star up to 2 favourites. Un-star one first.'); return; }
+    F.push(i);
   }
+  msApplyAllSync();
   msRenderSlotGrid();
 }
 
 function msUpdateSlotCount(){
   const el=document.getElementById('msSlotPickCount'); if(!el) return;
-  const n=MS.draft.picks.length;
+  const n=msPicks().length;
   el.textContent=n+' slot'+(n===1?'':'s')+' selected '+(n<MS_MIN_SLOTS_PICKED?'(need at least '+MS_MIN_SLOTS_PICKED+')':'✓');
   el.style.color=n<MS_MIN_SLOTS_PICKED?'#ff9d4d':'var(--green)';
 }
@@ -2911,7 +2952,12 @@ function msUpdateDeadlineBanners() {
 
 function msSubmitEntry(){
   if(msIsDeadlinePassed()){ toast('Submissions are closed — the deadline has passed.'); return; }
-  if(MS.draft.picks.length<MS_MIN_SLOTS_PICKED){ alert('Please select at least ' + MS_MIN_SLOTS_PICKED + ' timeslots.'); return; }
+  var _boards=msAppliedBoardsList();
+  var _pbb=MS.draft.picksByBoard||{};
+  for(var _bi=0;_bi<_boards.length;_bi++){
+    var _bp=_pbb[_boards[_bi]]||[];
+    if(_bp.length<MS_MIN_SLOTS_PICKED){ alert('Pick at least '+MS_MIN_SLOTS_PICKED+' timeslots for '+(MS_BOARD_META[_boards[_bi]]?MS_BOARD_META[_boards[_bi]].label:_boards[_bi])+'.'); return; }
+  }
 
   const committedHours={};
   MS_CATEGORIES.forEach(cat=>{
@@ -2928,7 +2974,9 @@ function msSubmitEntry(){
     ign: MS.draft.ign,
     verify: JSON.parse(JSON.stringify(MS.draft.verify)),
     commit: JSON.parse(JSON.stringify(MS.draft.commit)),
-    picks: [...MS.draft.picks],
+    picks: (function(){ var u={}; _boards.forEach(function(b){ (_pbb[b]||[]).forEach(function(s){ u[s]=1; }); }); return Object.keys(u).map(Number).sort(function(a,b){return a-b;}); })(),
+    picksByBoard: JSON.parse(JSON.stringify(_pbb)),
+    favByBoard: JSON.parse(JSON.stringify(MS.draft.favByBoard||{})),
     favourites: [...(MS.draft.favourites||[])],
     committedHours,
     boards: [...(MS.draft.boards||[])],
@@ -3061,10 +3109,13 @@ function msEditSubmission() {
       commit: JSON.parse(JSON.stringify(cur.commit||{})),
       picks: (cur.picks||[]).slice(),
       boards: (cur.boards||[]).slice(),
-      truegold: cur.truegold||0, dust: cur.dust||0
+      truegold: cur.truegold||0, dust: cur.dust||0,
+      picksByBoard: JSON.parse(JSON.stringify(cur.picksByBoard||{})),
+      favByBoard: JSON.parse(JSON.stringify(cur.favByBoard||{})),
+      applyAll: (cur.applyAll!==undefined?cur.applyAll:true)
     };
   } else {
-    MS.draft = {alliance:'', ign:'', verify:{}, commit:{}, picks:[], boards:[], truegold:0, dust:0}; 
+    MS.draft = {alliance:'', ign:'', verify:{}, commit:{}, picks:[], boards:[], truegold:0, dust:0, picksByBoard:{}, favByBoard:{}, applyAll:true};
   }
   MS._unlockedStep = 4; // all steps unlocked since they already completed them
   // Keep the overview tab visible so they can still see their current submission
