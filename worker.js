@@ -962,6 +962,7 @@ document.addEventListener('touchend',function(e){
     </div>
 
     <div class="card" id="msManagePanel" style="margin-bottom:14px;display:none">
+      <div id="msManageBoardTabs" style="display:none;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px">
         <div class="card-title" style="margin:0">👑 Manage Spots — Assign & Move</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -1026,6 +1027,8 @@ const MS = {
   draft: { alliance:'', ign:'', verify:{}, commit:{}, picks:[], favourites:[] }, // in-progress entry
   submissions: [], // {id, alliance, ign, verify:{cat:{amount,unit,hours}}, commit:{cat:pct}, picks:[slotIdx...], committedHours:{cat:hours}}
   _lastAllocation: null,
+  _allocByBoard: {},
+  _manageBoard: null,
   auditLog: [], // {who, action, when} — last ~25 manual leader changes, shared across leaders
   _currentStep: 1
 };
@@ -1067,6 +1070,7 @@ let syncSerialize = function() {
     attackAllianceName: document.getElementById('attackAllianceName') ? document.getElementById('attackAllianceName').value : '',
     msSubmissions: (typeof MS!=='undefined') ? MS.submissions : [],
     msLastAllocation: (typeof MS!=='undefined') ? MS._lastAllocation : null,
+    msAllocByBoard: (typeof MS!=='undefined') ? MS._allocByBoard : null,
     msDeadline: (typeof MS!=='undefined') ? MS.deadline : null,
     msSubmissionsByPlayer: (typeof MS!=='undefined') ? (MS.submissionsByPlayer||{}) : {},
     msAuditLog: (typeof MS!=='undefined') ? (MS.auditLog||[]) : []
@@ -1094,6 +1098,7 @@ let syncApplyRemote = function(data) {
     if (typeof MS!=='undefined') {
       MS.submissions = data.msSubmissions || [];
       MS._lastAllocation = data.msLastAllocation || null;
+      MS._allocByBoard = data.msAllocByBoard || MS._allocByBoard || {};
       MS.deadline = data.msDeadline || null;
       if(data.msSubmissionsByPlayer) { MS.submissionsByPlayer = data.msSubmissionsByPlayer; MS.submissions = Object.values(MS.submissionsByPlayer); }
       if(data.msAuditLog) { MS.auditLog = data.msAuditLog; }
@@ -1109,7 +1114,7 @@ let syncApplyRemote = function(data) {
 async function syncPull() {
   if (!syncEnabled()) return;
   try {
-    const res = await fetch(SYNC_API_URL.replace(/\\/$/, '') + '/state', { cache: 'no-store' });
+    const res = await fetch(SYNC_API_URL.replace(/\\/$/, '') + '/state', { cache: 'no-store', headers: stateHeaders() });
     if (!res.ok) { updateSyncStatus('error'); return; }
     const data = await res.json();
     const json = JSON.stringify(data);
@@ -1134,7 +1139,7 @@ async function syncPushNow() {
   try {
     const res = await fetch(SYNC_API_URL.replace(/\\/$/, '') + '/state', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: stateHeaders({ 'Content-Type': 'application/json' }),
       body: json
     });
     if (res.ok) { syncLastPushedJSON = json; updateSyncStatus('synced'); }
@@ -3028,25 +3033,34 @@ function msRenderOverview(entry) {
   if(!el || !entry) return;
   const totalH = MS_CATEGORIES.reduce((s,c) => s + (entry.committedHours[c]||0), 0);
 
-  // Allocation status box (member's own result)
+  // Allocation status box (member's own result, per board applied to)
   let statusHtml = '';
-  if(MS._lastAllocation){
-    const mine = MS._lastAllocation.assignments.find(function(a){ return a.entry.ign===entry.ign && a.entry.alliance===entry.alliance; });
-    if(mine){
-      statusHtml = '<div style="background:rgba(46,204,113,.1);border:1px solid rgba(46,204,113,.4);border-radius:8px;padding:12px 14px;margin-bottom:14px">'+
-        '<div style="font-weight:600;color:var(--green)">✅ You got a slot!</div>'+
-        '<div style="font-size:13px;color:var(--text);margin-top:4px">Your Minister Spot time: <strong class="mono" style="color:var(--gold)">'+msSlotLabel(mine.slot)+' UTC</strong></div>'+
-        '<div style="font-size:11px;color:var(--text3);margin-top:4px">Be online and ready at this time.</div>'+
-      '</div>';
-    } else {
-      const wasRejected = MS._lastAllocation.rejected.some(function(r){ return r.ign===entry.ign && r.alliance===entry.alliance; });
-      if(wasRejected){
-        statusHtml = '<div style="background:rgba(255,157,77,.08);border:1px solid rgba(255,157,77,.35);border-radius:8px;padding:12px 14px;margin-bottom:14px">'+
-          '<div style="font-weight:600;color:#ff9d4d">No slot this round</div>'+
-          '<div style="font-size:13px;color:var(--text2);margin-top:4px">All 48 Minister Spots were filled this round. If you have questions, please reach out to your R4/R5.</div>'+
+  const myBoards = (entry.boards && entry.boards.length) ? entry.boards : MS_BOARDS;
+  const byBoard = MS._allocByBoard || {};
+  const anyRun = myBoards.some(function(b){ return !!byBoard[b]; });
+  if(anyRun){
+    statusHtml = '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">';
+    myBoards.forEach(function(b){
+      const alloc = byBoard[b]; const m = MS_BOARD_META[b];
+      if(!alloc){
+        statusHtml += '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px 14px">'+
+          '<div style="font-size:13px;color:var(--text2)">⏳ '+m.icon+' '+m.label+' — not run yet.</div></div>';
+        return;
+      }
+      const mine = alloc.assignments.find(function(a){ return a.entry.ign===entry.ign && a.entry.alliance===entry.alliance; });
+      if(mine){
+        statusHtml += '<div style="background:rgba(46,204,113,.1);border:1px solid rgba(46,204,113,.4);border-radius:8px;padding:12px 14px">'+
+          '<div style="font-weight:600;color:var(--green)">✅ '+m.icon+' '+m.label+' — you got a slot!</div>'+
+          '<div style="font-size:13px;color:var(--text);margin-top:4px">Time: <strong class="mono" style="color:var(--gold)">'+msSlotLabel(mine.slot)+' UTC</strong></div>'+
+        '</div>';
+      } else {
+        const wasRejected = alloc.rejected.some(function(r){ return r.ign===entry.ign && r.alliance===entry.alliance; });
+        statusHtml += '<div style="background:rgba(255,157,77,.08);border:1px solid rgba(255,157,77,.35);border-radius:8px;padding:12px 14px">'+
+          '<div style="font-weight:600;color:#ff9d4d">'+m.icon+' '+m.label+' — '+(wasRejected?'no slot this round':'not run yet')+'</div>'+
         '</div>';
       }
-    }
+    });
+    statusHtml += '</div>';
   } else {
     statusHtml = '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px">'+
       '<div style="font-size:13px;color:var(--text2)">⏳ Your submission is in. Slot assignments are not finalised yet — check back later.</div>'+
@@ -3132,75 +3146,101 @@ function msRenderResultsSummary(){
   document.getElementById('msRejectedCount').textContent=(MS._lastAllocation?MS._lastAllocation.rejected.length:0);
 }
 
-function msRunAllocation(){
-  if(!MS.submissions.length){ toast('No submissions yet.'); return; }
-
-  // Preserve leader-locked (pinned) slots from the previous run
-  const pinned = new Map(); // slot(number) → entry
-  if(MS._lastAllocation){
-    MS._lastAllocation.assignments.forEach(a => { if(a.pinned) pinned.set(a.slot, a.entry); });
-  }
+function msRunAllocationForBoard(board, prev){
+  const pinned = new Map();
+  if(prev){ prev.assignments.forEach(a => { if(a.pinned) pinned.set(a.slot, a.entry); }); }
   const pinnedIGNs = new Set([...pinned.values()].map(e => e.ign));
   const takenSlots = new Set(pinned.keys());
   const assignments = [];
   pinned.forEach((entry, slot) => { assignments.push({entry, slot, pinned:true}); });
 
-  // Everyone not already locked in is a candidate for the remaining slots
-  const candidates = MS.submissions.filter(e => !pinnedIGNs.has(e.ign));
+  // only players who applied for this board (board-less legacy entries count everywhere)
+  const applied = MS.submissions.filter(e => !e.boards || !e.boards.length || e.boards.indexOf(board)>=0);
+  const candidates = applied.filter(e => !pinnedIGNs.has(e.ign));
 
-  const hoursOf = e => (e.committedHours && e.committedHours[MS_RANK_CATEGORY]) || 0;
+  // Troops = current structure (Training hours). Buildings/Research = points score.
+  const scoreOf = (board==='troops')
+    ? (e => (e.committedHours && e.committedHours.training) || 0)
+    : (e => (e.scores && e.scores[board]) || 0);
   const timeOf  = e => e.submittedAt ? new Date(e.submittedAt).getTime() : 0;
+  const picksOf = e => (e.picksByBoard && e.picksByBoard[board]) || e.picks || [];
+  const favsOf  = e => (e.favByBoard && e.favByBoard[board]) || e.favourites || [];
 
-  // ── PASS 1 — protect the constrained ──
-  // Sort by FEWEST picks first. Tie: more hours, then earlier submission.
+  // PASS 1 — protect the constrained (fewest picks first)
   const byConstraint = [...candidates].sort((a,b) => {
-    const pa=(a.picks||[]).length, pb=(b.picks||[]).length;
+    const pa=picksOf(a).length, pb=picksOf(b).length;
     if(pa!==pb) return pa-pb;
-    if(hoursOf(a)!==hoursOf(b)) return hoursOf(b)-hoursOf(a);
+    if(scoreOf(a)!==scoreOf(b)) return scoreOf(b)-scoreOf(a);
     return timeOf(a)-timeOf(b);
   });
-
-  const placed = new Set(); // IGNs already given a slot
-  const CONSTRAINED_MAX_PICKS = MS_MIN_SLOTS_PICKED; // only protect people who picked the minimum
+  const placed = new Set();
+  const CONSTRAINED_MAX_PICKS = MS_MIN_SLOTS_PICKED;
   byConstraint.forEach(entry => {
-    if((entry.picks||[]).length > CONSTRAINED_MAX_PICKS) return; // flexible → pass 2
+    if(picksOf(entry).length > CONSTRAINED_MAX_PICKS) return;
     if(takenSlots.size >= MS_TOTAL_SLOTS) return;
-    const favs = (entry.favourites||[]).filter(s => !takenSlots.has(s));
-    const pick = favs.length ? favs[0] : (entry.picks||[]).find(s => !takenSlots.has(s));
+    const favs = favsOf(entry).filter(s => !takenSlots.has(s));
+    const pick = favs.length ? favs[0] : picksOf(entry).find(s => !takenSlots.has(s));
     if(pick !== undefined){ takenSlots.add(pick); assignments.push({entry, slot:pick}); placed.add(entry.ign); }
   });
 
-  // ── PASS 2 — place the flexible by value ──
-  const remaining = candidates
-    .filter(e => !placed.has(e.ign))
-    .sort((a,b) => {
-      if(hoursOf(a)!==hoursOf(b)) return hoursOf(b)-hoursOf(a);
-      return timeOf(a)-timeOf(b);
-    });
-
-  const rejected = [];
-  const unassigned = [];
+  // PASS 2 — place the flexible by score
+  const remaining = candidates.filter(e => !placed.has(e.ign)).sort((a,b) => {
+    if(scoreOf(a)!==scoreOf(b)) return scoreOf(b)-scoreOf(a);
+    return timeOf(a)-timeOf(b);
+  });
+  const rejected = [], unassigned = [], rejectReasons = {};
   remaining.forEach(entry => {
-    if(takenSlots.size >= MS_TOTAL_SLOTS){ entry._rejectReason='all-full'; rejected.push(entry); return; }
-    const favs = (entry.favourites||[]).filter(s => !takenSlots.has(s));
-    const pick = favs.length ? favs[0] : (entry.picks||[]).find(s => !takenSlots.has(s));
+    if(takenSlots.size >= MS_TOTAL_SLOTS){ rejectReasons[entry.ign]='all-full'; rejected.push(entry); return; }
+    const favs = favsOf(entry).filter(s => !takenSlots.has(s));
+    const pick = favs.length ? favs[0] : picksOf(entry).find(s => !takenSlots.has(s));
     if(pick !== undefined){ takenSlots.add(pick); assignments.push({entry, slot:pick}); placed.add(entry.ign); }
-    else { unassigned.push(entry); }
+    else unassigned.push(entry);
   });
-
-// Philosophy B: you ONLY get a slot you actually picked.
-  // If all your picked slots are taken, you are rejected — never assigned a random slot.
-  unassigned.forEach(entry => { entry._rejectReason='picks-taken'; rejected.push(entry); });
+  // Philosophy B: you ONLY get a slot you actually picked.
+  unassigned.forEach(entry => { rejectReasons[entry.ign]='picks-taken'; rejected.push(entry); });
 
   assignments.sort((a,b) => a.slot - b.slot);
   const winners = assignments.map(a => a.entry);
+  return {winners, rejected, assignments, rejectReasons, board};
+}
 
-  MS._lastAllocation = {winners, rejected, assignments};
+function msBoardsInPlay(){
+  var bs = MS_BOARDS.filter(function(b){ return MS.submissions.some(function(e){ return e.boards && e.boards.indexOf(b)>=0; }); });
+  return bs.length ? bs : ['troops'];
+}
+
+function msRunAllocation(){
+  if(!MS.submissions.length){ toast('No submissions yet.'); return; }
+  MS._allocByBoard = MS._allocByBoard || {};
+  var boards = msBoardsInPlay();
+  boards.forEach(function(b){ MS._allocByBoard[b] = msRunAllocationForBoard(b, MS._allocByBoard[b]); });
+  if(boards.indexOf(MS._manageBoard)<0) MS._manageBoard = boards[0];
+  msSetManageBoard(MS._manageBoard);
+  syncQueuePush();
+  var total = boards.reduce(function(s,b){ return s + MS._allocByBoard[b].winners.length; }, 0);
+  toast('Allocation complete — '+total+' placed across '+boards.length+' board'+(boards.length===1?'':'s')+'.');
+}
+
+function msSetManageBoard(board){
+  MS._allocByBoard = MS._allocByBoard || {};
+  MS._manageBoard = board;
+  var res = MS._allocByBoard[board] || {winners:[],rejected:[],assignments:[],rejectReasons:{}};
+  if(res.rejectReasons){ res.rejected.forEach(function(e){ e._rejectReason = res.rejectReasons[e.ign]; }); }
+  MS._lastAllocation = res;
+  msRenderManageBoardTabs();
   msRenderResultsSummary();
   msRenderFinalSchedule();
   msRenderRejectedList();
-  syncQueuePush();
-  toast('Allocation complete — '+winners.length+' placed'+(pinned.size?', '+pinned.size+' locked':'')+', '+rejected.length+' not selected.');
+}
+
+function msRenderManageBoardTabs(){
+  var el=document.getElementById('msManageBoardTabs'); if(!el) return;
+  var boards=msBoardsInPlay();
+  el.style.display='flex';
+  el.innerHTML=boards.map(function(b){ var m=MS_BOARD_META[b]; var on=b===MS._manageBoard;
+    var n=(MS._allocByBoard&&MS._allocByBoard[b])?MS._allocByBoard[b].winners.length:0;
+    return '<button class="btn btn-sm'+(on?'':' btn-ghost')+'" onclick="msSetManageBoard('+"'"+b+"'"+')" style="'+(on?'border-color:'+m.color+';color:'+m.color:'')+'">'+m.icon+' '+m.label+' <span style="opacity:.6">('+n+'/48)</span></button>';
+  }).join('');
 }
 
 function msRenderFinalSchedule(){
@@ -3651,33 +3691,39 @@ function msClearAllSubs(){
 const AUTH = {
   role: null,        // 'member' | 'rallyleader' | 'r4r5' | 'admin'
   alliance: null,    // 'FIR'|'LOC'|'LYL'|'KNG'|'KOV'|'TLA' | null
-  playerVerified: false
+  playerVerified: false,
+  token: null        // signed server token (never a password)
 };
 
 const AUTH_DEFAULTS = {
-  rallyleader: 'kvk1057rally',
-  r4r5: 'kvk1057r4r5',
-  admin: 'kvk1057admin'
+  rallyleader: '',
+  r4r5: '',
+  admin: ''
 };
 
 let loadedPasswords = { rallyleader: null, r4r5: null, admin: null };
 
 const ALLIANCES = ['FIR','LOC','LYL','KNG','KOV','TLA'];
 
-async function loadPasswords() {
+// ── Token handling (server-issued, never a password) ──
+function authSaveToken(t){ AUTH.token = t; try { if(t) sessionStorage.setItem('auth_token', t); else sessionStorage.removeItem('auth_token'); } catch(e){} }
+function authLoadToken(){ try { AUTH.token = sessionStorage.getItem('auth_token'); } catch(e){} return AUTH.token; }
+function stateHeaders(extra){ var h = extra || {}; if(AUTH.token) h['Authorization'] = 'Bearer ' + AUTH.token; return h; }
+// Ask the Worker to verify a password/player and issue a token. Returns role or null.
+async function msAuthLogin(role, opts){
+  opts = opts || {};
   try {
-    const res = await fetch('/state', { cache: 'no-store' });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.pw_rallyleader) loadedPasswords.rallyleader = data.pw_rallyleader;
-      if (data.pw_r4r5) loadedPasswords.r4r5 = data.pw_r4r5;
-      if (data.pw_admin) loadedPasswords.admin = data.pw_admin;
-    }
+    const res = await fetch('/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ role: role, password: opts.password, playerId: opts.playerId }) });
+    const d = await res.json();
+    if (res.ok && d.ok && d.token){ authSaveToken(d.token); return d.role; }
   } catch(e) {}
+  return null;
 }
 
-function getPassword(type) { return loadedPasswords[type] || AUTH_DEFAULTS[type]; }
-function checkPassword(type, input) { return input === getPassword(type); }
+async function loadPasswords() { /* passwords are server-side only now — never sent to the client */ }
+
+function getPassword(type) { return null; }
+function checkPassword(type, input) { return false; }
 
 function sessionSetAuth(role, alliance) {
   try {
@@ -3715,6 +3761,12 @@ function msShowAdminActions() {
 function msInitResultsTab() {
   if (msCanAccessResults()) {
     msShowAdminActions();
+    var boards = msBoardsInPlay();
+    if (!MS._manageBoard || boards.indexOf(MS._manageBoard) < 0) MS._manageBoard = boards[0];
+    if (MS._allocByBoard && MS._allocByBoard[MS._manageBoard]) {
+      MS._lastAllocation = MS._allocByBoard[MS._manageBoard];
+    }
+    msRenderManageBoardTabs();
   } else {
     const guard = document.getElementById('msAdminGuard');
     const actions = document.getElementById('msAdminActions');
@@ -3723,11 +3775,13 @@ function msInitResultsTab() {
   }
 }
 
-function msUnlockAdmin() {
+async function msUnlockAdmin() {
   const input = document.getElementById('msAdminPwInput');
   const err = document.getElementById('msAdminPwErr');
   if (!input) return;
-  if (checkPassword('admin', input.value)) {
+  const role = await msAuthLogin('admin', { password: input.value });
+  if (role === 'admin') {
+    AUTH.role = 'admin';
     AUTH.adminUnlocked = true;
     sessionSetAuth('admin');
     msShowAdminActions();
@@ -3878,15 +3932,14 @@ async function bypassCheckPassword() {
   if (!alliance) { toast('Select your alliance first.'); return; }
 
   const pw = input.value;
-  await loadPasswords();
   let role = null;
-  if (checkPassword('admin', pw))            role = 'admin';
-  else if (checkPassword('r4r5', pw))        role = 'r4r5';
-  else if (checkPassword('rallyleader', pw)) role = 'rallyleader';
+  if (await msAuthLogin('admin', {password: pw})) role = 'admin';
+  else if (await msAuthLogin('r4r5', {password: pw})) role = 'r4r5';
+  else if (await msAuthLogin('rallyleader', {password: pw})) role = 'rallyleader';
 
   if (role) {
     verifiedPlayer = { id: 'bypass_' + role + '_' + Date.now(), name, kingdom: 1057, level: null, avatar: null };
-    _registerAndEnter(role, alliance);
+    await _registerAndEnter(role, alliance);
   } else {
     if (errEl) { errEl.style.display = 'block'; input.value = ''; input.focus(); setTimeout(() => errEl.style.display = 'none', 3000); }
   }
@@ -3955,27 +4008,28 @@ async function landingCheckPassword() {
   const errEl = document.getElementById('landingPwError');
   if (!input) return;
   const pw = input.value;
-  await loadPasswords();
-
-  let role = null;
   const pid = verifiedPlayer ? String(verifiedPlayer.id) : '';
 
-  if (pid === ADMIN_PLAYER_ID && checkPassword('admin', pw)) role = 'admin';
-  else if (checkPassword('r4r5', pw))        role = 'r4r5';
-  else if (checkPassword('rallyleader', pw)) role = 'rallyleader';
+  let role = null;
+  if (pid === ADMIN_PLAYER_ID) { if (await msAuthLogin('admin', {password: pw})) role = 'admin'; }
+  if (!role && await msAuthLogin('r4r5', {password: pw})) role = 'r4r5';
+  if (!role && await msAuthLogin('rallyleader', {password: pw})) role = 'rallyleader';
 
   if (role) {
     const alliance = (role === 'rallyleader' || role === 'admin') ? null : AUTH.alliance;
-    _registerAndEnter(role, alliance);
+    await _registerAndEnter(role, alliance);
   } else {
-    if (errEl) { errEl.style.display = 'block'; errEl.textContent = role === null && pid !== ADMIN_PLAYER_ID && pw === getPassword('admin') ? 'Admin access requires the correct Player ID.' : 'Incorrect password.'; }
+    if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Incorrect password.'; }
     input.value = '';
     input.focus();
     setTimeout(() => { if (errEl) errEl.style.display = 'none'; }, 3000);
   }
 }
 
-function _registerAndEnter(role, alliance) {
+async function _registerAndEnter(role, alliance) {
+  if (role === 'member' && !AUTH.token && verifiedPlayer) {
+    await msAuthLogin('member', { playerId: verifiedPlayer.id });
+  }
   if (verifiedPlayer) {
     try { sessionStorage.setItem('verifiedPlayer', JSON.stringify(verifiedPlayer)); } catch(e) {}
     // Persist to localStorage so next visit skips the form
@@ -4123,7 +4177,7 @@ function logOut() {
   if(pidInput) pidInput.value = '';
 }
 async function initApp() {
-  await loadPasswords();
+  authLoadToken();
 
   // Try session first (same tab/window)
   const { role, alliance } = sessionGetAuth();
@@ -4131,6 +4185,7 @@ async function initApp() {
     AUTH.role = role;
     AUTH.alliance = alliance || null;
     try { verifiedPlayer = JSON.parse(sessionStorage.getItem('verifiedPlayer')); } catch(e) {}
+    if (!AUTH.token && role === 'member' && verifiedPlayer) { await msAuthLogin('member', { playerId: verifiedPlayer.id }); }
     enterApp(role);
     return;
   }
@@ -4147,6 +4202,7 @@ async function initApp() {
       AUTH.role = 'member';
       AUTH.alliance = savedAlliance;
       sessionSetAuth('member', savedAlliance);
+      await msAuthLogin('member', { playerId: savedPlayer.id });
       enterApp('member');
       return;
     }
@@ -4236,10 +4292,10 @@ async function adminChangePassword(type) {
   const displayId = { rallyleader:'currentRallyPw', r4r5:'currentR4R5Pw', admin:'currentAdminPw' }[type];
   const newPw = document.getElementById(inputId).value.trim();
   if (!newPw) { toast('Enter a password first.'); return; }
-  const res = await fetch('/state', { cache: 'no-store' });
+  const res = await fetch('/state', { cache: 'no-store', headers: stateHeaders() });
   const data = res.ok ? await res.json() : {};
   data['pw_' + type] = newPw;
-  await fetch('/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  await fetch('/state', { method: 'PUT', headers: stateHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(data) });
   loadedPasswords[type] = newPw;
   document.getElementById(inputId).value = '';
   const el = document.getElementById(displayId);
@@ -5019,6 +5075,39 @@ document.addEventListener('DOMContentLoaded', initApp);
 </body>
 </html>
 `;
+
+// ══════════════════════ SERVER-SIDE AUTH ══════════════════════
+const AUTH_SECRET_KEY = 'auth_secret_v1';
+const PW_DEFAULTS = { rallyleader: 'kvk1057rally', r4r5: 'kvk1057r4r5', admin: 'kvk1057admin' };
+function _b64url(bytes){ let s=''; for (const b of bytes) s += String.fromCharCode(b); return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function _b64urlDecode(str){ const b = atob(str.replace(/-/g,'+').replace(/_/g,'/')); const a = new Uint8Array(b.length); for (let i=0;i<b.length;i++) a[i]=b.charCodeAt(i); return a; }
+async function getAuthSecret(env){
+  let s = await env.SVS_KV.get(AUTH_SECRET_KEY);
+  if (!s){ s = _b64url(crypto.getRandomValues(new Uint8Array(32))); await env.SVS_KV.put(AUTH_SECRET_KEY, s); }
+  return s;
+}
+async function _hmac(secret, msg){
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), {name:'HMAC',hash:'SHA-256'}, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg));
+  return _b64url(new Uint8Array(sig));
+}
+async function makeToken(env, role){
+  const body = _b64url(new TextEncoder().encode(JSON.stringify({ role, exp: Date.now() + 43200000 }))); // 12h
+  const sig = await _hmac(await getAuthSecret(env), body);
+  return body + '.' + sig;
+}
+async function verifyToken(env, token){
+  if (!token || token.indexOf('.') < 0) return null;
+  const parts = token.split('.');
+  const expect = await _hmac(await getAuthSecret(env), parts[0]);
+  if (parts[1] !== expect) return null;
+  let p; try { p = JSON.parse(new TextDecoder().decode(_b64urlDecode(parts[0]))); } catch(e){ return null; }
+  if (!p || !p.exp || Date.now() > p.exp) return null;
+  return p.role || null;
+}
+function stripPw(s){ if (s && typeof s==='object'){ delete s.pw_rallyleader; delete s.pw_r4r5; delete s.pw_admin; } return s; }
+function bearer(request){ return (request.headers.get('Authorization')||'').replace(/^Bearer\s+/,''); }
+// ═══════════════════════════════════════════════════════════════
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -5260,14 +5349,63 @@ Reply with ONLY one line of raw JSON, no explanation, no markdown. Use 0 for any
     }
 
     // Shared state
+    if (url.pathname==='/auth' && request.method==='POST') {
+      let b={}; try { b = await request.json(); } catch(e) {}
+      const role = b.role, password = b.password, playerId = b.playerId;
+      const stateRaw = await env.SVS_KV.get(STATE_KEY);
+      let st={}; try { st = JSON.parse(stateRaw||'{}'); } catch(e){}
+      if (role === 'member') {
+        if (!playerId) return json({ok:false, error:'missing-id'}, 400);
+        try {
+          const r = await fetch(KINGSHOT_API+'/player-info?playerId='+encodeURIComponent(playerId), {headers:{Accept:'application/json'}});
+          const d = await r.json();
+          const p = (d && d.data) ? d.data : (d && d.status==='success' ? d.data : null);
+          const kd = p ? (p.kingdom || p.kid || p.stove_lv || p.k) : null;
+          if (!p) return json({ok:false, error:'not-found'}, 404);
+          // accept if lookup returned a real player; kingdom check best-effort
+          if (kd !== undefined && kd !== null && String(kd) !== '1057' && String(kd) !== '') {
+            return json({ok:false, error:'not-1057'}, 403);
+          }
+        } catch(e) { return json({ok:false, error:'lookup-failed'}, 502); }
+        return json({ok:true, role:'member', token: await makeToken(env, 'member')});
+      }
+      if (role === 'rallyleader' || role === 'r4r5' || role === 'admin') {
+        const expected = st['pw_'+role] || PW_DEFAULTS[role];
+        if (!password || password !== expected) return json({ok:false, error:'bad-password'}, 401);
+        return json({ok:true, role, token: await makeToken(env, role)});
+      }
+      return json({ok:false, error:'bad-role'}, 400);
+    }
+
     if (url.pathname==='/state' && request.method==='GET') {
+      const role = await verifyToken(env, bearer(request));
+      if (!role) return json({ok:false, error:'unauthorized'}, 401);
       const raw = await env.SVS_KV.get(STATE_KEY);
-      return new Response(raw||'{}',{headers:{'Content-Type':'application/json',...cors()}});
+      let st={}; try { st = JSON.parse(raw||'{}'); } catch(e){}
+      return json(stripPw(st));
     }
     if (url.pathname==='/state' && request.method==='PUT') {
+      const role = await verifyToken(env, bearer(request));
+      if (!role) return json({ok:false, error:'unauthorized'}, 401);
       const body = await request.text();
-      try { JSON.parse(body); } catch(e) { return json({error:'Invalid JSON'},400); }
-      await env.SVS_KV.put(STATE_KEY, body);
+      let incoming; try { incoming = JSON.parse(body); } catch(e) { return json({error:'Invalid JSON'},400); }
+      const oldRaw = await env.SVS_KV.get(STATE_KEY);
+      let old={}; try { old = JSON.parse(oldRaw||'{}'); } catch(e){}
+      // Admin-only: running allocation, or clearing/reducing submissions
+      const allocChanged =
+        JSON.stringify(incoming.msAllocByBoard||null)   !== JSON.stringify(old.msAllocByBoard||null) ||
+        JSON.stringify(incoming.msLastAllocation||null) !== JSON.stringify(old.msLastAllocation||null);
+      const oldSubs = old.msSubmissionsByPlayer ? Object.keys(old.msSubmissionsByPlayer).length : 0;
+      const newSubs = incoming.msSubmissionsByPlayer ? Object.keys(incoming.msSubmissionsByPlayer).length : 0;
+      const subsReduced = newSubs < oldSubs;
+      if ((allocChanged || subsReduced) && role !== 'admin') {
+        return json({ok:false, error:'admin-required'}, 403);
+      }
+      // Preserve server-only secrets; only an admin may change them explicitly
+      incoming.pw_rallyleader = (role==='admin' && incoming.pw_rallyleader!==undefined) ? incoming.pw_rallyleader : old.pw_rallyleader;
+      incoming.pw_r4r5 = (role==='admin' && incoming.pw_r4r5!==undefined) ? incoming.pw_r4r5 : old.pw_r4r5;
+      incoming.pw_admin = (role==='admin' && incoming.pw_admin!==undefined) ? incoming.pw_admin : old.pw_admin;
+      await env.SVS_KV.put(STATE_KEY, JSON.stringify(incoming));
       return json({ok:true});
     }
 
