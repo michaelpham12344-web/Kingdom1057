@@ -590,7 +590,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .bs-main{flex:1;min-width:0;}
 @media(max-width:900px){.bs-layout{flex-direction:column;}.bs-sidebar{width:100%;position:static;max-height:none;margin-right:0;margin-bottom:16px;}}
 .bs-sidebar .side-sec{padding:14px 16px;border-bottom:1px solid var(--border);}
-.bs-sidebar .side-sec h3{font-family:var(--head);font-weight:600;letter-spacing:.05em;text-transform:uppercase;font-size:12px;color:var(--accent2);margin:0 0 10px;display:flex;align-items:center;gap:7px;}
+.bs-sidebar .side-sec h3{font-family:var(--head);font-weight:700;letter-spacing:.05em;text-transform:uppercase;font-size:15px;color:var(--accent2);margin:0 0 10px;display:flex;align-items:center;gap:7px;}
 
 /* MINISTER SPOTS */
 .ms-slot-btn{font-family:var(--mono);font-size:11px;padding:8px 4px;border-radius:5px;border:1px solid var(--border2);background:var(--bg4);color:var(--text2);cursor:pointer;transition:all .15s;text-align:center;}
@@ -847,16 +847,18 @@ document.addEventListener('touchend',function(e){
           <div id="bsClockSS" class="mono" style="font-size:20px;color:var(--text);background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:6px 12px;min-width:46px;text-align:center">00</div>
           <span style="font-size:11px;color:var(--text3);margin-left:6px">UTC now</span>
         </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn btn-gold btn-sm" onclick="bsSetOffset(15)">+15s</button>
-          <button class="btn btn-gold btn-sm" onclick="bsSetOffset(30)">+30s</button>
-          <button class="btn btn-gold btn-sm" onclick="bsSetOffset(45)">+45s</button>
-          <button class="btn btn-gold btn-sm" onclick="bsSetOffset(60)">+1m</button>
-          <button class="btn btn-gold btn-sm" onclick="bsSetOffset(120)">+2m</button>
-          <button class="btn btn-gold btn-sm" onclick="bsSetOffset(180)">+3m</button>
-          <button class="btn btn-gold btn-sm" onclick="bsSetOffset(240)">+4m</button>
-          <input type="number" id="bsOffsetManual" min="0" placeholder="custom s" style="width:90px" onkeydown="if(event.key==='Enter')bsSetOffsetManual()">
-          <button class="btn btn-primary btn-sm" onclick="bsSetOffsetManual()">Set</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-gold btn-sm" id="bsOffsetBtn-15" onclick="bsSetOffset(15)">+15s</button>
+          <button class="btn btn-gold btn-sm" id="bsOffsetBtn-30" onclick="bsSetOffset(30)">+30s</button>
+          <button class="btn btn-gold btn-sm" id="bsOffsetBtn-45" onclick="bsSetOffset(45)">+45s</button>
+          <button class="btn btn-gold btn-sm" id="bsOffsetBtn-60" onclick="bsSetOffset(60)">+1m</button>
+          <button class="btn btn-gold btn-sm" id="bsOffsetBtn-120" onclick="bsSetOffset(120)">+2m</button>
+          <button class="btn btn-gold btn-sm" id="bsOffsetBtn-180" onclick="bsSetOffset(180)">+3m</button>
+          <button class="btn btn-gold btn-sm" id="bsOffsetBtn-240" onclick="bsSetOffset(240)">+4m</button>
+          <div id="bsCustomOffsetWrap" style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:8px;border:2px solid var(--border2);background:var(--bg3)">
+            <input type="number" id="bsOffsetManual" min="0" placeholder="Custom seconds" style="width:140px;font-size:14px;font-weight:600" onkeydown="if(event.key==='Enter')bsSetOffsetManual()">
+            <button class="btn btn-primary btn-sm" onclick="bsSetOffsetManual()">Set</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1196,6 +1198,10 @@ const S = {
   alliances: []  // {id, name, color}
 };
 const BS_ALLIANCE_PALETTE = ['#c084fc','#f5b833','#ff8fa3','#4dd0e1','#ffb74d','#a5d6a7','#9575cd','#4db6ac'];
+const BS_TEAM_PALETTE = ['#6ab0ff','#5ddb8a','#ff8fa3','#f5b833','#c084fc','#4dd0e1','#ffb74d','#9575cd'];
+function bsEnsureTeamColors(){
+  (S.teams||[]).forEach(function(t,i){ if(!t.color) t.color=BS_TEAM_PALETTE[i % BS_TEAM_PALETTE.length]; });
+}
 function bsEnsureAlliances(){
   if(!S.alliances) S.alliances=[];
   if(S.alliances.length===0){
@@ -1251,7 +1257,7 @@ let syncSerialize = function() {
       teamId: l.teamId, pet: l.pet ? { active: !!l.pet.active, startMs: l.pet.startMs || null } : { active: false, startMs: null },
       bsSlot: l.bsSlot || { slotType: 'pool', slotId: null }
     })),
-    teams: S.teams.map(t => ({ id: t.id, name: t.name, alliance: t.alliance })),
+    teams: S.teams.map(t => ({ id: t.id, name: t.name, alliance: t.alliance, color: t.color })),
     alliances: S.alliances || [],
     garrisonAllianceName: document.getElementById('garrisonAllianceName') ? document.getElementById('garrisonAllianceName').value : '',
     attackAllianceName: document.getElementById('attackAllianceName') ? document.getElementById('attackAllianceName').value : '',
@@ -1879,7 +1885,7 @@ function bsFirePetPlans(){
   const now=Date.now(); let changed=false;
   bsPetPlans.forEach(function(p){
     if(p.fired||now<p.targetMs) return;
-    p.leaderIds.forEach(function(id){ const l=S.leaders.find(function(x){return x.id===id;}); if(l){ if(!l.pet)l.pet={active:false,startMs:null}; if(!l.pet.active){ l.pet.active=true; l.pet.startMs=now; } } });
+    p.leaderIds.forEach(function(id){ const l=S.leaders.find(function(x){return x.id===id;}); if(l){ if(!l.pet)l.pet={active:false,startMs:null}; l.pet.active=true; l.pet.startMs=now; } });
     p.fired=true; changed=true;
   });
   if(changed){ if(typeof renderBattleStrategy==='function') renderBattleStrategy(); if(typeof syncQueuePush==='function') syncQueuePush(); toast('Pets activated by plan'); }
@@ -1926,6 +1932,11 @@ function bsGetAssignment(leaderId){
   if(!l.bsSlot) l.bsSlot={slotType:'pool',slotId:null};
   return l.bsSlot;
 }
+function bsRemoveFromSlot(leaderId){
+  const l=S.leaders.find(x=>x.id===leaderId); if(!l) return;
+  l.bsSlot={slotType:'pool',slotId:null};
+  renderBattleStrategy(); syncQueuePush();
+}
 
 function bsLeaderCardHTML(l){
   const p=l.pet||{active:false,startMs:null};
@@ -1934,13 +1945,19 @@ function bsLeaderCardHTML(l){
     const rem=PET_DUR-(Date.now()-p.startMs);
     if(rem>0){ petCls=(rem<=WARN_MS)?'warn':'on'; petTxt=fmtSec(Math.ceil(rem/1000)); petPct=Math.max(0,Math.min(100,rem/PET_DUR*100)); }
   }
-  const team=S.teams.find(t=>t.id===l.teamId);
-  return \`<div class="bs-leader-card" id="bsleader-\${l.id}">
-    <div class="bs-leader-name" style="display:flex;align-items:center;gap:4px"><span style="flex:1">\${l.name} <span class="badge badge-\${l.tier.toLowerCase()}" style="margin-left:3px">\${l.tier}</span></span><span onclick="event.stopPropagation();bsOpenMoveModal('\${l.id}')" title="Move" style="cursor:pointer;color:var(--text3);font-size:13px;padding:0 2px">⇄</span></div>
-    <div class="bs-leader-meta">\${team?team.name:'No team'} · \${l.march}s march</div>
-    <div class="bs-pet-bar" style="cursor:pointer" onclick="bsTogglePet(event,'\${l.id}')" title="Click to toggle 2.5h pet buff"><div class="bs-pet-bar-fill \${petCls}" id="bspetfill-\${l.id}" style="width:\${petPct}%"></div></div>
-    <div class="bs-pet-label \${petCls}" id="bspetlabel-\${l.id}" style="cursor:pointer" onclick="bsTogglePet(event,'\${l.id}')">\${petTxt}</div>
-  </div>\`;
+  // Team color accent reflects the leader's ACTUAL current placement (bsSlot), not the
+  // unused legacy l.teamId field — that's what was producing the always-wrong "No team" label.
+  const inPool = !l.bsSlot || l.bsSlot.slotType==='pool';
+  let placedTeam=null;
+  if(l.bsSlot && l.bsSlot.slotType==='team'){ bsEnsureTeamColors(); placedTeam=S.teams.find(t=>t.id===l.bsSlot.slotId); }
+  const accent = placedTeam ? ('border-left:4px solid '+placedTeam.color+';') : '';
+  const removeBtn = inPool ? '' : '<span onclick="event.stopPropagation();bsRemoveFromSlot(\''+l.id+'\')" title="Remove — back to pool" style="cursor:pointer;color:#ff8080;font-size:13px;padding:0 2px">✕</span>';
+  return `<div class="bs-leader-card" id="bsleader-${l.id}" style="${accent}">
+    <div class="bs-leader-name" style="display:flex;align-items:center;gap:4px"><span style="flex:1">${l.name} <span class="badge badge-${l.tier.toLowerCase()}" style="margin-left:3px">${l.tier}</span></span>${removeBtn}<span onclick="event.stopPropagation();bsOpenMoveModal('${l.id}')" title="Move" style="cursor:pointer;color:var(--text3);font-size:13px;padding:0 2px">⇄</span></div>
+    <div class="bs-leader-meta">${placedTeam?placedTeam.name+' · ':''}${l.march}s march</div>
+    <div class="bs-pet-bar" style="cursor:pointer" onclick="bsTogglePet(event,'${l.id}')" title="Click to toggle 2.5h pet buff"><div class="bs-pet-bar-fill ${petCls}" id="bspetfill-${l.id}" style="width:${petPct}%"></div></div>
+    <div class="bs-pet-label ${petCls}" id="bspetlabel-${l.id}" style="cursor:pointer" onclick="bsTogglePet(event,'${l.id}')">${petTxt}</div>
+  </div>`;
 }
 
 function bsTogglePet(e,leaderId){
@@ -2000,7 +2017,6 @@ function bsRenderAddModal(){
 function bsAddToSlot(leaderId){
   const l=S.leaders.find(function(x){return x.id===leaderId;}); if(!l||!bsAddModalTarget) return;
   const tgt=bsAddModalTarget;
-  if(tgt.slotType==='turret'){ const occ=S.leaders.find(function(x){return x.bsSlot&&x.bsSlot.slotType==='turret'&&x.bsSlot.slotId===tgt.slotId&&x.id!==l.id;}); if(occ) occ.bsSlot={slotType:'pool',slotId:null}; }
   l.bsSlot={slotType:tgt.slotType, slotId:tgt.slotId};
   renderBattleStrategy(); syncQueuePush(); bsRenderAddModal();
 }
@@ -2015,34 +2031,36 @@ function teamBoxHTML(t){
   bsEnsureAlliances();
   const pills=S.alliances.map(function(a){
     const active=t.alliance===a.id;
-    const st=active?('background:'+bsHexA(a.color,.2)+';color:'+a.color+';border-color:'+bsHexA(a.color,.5)):'';
+    const st=active
+      ? ('background:'+bsHexA(a.color,.28)+';color:'+a.color+';border-color:'+bsHexA(a.color,.65)+';font-weight:700;')
+      : ('background:var(--bg4);color:var(--text2);border-color:var(--border2);');
     return '<span class="ally-pill" style="'+st+'" onclick="bsSetTeamAlliance('+"'"+t.id+"'"+','+"'"+a.id+"'"+')">'+a.name+'</span>';
   }).join('');
-  return \`<div class="bs-team-box" id="bsteam-\${t.id}" style="background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px">
-      <div class="bs-team-header" style="display:flex;align-items:center;gap:6px"><span style="flex:1;font-weight:600">\${t.name}</span><span onclick="bsRenameTeam('\${t.id}')" title="Rename" style="cursor:pointer;color:var(--text3);font-size:12px">✎</span><span onclick="bsDeleteTeam('\${t.id}')" title="Delete team" style="cursor:pointer;color:#e0685f;font-size:13px">✕</span></div>
-      <div class="bs-alliance-toggle" style="display:flex;gap:5px;flex-wrap:wrap;margin:7px 0 8px">\${pills}</div>
+  return `<div class="bs-team-box" id="bsteam-${t.id}" style="background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px">
+      <div class="bs-team-header" style="display:flex;align-items:center;gap:6px"><span style="flex:1;font-weight:600">${t.name}</span><span onclick="bsRenameTeam('${t.id}')" title="Rename" style="cursor:pointer;color:var(--text3);font-size:12px">✎</span><span onclick="bsDeleteTeam('${t.id}')" title="Delete team" style="cursor:pointer;color:#e0685f;font-size:13px">✕</span></div>
+      <div class="bs-alliance-toggle" style="display:flex;gap:5px;flex-wrap:wrap;margin:7px 0 8px">${pills}</div>
+      <button style="width:100%;margin-bottom:8px;background:rgba(61,142,240,.15);border:1.5px solid var(--accent);color:var(--accent2);font-weight:700;font-size:12px;padding:7px;border-radius:6px;cursor:pointer;font-family:var(--head);letter-spacing:.03em" onclick="bsOpenAddModal('team','${t.id}')">➕ Add Leader</button>
       <div class="bs-team-zone">
-        \${occupants.length?occupants.map(o=>bsLeaderCardHTML(o)).join(''):'<div style="color:var(--text3);font-size:12px;padding:8px">No leaders yet.</div>'}
+        ${occupants.length?occupants.map(o=>bsLeaderCardHTML(o)).join(''):'<div style="color:var(--text3);font-size:12px;padding:8px">No leaders yet.</div>'}
       </div>
-      <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:6px;font-size:11px" onclick="bsOpenAddModal('team','\${t.id}')">+ Add leader</button>
-    </div>\`;
+    </div>`;
 }
 function renderBsAllianceZones(){
   bsEnsureAlliances();
   var el=document.getElementById('bsAllianceZones'); if(!el) return;
   var known={}; S.alliances.forEach(function(a){ known[a.id]=true; });
-  var html='';
+  var cards='';
   S.alliances.forEach(function(a){
     var teams=S.teams.filter(function(t){return t.alliance===a.id;});
-    html+='<div class="card" style="margin-bottom:14px"><div class="card-title" style="color:'+a.color+'">🛡️ '+a.name+'</div>'+
+    cards+='<div class="card" style="width:320px;flex:0 0 320px;margin-bottom:0"><div class="card-title" style="color:'+a.color+'">🛡️ '+a.name+'</div>'+
       (teams.length?teams.map(teamBoxHTML).join(''):'<div style="color:var(--text3);font-size:12px">No teams yet. Add a team, then use its alliance buttons to place it here.</div>')+
       '</div>';
   });
   var un=S.teams.filter(function(t){return !t.alliance || !known[t.alliance];});
   if(un.length){
-    html+='<div class="card" style="margin-bottom:14px"><div class="card-title" style="color:var(--text3)">📦 Unassigned</div>'+un.map(teamBoxHTML).join('')+'</div>';
+    cards+='<div class="card" style="width:320px;flex:0 0 320px;margin-bottom:0"><div class="card-title" style="color:var(--text3)">📦 Unassigned</div>'+un.map(teamBoxHTML).join('')+'</div>';
   }
-  el.innerHTML=html;
+  el.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:14px">'+cards+'</div>';
 }
 function bsRenameTeam(teamId){
   var t=S.teams.find(function(x){return x.id===teamId;}); if(!t) return;
@@ -2102,7 +2120,6 @@ function bsOpenMoveModal(leaderId){
 function bsCloseMoveModal(){ const ov=document.getElementById('bsMoveOverlay'); if(ov) ov.style.display='none'; bsMoveLeaderId=null; }
 function bsMoveTo(slotType,slotId){
   const l=S.leaders.find(function(x){return x.id===bsMoveLeaderId;}); if(!l) return;
-  if(slotType==='turret'){ const occ=S.leaders.find(function(x){return x.bsSlot&&x.bsSlot.slotType==='turret'&&x.bsSlot.slotId===slotId&&x.id!==l.id;}); if(occ) occ.bsSlot={slotType:'pool',slotId:null}; }
   l.bsSlot={slotType:slotType,slotId:slotId};
   renderBattleStrategy(); syncQueuePush(); bsCloseMoveModal();
 }
@@ -2189,7 +2206,8 @@ function bsAddTeam(){
   const el=document.getElementById('bsNewTeamName'); if(!el) return;
   const name=(el.value||'').trim(); if(!name){ toast('Enter a team name'); return; }
   bsEnsureAlliances();
-  S.teams.push({id:uid(),name:name,alliance:(S.alliances[0]?S.alliances[0].id:null)});
+  bsEnsureTeamColors();
+  S.teams.push({id:uid(),name:name,alliance:(S.alliances[0]?S.alliances[0].id:null),color:BS_TEAM_PALETTE[S.teams.length % BS_TEAM_PALETTE.length]});
   el.value='';
   if(typeof renderSetup==='function') renderSetup();
   renderBattleStrategy();
@@ -2206,14 +2224,38 @@ function renderBsSidebar(){
       '<div id="bsAddPreview" style="margin-bottom:8px"></div>'+
       '<div style="display:flex;gap:6px;align-items:flex-end"><div style="width:80px"><label style="display:block;font-size:10px;color:var(--text2);margin-bottom:3px">March (s)</label><input type="number" id="bsAddMarch" min="0" placeholder="35" style="width:100%"></div><button class="btn btn-primary btn-sm" style="flex:1" onclick="bsAddLeaderById()">+ Add Leader</button></div>'+
     '</div>'+
-    '<div class="side-sec"><h3>🛡️ Add Team</h3>'+
-      '<div style="display:flex;gap:6px;align-items:flex-end"><div style="flex:1"><label style="display:block;font-size:10px;color:var(--text2);margin-bottom:3px">Team name</label><input id="bsNewTeamName" placeholder="e.g. Team 5" style="width:100%"></div><button class="btn btn-primary btn-sm" onclick="bsAddTeam()">+ Add</button></div>'+
-    '</div>'+
-    '<div class="side-sec"><h3>⚔️ Alliances</h3>'+
+    '<div class="side-sec"><h3>⚔️ Alliance</h3>'+
+      '<div style="background:rgba(61,142,240,.1);border:2px solid var(--accent);border-radius:8px;padding:10px;margin-bottom:10px">'+
+        '<label style="display:block;font-size:11px;font-weight:700;color:var(--accent2);margin-bottom:5px">＋ Add New Alliance</label>'+
+        '<div style="display:flex;gap:6px"><input id="bsNewAllianceName" placeholder="e.g. Attack 2" style="flex:1"><button class="btn btn-primary" onclick="bsAddAlliance()">+ Add</button></div>'+
+      '</div>'+
       '<div id="bsAllianceList"></div>'+
-      '<div style="display:flex;gap:6px;align-items:flex-end;margin-top:6px"><div style="flex:1"><label style="display:block;font-size:10px;color:var(--text2);margin-bottom:3px">New alliance name</label><input id="bsNewAllianceName" placeholder="e.g. Attack 2" style="width:100%"></div><button class="btn btn-primary btn-sm" onclick="bsAddAlliance()">+ Add</button></div>'+
+    '</div>'+
+    '<div class="side-sec"><h3>🛡️ Team</h3>'+
+      '<div style="background:rgba(61,142,240,.06);border:2px solid var(--border2);border-radius:8px;padding:10px;margin-bottom:10px">'+
+        '<label style="display:block;font-size:11px;font-weight:700;color:var(--text);margin-bottom:5px">＋ Add New Team</label>'+
+        '<div style="display:flex;gap:6px"><input id="bsNewTeamName" placeholder="e.g. Team 5" style="flex:1"><button class="btn btn-primary" onclick="bsAddTeam()">+ Add</button></div>'+
+      '</div>'+
+      '<div id="bsTeamList"></div>'+
     '</div>'+
     '<div class="side-sec"><h3>👥 Rally Leaders</h3><div id="bsLeaderOverview"></div></div>';
+}
+function renderBsTeamList(){
+  var el=document.getElementById('bsTeamList'); if(!el) return;
+  bsEnsureTeamColors();
+  if(!S.teams.length){ el.innerHTML='<div style="color:var(--text3);font-size:12px">No teams yet.</div>'; return; }
+  el.innerHTML=S.teams.map(function(t){
+    return '<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">'+
+      '<span style="width:10px;height:10px;border-radius:50%;background:'+t.color+';flex-shrink:0"></span>'+
+      '<input value="'+(t.name||'').replace(/"/g,'&quot;')+'" onchange="bsRenameTeamInput(\''+t.id+'\',this.value)" style="flex:1;font-size:12px;padding:4px 7px">'+
+      '<span onclick="bsDeleteTeam(\''+t.id+'\')" style="cursor:pointer;color:var(--text3);font-size:13px" title="Remove team">✕</span>'+
+    '</div>';
+  }).join('');
+}
+function bsRenameTeamInput(teamId, val){
+  var t=S.teams.find(function(x){return x.id===teamId;}); if(!t) return;
+  var name=(val||'').trim(); if(!name) return;
+  t.name=name; renderBattleStrategy(); if(typeof renderSetup==='function') renderSetup(); syncQueuePush();
 }
 function bsOnDrop(e,slotType,slotId){
   e.preventDefault();
@@ -2221,13 +2263,7 @@ function bsOnDrop(e,slotType,slotId){
   if(!bsDragLeaderId) return;
   const l=S.leaders.find(x=>x.id===bsDragLeaderId); if(!l) return;
 
-  // if dropping onto a turret slot that's already occupied by someone else, swap them to pool
-  if(slotType==='turret'){
-    const occupant=S.leaders.find(x=>x.bsSlot&&x.bsSlot.slotType==='turret'&&x.bsSlot.slotId===slotId&&x.id!==l.id);
-    if(occupant) occupant.bsSlot={slotType:'pool',slotId:null};
-  }
-
-  l.bsSlot={slotType,slotId};
+l.bsSlot={slotType,slotId};
   renderBattleStrategy();
   syncQueuePush();
 }
@@ -2287,16 +2323,17 @@ function renderBattleStrategy(){
   if(aTitle) aTitle.textContent=(aNameInput&&aNameInput.value)?aNameInput.value:'Attacking Alliance';
 
   // ── TURRETS ──
-  const turretGrid=document.getElementById('bsTurretGrid');
+const turretGrid=document.getElementById('bsTurretGrid');
   if(turretGrid){
     turretGrid.innerHTML=BS_TURRETS.map((t,i)=>{
-      const occupant=S.leaders.find(l=>l.bsSlot&&l.bsSlot.slotType==='turret'&&l.bsSlot.slotId===i);
-      return \`<div>
-        <div class="bs-slot-label">🗼 \${t.name}</div>
-        <div class="bs-slot">
-          \${occupant?bsLeaderCardHTML(occupant):'<button class="btn btn-ghost btn-sm" style="width:100%;font-size:11px" onclick="bsOpenAddModal('+"'"+'turret'+"'"+','+i+')">+ Add leader</button>'}
+      const occupants=S.leaders.filter(l=>l.bsSlot&&l.bsSlot.slotType==='turret'&&l.bsSlot.slotId===i);
+      return `<div>
+        <div class="bs-slot-label">🗼 ${t.name}</div>
+        <div class="bs-slot" style="display:flex;flex-direction:column;gap:8px">
+          ${occupants.length?occupants.map(o=>bsLeaderCardHTML(o)).join(''):'<div style="color:var(--text3);font-size:11px;text-align:center;padding:6px 0">No leaders yet.</div>'}
+          <button class="btn btn-ghost btn-sm" style="width:100%;font-size:11px" onclick="bsOpenAddModal('+"'"+'turret'+"'"+','+i+')">+ Add leader</button>
         </div>
-      </div>\`;
+      </div>`;
     }).join('');
   }
 
@@ -2313,6 +2350,7 @@ bsRenderTeamButtons();
 if(typeof renderPetPlans==='function') renderPetPlans();
   if(typeof renderBsSidebar==='function') renderBsSidebar();
   if(typeof renderBsAllianceList==='function') renderBsAllianceList();
+  if(typeof renderBsTeamList==='function') renderBsTeamList();
   if(typeof renderBsLeaderOverview==='function') renderBsLeaderOverview();
 }
 renderBattleStrategy();
@@ -2344,22 +2382,31 @@ function s2hms(totalSec){
   return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(ss).padStart(2,'0');
 }
 
+function bsClearOffsetHighlight(){
+  document.querySelectorAll('#page-strategy [id^="bsOffsetBtn-"]').forEach(function(b){
+    b.style.background=''; b.style.color=''; b.style.boxShadow=''; b.style.transform='';
+  });
+  var wrap=document.getElementById('bsCustomOffsetWrap');
+  if(wrap){ wrap.style.borderColor='var(--border2)'; wrap.style.background='var(--bg3)'; }
+}
 function bsSetOffsetManual(){
   const el=document.getElementById('bsOffsetManual'); if(!el) return;
   const v=parseInt(el.value,10);
   if(isNaN(v)||v<0){ toast('Enter seconds (0 or more)'); return; }
   BS_CALC.offsetSec=v;
-  document.querySelectorAll('#page-strategy .btn-gold').forEach(b=>b.style.outline='');
+  bsClearOffsetHighlight();
+  var wrap=document.getElementById('bsCustomOffsetWrap');
+  if(wrap){ wrap.style.borderColor='var(--gold)'; wrap.style.background='rgba(240,165,0,.15)'; }
   if(BS_CALC.selectedTeamId!==null) bsCalcTeam(BS_CALC.selectedTeamId, v, true);
   else toast('Offset set to '+(v<60?v+'s':Math.floor(v/60)+'m'+(v%60?' '+(v%60)+'s':''))+' — now click a team');
 }
 function bsSetOffset(sec){
   BS_CALC.offsetSec=sec;
-  // highlight selected offset button
-  document.querySelectorAll('#page-strategy .btn-gold').forEach(b=>b.style.outline='');
-  if(event&&event.currentTarget) event.currentTarget.style.outline='2px solid var(--gold)';
+  bsClearOffsetHighlight();
+  var btn=document.getElementById('bsOffsetBtn-'+sec);
+  if(btn){ btn.style.background='var(--gold)'; btn.style.color='#1a1206'; btn.style.boxShadow='0 0 0 3px rgba(240,165,0,.35)'; }
   if(BS_CALC.selectedTeamId!==null) bsCalcTeam(BS_CALC.selectedTeamId, sec, true);
-  else toast(\`Offset set to +\${sec<60?sec+'s':Math.floor(sec/60)+'m'} — now click a team\`);
+  else toast(`Offset set to +${sec<60?sec+'s':Math.floor(sec/60)+'m'} — now click a team`);
 }
 
 // Per-team rally state (transient, not synced — driven by the land timer in the rally flow)
@@ -4616,9 +4663,9 @@ function enterApp(role) {
     if(tab) tab.style.display = (isRally || isR4 || isAdm) ? '' : 'none';
   });
 
-  // Minister Spots — members and R4/R5/Admin only, NOT rally leaders
+// Minister Spots — Members, Rally Leaders, R4/R5, and Admin (same experience as Members)
   const msTab = document.querySelector('.nav > .tab[onclick*="minister"]');
-  if(msTab) msTab.style.display = (isMemberOnly || isR4 || isAdm) ? '' : 'none';
+  if(msTab) msTab.style.display = (isMemberOnly || isRally || isR4 || isAdm) ? '' : 'none';
 
   // Swordland / Tri Alliance — R4/R5, Admin, Rally Leaders (view only)
   ['tabSwordland','tabTrialliance'].forEach(id => {
