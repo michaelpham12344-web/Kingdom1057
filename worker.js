@@ -213,6 +213,174 @@ function json(data, status=200) {
   return new Response(JSON.stringify(data), { status, headers:{'Content-Type':'application/json',...cors()} });
 }
 
+// ════════════ MINISTER SPOTS SERVER-SIDE AUTOMATION (Phase 3) ════════════
+// Self-contained port of the client's schedule + allocation logic, with no DOM
+// dependency, so the cron can clear/allocate without a browser open. Suffixed
+// "Srv" throughout to keep this fully independent of the identically-named
+// client functions living inside the SITE_HTML string.
+const KVK_ANCHOR_UTC_SRV = Date.UTC(2026,6,13,0,0,0);
+const KVK_CYCLE_MS_SRV   = 28*24*60*60*1000;
+const MS_BOARD_DAY_OFFSET_SRV = { buildings:0, research:1, troops:3 };
+const MS_BOARDS_SRV = ['buildings','research','troops'];
+const MS_PTS_SRV = { perMin: 30, truegold: 2000, dust: 1000 };
+const MS_TOTAL_SLOTS_SRV = 48;
+const MS_MIN_SLOTS_PICKED_SRV = 4;
+const _DAY_SRV = 86400000, _H_SRV = 3600000;
+
+function nextKvKStartSrv(now){ let t=KVK_ANCHOR_UTC_SRV; if(now>=t){ t += Math.ceil((now-t+1)/KVK_CYCLE_MS_SRV)*KVK_CYCLE_MS_SRV; } return t; }
+function currentKvKDay1Srv(now, override){
+  if(override) return override;
+  var k = Math.floor((now - KVK_ANCHOR_UTC_SRV) / KVK_CYCLE_MS_SRV);
+  for(var i=k; i<=k+1; i++){
+    var day1 = KVK_ANCHOR_UTC_SRV + i*KVK_CYCLE_MS_SRV;
+    if(now >= day1 - 8*_DAY_SRV && now < day1 + 6*_DAY_SRV) return day1;
+  }
+  return nextKvKStartSrv(now);
+}
+function msScheduleSrv(now, override){
+  var day1 = currentKvKDay1Srv(now, override);
+  var sched = { day1:day1, openAt: day1 - 7*_DAY_SRV, boards:{} };
+  Object.keys(MS_BOARD_DAY_OFFSET_SRV).forEach(function(b){
+    var dStart = day1 + MS_BOARD_DAY_OFFSET_SRV[b]*_DAY_SRV;
+    sched.boards[b] = { dayStart: dStart, deadline: dStart - (36*_H_SRV + 60000), allocAt: dStart - 36*_H_SRV };
+  });
+  return sched;
+}
+function msBoardScoreSrv(board, c){
+  c = c || {};
+  if(board==='buildings') return (c.construction||0)*MS_PTS_SRV.perMin + (c.general||0)*MS_PTS_SRV.perMin + (c.truegold||0)*MS_PTS_SRV.truegold;
+  if(board==='research')  return (c.research||0)*MS_PTS_SRV.perMin + (c.general||0)*MS_PTS_SRV.perMin + (c.dust||0)*MS_PTS_SRV.dust;
+  if(board==='troops')    return (c.training||0) + (c.general||0);
+  return 0;
+}
+// Faithful port of the client's msRunAllocationForBoard — same two-pass logic,
+// operating on a plain submissions array instead of the global MS object.
+function msRunAllocationForBoardSrv(board, submissions, prev){
+  const pinned = new Map();
+  if(prev){ (prev.assignments||[]).forEach(a => { if(a.pinned) pinned.set(a.slot, a.entry); }); }
+  const pinnedIGNs = new Set([...pinned.values()].map(e => e.ign));
+  const takenSlots = new Set(pinned.keys());
+  const assignments = [];
+  pinned.forEach((entry, slot) => { assignments.push({entry, slot, pinned:true}); });
+
+  const applied = submissions.filter(e => !e.boards || !e.boards.length || e.boards.indexOf(board)>=0);
+  const candidates = applied.filter(e => !pinnedIGNs.has(e.ign));
+
+  const scoreOf = (board==='troops')
+    ? (e => (e.committedHours && e.committedHours.training) || 0)
+    : (e => (e.scores && e.scores[board]) || 0);
+  const timeOf  = e => e.submittedAt ? new Date(e.submittedAt).getTime() : 0;
+  const picksOf = e => (e.picksByBoard && e.picksByBoard[board]) || e.picks || [];
+  const favsOf  = e => (e.favByBoard && e.favByBoard[board]) || e.favourites || [];
+
+  const byConstraint = [...candidates].sort((a,b) => {
+    const pa=picksOf(a).length, pb=picksOf(b).length;
+    if(pa!==pb) return pa-pb;
+    if(scoreOf(a)!==scoreOf(b)) return scoreOf(b)-scoreOf(a);
+    return timeOf(a)-timeOf(b);
+  });
+  const placed = new Set();
+  const CONSTRAINED_MAX_PICKS = MS_MIN_SLOTS_PICKED_SRV;
+  byConstraint.forEach(entry => {
+    if(picksOf(entry).length > CONSTRAINED_MAX_PICKS) return;
+    if(takenSlots.size >= MS_TOTAL_SLOTS_SRV) return;
+    const favs = favsOf(entry).filter(s => !takenSlots.has(s));
+    const pick = favs.length ? favs[0] : picksOf(entry).find(s => !takenSlots.has(s));
+    if(pick !== undefined){ takenSlots.add(pick); assignments.push({entry, slot:pick}); placed.add(entry.ign); }
+  });
+
+  const remaining = candidates.filter(e => !placed.has(e.ign)).sort((a,b) => {
+    if(scoreOf(a)!==scoreOf(b)) return scoreOf(b)-scoreOf(a);
+    return timeOf(a)-timeOf(b);
+  });
+  const rejected = [], unassigned = [], rejectReasons = {};
+  remaining.forEach(entry => {
+    if(takenSlots.size >= MS_TOTAL_SLOTS_SRV){ rejectReasons[entry.ign]='all-full'; rejected.push(entry); return; }
+    const favs = favsOf(entry).filter(s => !takenSlots.has(s));
+    const pick = favs.length ? favs[0] : picksOf(entry).find(s => !takenSlots.has(s));
+    if(pick !== undefined){ takenSlots.add(pick); assignments.push({entry, slot:pick}); placed.add(entry.ign); }
+    else unassigned.push(entry);
+  });
+  unassigned.forEach(entry => { rejectReasons[entry.ign]='picks-taken'; rejected.push(entry); });
+
+  assignments.sort((a,b) => a.slot - b.slot);
+  const winners = assignments.map(a => a.entry);
+  return {winners, rejected, assignments, rejectReasons, board};
+}
+
+function msAuditPushSrv(state, who, action){
+  state.msAuditLog = state.msAuditLog || [];
+  state.msAuditLog.unshift({ who: who, action: action, when: Date.now() });
+  if(state.msAuditLog.length > 30) state.msAuditLog = state.msAuditLog.slice(0, 30);
+}
+
+// Runs on every cron tick. Clears old submissions once per KvK cycle at Day1-7d,
+// and runs each board's allocation once at its own Day1-36h mark. Idempotent via
+// state.msAuto, keyed to the cycle's Day-1 timestamp so a 30-min tick cadence
+// can never double-fire either action.
+async function runMsAutomation(env){
+  const raw = await env.SVS_KV.get(STATE_KEY);
+  let state = {}; try { state = JSON.parse(raw||'{}'); } catch(e){ state = {}; }
+
+  const now = Date.now();
+  const override = state.kvkDay1Override ? new Date(state.kvkDay1Override).getTime() : null;
+  const sched = msScheduleSrv(now, (override && !isNaN(override)) ? override : null);
+  const cycleId = sched.day1;
+
+  let auto = state.msAuto;
+  let changed = false;
+
+  // Bootstrap: first time this code has ever run, adopt the current cycle WITHOUT
+  // retroactively clearing or allocating anything that's already in the past for it
+  // (e.g. deploying mid-cycle shouldn't wipe a KvK that's already underway).
+  // Automation takes full effect starting with the next detected cycle.
+  if(!auto){
+    auto = { cycleId: cycleId, clearedAt: (now >= sched.openAt) ? now : null, allocDone: {} };
+    MS_BOARDS_SRV.forEach(function(b){ if(now >= sched.boards[b].allocAt) auto.allocDone[b] = true; });
+    state.msAuto = auto;
+    msAuditPushSrv(state, 'system(cron)', 'Automation initialised for current cycle (no retroactive clear/allocate).');
+    changed = true;
+  }
+  // New cycle detected — reset the per-cycle markers.
+  if(auto.cycleId !== cycleId){
+    auto = { cycleId: cycleId, clearedAt: null, allocDone: {} };
+    state.msAuto = auto;
+    changed = true;
+  }
+
+  // Auto-clear old submissions once, at Day1-7d.
+  if(now >= sched.openAt && !auto.clearedAt){
+    state.msSubmissionsByPlayer = {};
+    state.msSubmissions = [];
+    state.msLastAllocation = null;
+    state.msAllocByBoard = {};
+    auto.clearedAt = now;
+    msAuditPushSrv(state, 'system(cron)', 'Auto-cleared old Minister Spots submissions for new KvK cycle.');
+    changed = true;
+  }
+
+  // Auto-run allocation per board, once each, at that board's own Day1-36h mark.
+  const submissions = state.msSubmissionsByPlayer ? Object.values(state.msSubmissionsByPlayer) : (state.msSubmissions||[]);
+  state.msAllocByBoard = state.msAllocByBoard || {};
+  let lastRunBoard = null;
+  MS_BOARDS_SRV.forEach(function(b){
+    if(now >= sched.boards[b].allocAt && !auto.allocDone[b]){
+      const prev = state.msAllocByBoard[b] || null;
+      state.msAllocByBoard[b] = msRunAllocationForBoardSrv(b, submissions, prev);
+      auto.allocDone[b] = true;
+      lastRunBoard = b;
+      msAuditPushSrv(state, 'system(cron)', 'Auto-ran allocation: '+b+' ('+state.msAllocByBoard[b].winners.length+'/'+MS_TOTAL_SLOTS_SRV+' placed).');
+      changed = true;
+    }
+  });
+  if(lastRunBoard) state.msLastAllocation = state.msAllocByBoard[lastRunBoard];
+
+  if(changed){
+    state.msAuto = auto;
+    await env.SVS_KV.put(STATE_KEY, JSON.stringify(state));
+  }
+}
+
 const SITE_HTML=`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5590,8 +5758,9 @@ Reply with ONLY one line of raw JSON, no explanation, no markdown. Use 0 for any
     return new Response('Not found',{status:404,headers:cors()});
   },
 
-  // Cron: every 30 min — process next batch of 5 players
+// Cron: every 30 min — process next batch of 5 players, and check Minister Spots automation
   async scheduled(event, env, ctx) {
     ctx.waitUntil(runBatch(env));
+    ctx.waitUntil(runMsAutomation(env).catch(function(e){ console.error('runMsAutomation failed:', e && e.message); }));
   }
 };
