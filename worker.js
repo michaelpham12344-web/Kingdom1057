@@ -222,6 +222,7 @@ const KVK_ANCHOR_UTC_SRV = Date.UTC(2026,6,13,0,0,0);
 const KVK_CYCLE_MS_SRV   = 28*24*60*60*1000;
 const MS_BOARD_DAY_OFFSET_SRV = { buildings:0, research:1, troops:3 };
 const MS_BOARDS_SRV = ['buildings','research','troops'];
+const MS_BOARD_LABEL_SRV = { buildings:'Construction', research:'Research', troops:'Troops' };
 const MS_PTS_SRV = { perMin: 30, truegold: 2000, dust: 1000 };
 const MS_TOTAL_SLOTS_SRV = 48;
 const MS_MIN_SLOTS_PICKED_SRV = 4;
@@ -369,7 +370,7 @@ async function runMsAutomation(env){
       state.msAllocByBoard[b] = msRunAllocationForBoardSrv(b, submissions, prev);
       auto.allocDone[b] = true;
       lastRunBoard = b;
-      msAuditPushSrv(state, 'system(cron)', 'Auto-ran allocation: '+b+' ('+state.msAllocByBoard[b].winners.length+'/'+MS_TOTAL_SLOTS_SRV+' placed).');
+      msAuditPushSrv(state, 'system(cron)', 'Auto-ran allocation: '+(MS_BOARD_LABEL_SRV[b]||b)+' ('+state.msAllocByBoard[b].winners.length+'/'+MS_TOTAL_SLOTS_SRV+' placed).');
       changed = true;
     }
   });
@@ -597,7 +598,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .ms-slot-btn.selected{background:rgba(61,142,240,.25);color:var(--accent2);border-color:var(--accent);font-weight:600;}
 .ms-slot-btn.taken{background:rgba(224,58,58,.12);color:#ff8080;border-color:rgba(224,58,58,.3);cursor:not-allowed;opacity:.6;}
 .ms-verify-field{background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:12px 14px;}
-.ms-verify-field label{margin-bottom:6px;}
+.ms-verify-field label{margin-bottom:6px;font-size:15px;font-weight:700;color:var(--gold);letter-spacing:.01em;}
 .ms-slider-row{margin-bottom:18px;}
 .ms-slider-row input[type=range]{width:100%;margin:8px 0;accent-color:var(--accent);}
 .ms-rank-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--border);font-size:13px;}
@@ -955,13 +956,14 @@ document.addEventListener('touchend',function(e){
   </div>
 
   <!-- STEP TABS -->
-  <div class="phase-tabs" style="margin-bottom:18px">
+  <div class="phase-tabs" style="margin-bottom:18px;align-items:center">
     <button class="tab ms-step-tab" id="msStepTab0" onclick="msGoStep(0)" style="display:none">📋 My Submission</button>
     <button class="tab ms-step-tab active" id="msStepTab1" onclick="msGoStep(1)">1. Upload</button>
     <button class="tab ms-step-tab" id="msStepTab2" onclick="msGoStep(2)">2. Verify</button>
     <button class="tab ms-step-tab" id="msStepTab3" onclick="msGoStep(3)">3. Commitment</button>
     <button class="tab ms-step-tab" id="msStepTab4" onclick="msGoStep(4)">4. Timeslots &amp; Submit</button>
-    <button class="tab ms-step-tab" id="msStepTab5" onclick="msGoStep(5)" style="margin-left:auto;display:none;color:var(--gold);border-color:var(--gold)">👑 Manage Spots <span title="Leader controls for Minister Spots. Lock players into specific slots, manually assign or move anyone (even non-submitters), and review who wasn't selected and why." style="cursor:help;opacity:.7;font-size:11px">ⓘ</span></button>
+    <button id="msChangeSpotsHeaderBtn" onclick="msChangeBoards()" style="margin-left:auto;background:rgba(197,92,255,.12);border:1.5px solid #c55cff;color:#c55cff;font-weight:700;font-size:13px;padding:8px 16px;border-radius:8px;cursor:pointer">👑 Change Minister Spots</button>
+    <button class="tab ms-step-tab" id="msStepTab5" onclick="msGoStep(5)" style="display:none;color:var(--gold);border-color:var(--gold)">👑 Manage Spots <span title="Leader controls for Minister Spots. Lock players into specific slots, manually assign or move anyone (even non-submitters), and review who wasn't selected and why." style="cursor:help;opacity:.7;font-size:11px">ⓘ</span></button>
   </div>
 
   <!-- STEP 0: MY SUBMISSION OVERVIEW -->
@@ -977,14 +979,14 @@ document.addEventListener('touchend',function(e){
       <div id="msOverviewContent"></div>
     </div>
     <div style="background:rgba(61,142,240,.06);border:1px solid rgba(61,142,240,.2);border-radius:7px;padding:12px 14px;font-size:12px;color:var(--text2)">
-      💡 <strong>Want to change your entry?</strong> Click "Edit my submission" above. You'll go back to Step 1 and need to complete all steps again. Your current submission will be kept until you submit a new one.
+    💡 <strong>Want to change your entry?</strong> Click "Edit my submission" above. You'll start from "Which minister spots are you applying for?" and need to complete all steps again. Your current submission will be kept until you submit a new one.
     </div>
   </div>
 
   <!-- STEP 1: UPLOAD -->
   <div id="msStep1" class="ms-step">
     <div class="card">
-      <div class="card-title" style="display:flex;align-items:center;gap:10px">📸 Step 1 — Identify &amp; Upload <span onclick="msChangeBoards()" style="margin-left:auto;font-size:11px;font-weight:400;color:var(--accent2);cursor:pointer;letter-spacing:0;text-transform:none">← Change minister spots</span></div>
+    <div class="card-title" style="display:flex;align-items:center;gap:10px">📸 Step 1 — Identify &amp; Upload <button onclick="msChangeBoards()" style="margin-left:auto;background:rgba(197,92,255,.12);border:1.5px solid #c55cff;color:#c55cff;font-weight:700;font-size:13px;padding:7px 14px;border-radius:8px;cursor:pointer;letter-spacing:0;text-transform:none">👑 Change Minister Spots</button></div>
       <div class="row">
         <div id="msIdentityDisplay" style="background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:10px 14px;display:flex;align-items:center;gap:12px">
           <img id="msIdentityAvatar" src="" style="width:36px;height:36px;border-radius:50%;border:2px solid var(--border2);display:none">
@@ -1038,7 +1040,7 @@ document.addEventListener('touchend',function(e){
   <!-- STEP 2: VERIFY -->
   <div id="msStep2" class="ms-step" style="display:none">
     <div class="card">
-      <div class="card-title">✅ Step 2 — Verify &amp; Correct</div>
+      <div class="card-title" style="display:flex;align-items:center;gap:10px">✅ Step 2 — Verify &amp; Correct <span onclick="msGoStep(1)" style="margin-left:auto;font-size:11px;font-weight:400;color:var(--accent2);cursor:pointer;letter-spacing:0;text-transform:none">← Back</span></div>
       <p style="color:var(--text2);font-size:12px;margin-bottom:14px">Confirm the detected speedup amounts below. If a number looks wrong, correct it manually — OCR isn't perfect. Enter the raw amount and pick its unit; it converts to hours automatically.</p>
       <div id="msVerifyGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px"></div>
       <button class="btn btn-primary" style="margin-top:16px" onclick="msMarkStepComplete(2);msGoStep(3)">Continue to Commitment →</button>
@@ -1048,7 +1050,7 @@ document.addEventListener('touchend',function(e){
   <!-- STEP 3: COMMITMENT SLIDERS -->
   <div id="msStep3" class="ms-step" style="display:none">
     <div class="card">
-      <div class="card-title">🎯 Step 3 — Expected Usage This KvK</div>
+      <div class="card-title" style="display:flex;align-items:center;gap:10px">🎯 Step 3 — Expected Usage This KvK <span onclick="msGoStep(2)" style="margin-left:auto;font-size:11px;font-weight:400;color:var(--accent2);cursor:pointer;letter-spacing:0;text-transform:none">← Back</span></div>
       <p style="color:var(--text2);font-size:12px;margin-bottom:14px">For each category, set how much of your speedups you plan to commit this KvK. This determines your ranking priority for minister spots.</p>
       <div id="msSliderGrid"></div>
       <button class="btn btn-primary" style="margin-top:10px" onclick="msMarkStepComplete(3);msGoStep(4)">Continue to Timeslots →</button>
@@ -1092,11 +1094,14 @@ document.addEventListener('touchend',function(e){
   <!-- STEP 5: RESULTS / LEADER VIEW -->
   <div id="msStep5" class="ms-step" style="display:none">
     <div class="card" style="margin-bottom:14px">
-      <div class="card-title">📊 All Submissions</div>
-      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px">
-        <div class="stat-box"><div class="stat-val" id="msTotalSubs">0</div><div class="stat-lbl">Total submissions</div></div>
-        <div class="stat-box"><div class="stat-val" style="color:var(--green)" id="msWinnerCount">0</div><div class="stat-lbl">Spots filled (of 48)</div></div>
-        <div class="stat-box"><div class="stat-val" style="color:var(--enemy)" id="msRejectedCount">0</div><div class="stat-lbl">Not selected</div></div>
+<div class="card-title">📊 All Submissions</div>
+      <div style="display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:14px">
+        <div style="display:flex;gap:14px;flex-wrap:wrap">
+          <div class="stat-box"><div class="stat-val" id="msTotalSubs">0</div><div class="stat-lbl">Total submissions</div></div>
+          <div class="stat-box"><div class="stat-val" style="color:var(--green)" id="msWinnerCount">0</div><div class="stat-lbl">Spots filled (of 48)</div></div>
+          <div class="stat-box"><div class="stat-val" style="color:var(--enemy)" id="msRejectedCount">0</div><div class="stat-lbl">Not selected</div></div>
+        </div>
+        <div id="msBoardTimersPanel" style="display:flex;flex-direction:column;gap:8px;min-width:260px"></div>
       </div>
       <div id="msAdminGuard" style="display:none;background:rgba(61,142,240,.08);border:1px solid var(--border);border-radius:7px;padding:14px;margin-bottom:10px">
         <div style="font-size:13px;color:var(--text2);margin-bottom:10px">🔒 Admin password required to manage results.</div>
@@ -2465,6 +2470,7 @@ setInterval(bsTickRally,1000);
 // ════════════ MINISTER SPOTS ════════════
 const MS_CATEGORIES = ['general','training','construction','research'];
 const MS_CATEGORY_LABELS = {general:'General Speedup',training:'Soldier Training Speedup',construction:'Construction Speedup',research:'Research Speedup'};
+const MS_CATEGORY_ICONS = {general:'⏱️',training:'⚔️',construction:'🏗️',research:'🔬'};
 const MS_TOTAL_SLOTS = 48;
 const MS_MIN_SLOTS_PICKED = 4;
 const MS_POSITION_ID = 'noble_advisor_day4';
@@ -2473,7 +2479,7 @@ const MS_RANK_CATEGORY = 'training'; // Noble Advisor ranks by Training hours on
 // ── 3-BOARD MINISTER SPOTS ──
 const MS_BOARDS = ['buildings','research','troops'];
 const MS_BOARD_META = {
-  buildings: { label:'Buildings', icon:'🏛️', color:'#6ab0ff', unit:'pts', blurb:'Construction speedups + TrueGold', cats:['construction','general'], hasTG:true },
+  buildings: { label:'Construction', icon:'🏛️', color:'#6ab0ff', unit:'pts', blurb:'Construction speedups + TrueGold', cats:['construction','general'], hasTG:true },
   research:  { label:'Research',  icon:'🔬', color:'#c084fc', unit:'pts', blurb:'Research speedups + TrueGold Dust', cats:['research','general'], hasDust:true },
   troops:    { label:'Troops',    icon:'⚔️', color:'#f5b833', unit:'h',   blurb:'Training speedups', cats:['training','general'] }
 };
@@ -2579,8 +2585,9 @@ function msInit(){
     if (msAllianceEl) msAllianceEl.value = alliance || '';
     if (msIGNEl) msIGNEl.value = vp.name || '';
   }
-  // If member has existing submission, show overview directly
-  if(MS._submittedEntry && !msCanAccessResults() && !MS._editing) {
+  // If member has existing submission, show overview directly (same for R4/R5 — their
+  // only extra capability is the separate Manage Spots tab, not a different landing flow)
+  if(MS._submittedEntry && !MS._editing) {
     const tab0 = document.getElementById('msStepTab0');
     if(tab0) tab0.style.display = '';
     msGoStep(0);
@@ -2589,8 +2596,8 @@ function msInit(){
     msUpdateDeadlineBanners();
     return;
   }
-  // Board-pick gate: members applying fresh must choose boards first
-  if(!msCanAccessResults() && !MS._editing && !(MS.draft && MS.draft.boards && MS.draft.boards.length)){
+  // Board-pick gate: applying fresh must choose boards first — identical for R4/R5
+  if(!MS._editing && !(MS.draft && MS.draft.boards && MS.draft.boards.length)){
     msShowBoardPick();
     msRenderStepTabs();
     msUpdateDeadlineBanners();
@@ -2613,13 +2620,13 @@ function msMarkStepComplete(n){
 function msRenderStepTabs(){
   const isR4 = msCanAccessResults();
   const hasSubmission = !!MS._submittedEntry;
-  const unlocked = isR4 ? 5 : (hasSubmission ? 0 : (MS._unlockedStep||1));
+  const unlocked = hasSubmission ? 0 : (MS._unlockedStep||1);
 
-  // Step 0 (overview) - only shown if member has submitted
+  // Step 0 (overview) - shown whenever the person has submitted, same for everyone
   const tab0 = document.getElementById('msStepTab0');
-  if(tab0) tab0.style.display = (!isR4 && hasSubmission) ? '' : 'none';
+  if(tab0) tab0.style.display = hasSubmission ? '' : 'none';
 
-  // Step 5 (results) - only shown for R4/R5
+  // Step 5 (Manage Spots) - the one extra capability R4/R5 has over regular members
   const tab5 = document.getElementById('msStepTab5');
   if(tab5) tab5.style.display = isR4 ? '' : 'none';
 
@@ -2637,14 +2644,14 @@ function msRenderStepTabs(){
 function msGoStep(n){
   const isR4 = msCanAccessResults();
   const hasSubmission = !!MS._submittedEntry;
-const unlocked = isR4 ? 5 : ((hasSubmission && !MS._editing) ? 0 : (MS._unlockedStep||1));
+const unlocked = (hasSubmission && !MS._editing) ? 0 : (MS._unlockedStep||1);
 
-  // Block step 5 for non-R4/R5
+  // Block step 5 for non-R4/R5 — the one extra capability R4/R5 has over regular members
   if(n===5 && !isR4){ toast('Results are only visible to R4/R5.'); return; }
-  // If member has submitted, steps 1-4 are locked (they must click Edit)
-if(!isR4 && hasSubmission && !MS._editing && n>=1 && n<=4){ toast('Click "Edit my submission" to make changes.'); n=0; }
-  // Normal step lock
-  if(n>1 && n>unlocked && !isR4 && !hasSubmission){ toast('Please complete the previous step first.'); n=unlocked; }
+  // If they've submitted, steps 1-4 are locked (must click Edit) — same for everyone
+if(hasSubmission && !MS._editing && n>=1 && n<=4){ toast('Click "Edit my submission" to make changes.'); n=0; }
+  // Normal step lock — same for everyone
+  if(n>1 && n>unlocked && !hasSubmission){ toast('Please complete the previous step first.'); n=unlocked; }
 
   MS._currentStep=n;
   // Show/hide step panels (0-5)
@@ -2967,7 +2974,7 @@ function msRenderVerifyGrid(){
     const v=MS.draft.verify[cat];
     const flagged=v.ocrAmount!==null && v.amount>0 && Math.abs(v.amount-v.ocrAmount)/Math.max(v.ocrAmount,1)>0.2;
     return \`<div class="ms-verify-field">
-      <label>\${MS_CATEGORY_LABELS[cat]}</label>
+    <label>\${MS_CATEGORY_ICONS[cat]} \${MS_CATEGORY_LABELS[cat]}</label>
       \${v.ocrRaw?\`<div style="font-size:11px;color:var(--text3);margin-bottom:6px">OCR read: "\${v.ocrRaw}" → \${v.ocrAmount}h</div>\`:v.ocrAmount===null&&v.hasOwnProperty('ocrRaw')?\`<div style="font-size:11px;color:#ff9d4d;margin-bottom:6px">⚠ Not detected — enter manually</div>\`:''}
       <div style="display:flex;gap:6px">
         <input type="number" min="0" step="0.1" value="\${v.amount}" style="width:90px" id="msVerifyAmt-\${cat}" oninput="msUpdateVerify('\${cat}')">
@@ -3002,7 +3009,7 @@ function msRenderSliderGrid(){
     const committedDays=committedHours/24;
     return \`<div class="ms-slider-row">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-        <strong style="font-size:14px">\${MS_CATEGORY_LABELS[cat]}</strong>
+        <strong style="font-size:14px">\${MS_CATEGORY_ICONS[cat]} \${MS_CATEGORY_LABELS[cat]}</strong>
         <span style="font-size:12px;color:var(--text3)">\${hours.toFixed(1)}h available</span>
       </div>
       <input type="range" min="0" max="100" value="\${pct}" id="msSlider-\${cat}" oninput="msUpdateSlider('\${cat}')">
@@ -3012,11 +3019,70 @@ function msRenderSliderGrid(){
       </div>
     </div>\`;
   }).join('');
-  var _b=(MS.draft&&MS.draft.boards)?MS.draft.boards:[];
+var _b=(MS.draft&&MS.draft.boards)?MS.draft.boards:[];
   var _extra='';
   if(_b.indexOf('buildings')>=0) _extra+='<div class="ms-slider-row" style="display:flex;align-items:center;gap:12px;justify-content:space-between"><strong style="font-size:14px">🟨 TrueGold to use</strong><input type="number" min="0" value="'+(MS.draft.truegold||0)+'" style="width:100px" oninput="msUpdateTG(this.value)"></div>';
   if(_b.indexOf('research')>=0) _extra+='<div class="ms-slider-row" style="display:flex;align-items:center;gap:12px;justify-content:space-between"><strong style="font-size:14px">🔺 TrueGold Dust to use</strong><input type="number" min="0" value="'+(MS.draft.dust||0)+'" style="width:100px" oninput="msUpdateDust(this.value)"></div>';
   if(_extra) grid.innerHTML += _extra;
+  grid.innerHTML += '<div id="msGeneralSplitWrap" style="display:none;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-top:10px"></div>';
+  if(typeof msRenderGeneralSplit==='function') msRenderGeneralSplit();
+}
+// ── General Speedup split (fixes double-counting when 2+ applied boards share "General Speedup") ──
+function msGeneralSplitBoards(){
+  return ((MS.draft&&MS.draft.boards)||[]).filter(function(b){ var m=MS_BOARD_META[b]; return m && m.cats && m.cats.indexOf('general')>=0; });
+}
+function msGeneralCommittedHours(){
+  var hours = (MS.draft.verify && MS.draft.verify.general) ? MS.draft.verify.general.hours : 0;
+  var pct = (MS.draft.commit && MS.draft.commit.general!==undefined) ? MS.draft.commit.general : 50;
+  return hours*pct/100;
+}
+function msRenderGeneralSplit(){
+  var host = document.getElementById('msGeneralSplitWrap'); if(!host) return;
+  var genBoards = msGeneralSplitBoards();
+  if(genBoards.length<2){ host.style.display='none'; host.innerHTML=''; return; }
+  var committedH = msGeneralCommittedHours();
+  MS.draft.generalSplit = MS.draft.generalSplit || {};
+  var keysMatch = genBoards.every(function(b){ return MS.draft.generalSplit[b]!==undefined; }) && Object.keys(MS.draft.generalSplit).length===genBoards.length;
+  if(!keysMatch){
+    var each = genBoards.length ? committedH/genBoards.length : 0;
+    MS.draft.generalSplit = {};
+    genBoards.forEach(function(b){ MS.draft.generalSplit[b]=Math.round(each*10)/10; });
+  }
+  host.style.display='block';
+  var rows = genBoards.map(function(b){
+    var m=MS_BOARD_META[b];
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="width:120px;font-size:12px;color:'+m.color+'">'+m.icon+' '+m.label+'</span><input type="number" min="0" step="0.1" value="'+(MS.draft.generalSplit[b]||0)+'" style="width:90px" oninput="msUpdateGeneralSplit(\''+b+'\',this.value)"><span style="font-size:11px;color:var(--text3)">hours</span></div>';
+  }).join('');
+  host.innerHTML =
+    '<div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">⚖️ Split your General Speedup between boards</div>'+
+    '<div style="font-size:11.5px;color:var(--text3);margin-bottom:8px">You picked more than one board that uses General Speedup. Tell us how many of your '+committedH.toFixed(1)+'h committed hours go to each — otherwise the same hours get counted toward both boards\' KvK points.</div>'+
+    rows+
+    '<div id="msGeneralSplitSummary" style="font-size:12px;margin-top:4px"></div>'+
+    '<button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="msSplitGeneralEvenly()">Split evenly</button>';
+  msRenderGeneralSplitSummary();
+}
+function msRenderGeneralSplitSummary(){
+  var el=document.getElementById('msGeneralSplitSummary'); if(!el) return;
+  var committedH = msGeneralCommittedHours();
+  var used = Object.keys(MS.draft.generalSplit||{}).reduce(function(a,k){ return a+(parseFloat(MS.draft.generalSplit[k])||0); },0);
+  var diff = committedH - used;
+  if(Math.abs(diff)<0.05){ el.innerHTML = '<span style="color:var(--green)">✓ '+used.toFixed(1)+'h of '+committedH.toFixed(1)+'h allocated</span>'; }
+  else if(diff>0){ el.innerHTML = '<span style="color:#ff9d4d">'+used.toFixed(1)+'h of '+committedH.toFixed(1)+'h allocated — '+diff.toFixed(1)+'h unassigned</span>'; }
+  else { el.innerHTML = '<span style="color:#ff7070">'+used.toFixed(1)+'h of '+committedH.toFixed(1)+'h allocated — '+(-diff).toFixed(1)+'h over budget</span>'; }
+}
+function msUpdateGeneralSplit(board, val){
+  MS.draft.generalSplit = MS.draft.generalSplit || {};
+  var n = parseFloat(val); if(isNaN(n)||n<0) n=0;
+  MS.draft.generalSplit[board] = n;
+  msRenderGeneralSplitSummary();
+}
+function msSplitGeneralEvenly(){
+  var genBoards = msGeneralSplitBoards();
+  var committedH = msGeneralCommittedHours();
+  var each = genBoards.length ? committedH/genBoards.length : 0;
+  MS.draft.generalSplit = {};
+  genBoards.forEach(function(b){ MS.draft.generalSplit[b]=Math.round(each*10)/10; });
+  msRenderGeneralSplit();
 }
 function msUpdateTG(v){ MS.draft=MS.draft||{}; var n=parseInt(v,10); MS.draft.truegold=(isNaN(n)||n<0)?0:n; }
 function msUpdateDust(v){ MS.draft=MS.draft||{}; var n=parseInt(v,10); MS.draft.dust=(isNaN(n)||n<0)?0:n; }
@@ -3027,6 +3093,7 @@ function msUpdateSlider(cat){
   const committedHours=hours*pct/100;
   document.getElementById('msSliderPct-'+cat).textContent=pct+'%';
   document.getElementById('msSliderDays-'+cat).textContent=(committedHours/24).toFixed(1)+' days ('+committedHours.toFixed(1)+'h)';
+  if(cat==='general' && typeof msRenderGeneralSplit==='function') msRenderGeneralSplit();
 }
 
 // ── STEP 4: TIMESLOTS ──
@@ -3053,7 +3120,7 @@ function msRenderSignupSummary(){
     var v=MS.draft.verify[c]?MS.draft.verify[c].hours:0;
     var pct=MS.draft.commit[c]!==undefined?MS.draft.commit[c]:50;
     var committed=v*pct/100, left=v-committed;
-    return '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:var(--text2)">'+MS_CATEGORY_LABELS[c]+'</span><span class="mono"><span style="color:var(--gold)">'+committed.toFixed(1)+'h</span> committed · <span style="color:var(--text3)">'+left.toFixed(1)+'h left</span></span></div>';
+    return '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:var(--text2)">'+MS_CATEGORY_ICONS[c]+' '+MS_CATEGORY_LABELS[c]+'</span><span class="mono"><span style="color:var(--gold)">'+committed.toFixed(1)+'h</span> committed · <span style="color:var(--text3)">'+left.toFixed(1)+'h left</span></span></div>';
   }).join('');
   var b=msAppliedBoardsList();
   if(b.indexOf('buildings')>=0) rows+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:var(--text2)">🟨 TrueGold</span><span class="mono" style="color:var(--gold)">'+(MS.draft.truegold||0)+'</span></div>';
@@ -3234,7 +3301,7 @@ function msSetDeadline() {
   const input = document.getElementById('msDeadlineInput');
   if (!input || !input.value) { toast('Pick a date and time first.'); return; }
   const iso = new Date(input.value).toISOString();
-  if (!confirm('⚠️ This overrides the computed per-board schedule and closes ALL 3 boards (Buildings, Research, Troops) at once, at '+new Date(iso).toUTCString()+'.\n\nMembers will immediately see their open boards as locked once this time passes. Continue?')) return;
+  if (!confirm('⚠️ This overrides the computed per-board schedule and closes ALL 3 boards (Construction, Research, Troops) at once, at '+new Date(iso).toUTCString()+'.\n\nMembers will immediately see their open boards as locked once this time passes. Continue?')) return;
   // datetime-local gives local time — store as UTC ISO string
   MS.deadline = iso;
   syncQueuePush();
@@ -3304,9 +3371,22 @@ function msSubmitEntry(){
   var _pbb=MS.draft.picksByBoard||{};
   // Only open boards need fresh valid picks; closed boards reuse their frozen picks.
   var _openForCheck = _boards.filter(function(b){ return !msBoardClosed(b); });
-  for(var _bi=0;_bi<_openForCheck.length;_bi++){
+for(var _bi=0;_bi<_openForCheck.length;_bi++){
     var _bp=_pbb[_openForCheck[_bi]]||[];
     if(_bp.length<MS_MIN_SLOTS_PICKED){ alert('Pick at least '+MS_MIN_SLOTS_PICKED+' timeslots for '+(MS_BOARD_META[_openForCheck[_bi]]?MS_BOARD_META[_openForCheck[_bi]].label:_openForCheck[_bi])+'.'); return; }
+  }
+  // If 2+ applied boards share "General Speedup", the split must be filled in and add up —
+  // otherwise the same hours would silently get double-counted toward both boards' KvK points.
+  var _genBoards = _boards.filter(function(b){ var m=MS_BOARD_META[b]; return m && m.cats && m.cats.indexOf('general')>=0; });
+  if(_genBoards.length>=2){
+    var _gCommitted = msGeneralCommittedHours();
+    var _gSplit = MS.draft.generalSplit||{};
+    var _gUsed = _genBoards.reduce(function(a,b){ return a+(parseFloat(_gSplit[b])||0); },0);
+    if(Math.abs(_gCommitted-_gUsed) > 0.05){
+      alert('Please split your General Speedup hours between '+_genBoards.map(function(b){return MS_BOARD_META[b].label;}).join(' and ')+' in Step 3 — the split must add up to your '+_gCommitted.toFixed(1)+'h committed.');
+      msGoStep(3);
+      return;
+    }
   }
 
   const committedHours={};
@@ -3332,9 +3412,17 @@ function msSubmitEntry(){
     boards: _boards.slice(),
     truegold: MS.draft.truegold||0,
     dust: MS.draft.dust||0,
+    generalSplit: (_genBoards.length>=2) ? JSON.parse(JSON.stringify(MS.draft.generalSplit||{})) : null,
     scores: (function(){
-      var cm={construction:(committedHours.construction||0)*60,research:(committedHours.research||0)*60,training:(committedHours.training||0)*60,general:(committedHours.general||0)*60,truegold:MS.draft.truegold||0,dust:MS.draft.dust||0};
-      var s={}; _boards.forEach(function(b){ s[b]=msBoardScore(b,cm); }); return s;
+      var splitMode = _genBoards.length>=2;
+      var gSplit = MS.draft.generalSplit||{};
+      var s={};
+      _boards.forEach(function(b){
+        var gHours = splitMode ? (parseFloat(gSplit[b])||0) : (committedHours.general||0);
+        var cm={construction:(committedHours.construction||0)*60,research:(committedHours.research||0)*60,training:(committedHours.training||0)*60,general:gHours*60,truegold:MS.draft.truegold||0,dust:MS.draft.dust||0};
+        s[b]=msBoardScore(b,cm);
+      });
+      return s;
     })(),
 submittedAt: new Date().toISOString()
   };
@@ -3406,7 +3494,7 @@ function msRenderOverview(entry) {
         var _sb = (function(){ try { return msSchedule(Date.now()).boards[b]; } catch(e){ return null; } })();
         var _runInfo = _sb ? '<div style="font-size:12px;color:var(--text3);margin-top:3px">Allocation runs: <strong class="mono" style="color:#ff9d4d">'+fmtUTCDateTime(_sb.allocAt)+'</strong></div>' : '';
         statusHtml += '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px 14px">'+
-          '<div style="font-size:13px;color:var(--text2)">⏳ '+m.icon+' '+m.label+' — not run yet.</div>'+_runInfo+'</div>';
+      '<div style="font-size:13px;color:var(--text2)">⏳ '+m.icon+' '+m.label+' — Allocation pending.</div>'+_runInfo+'</div>';
         return;
       }
       const mine = alloc.assignments.find(function(a){ return a.entry.ign===entry.ign && a.entry.alliance===entry.alliance; });
@@ -3418,14 +3506,14 @@ function msRenderOverview(entry) {
       } else {
         const wasRejected = alloc.rejected.some(function(r){ return r.ign===entry.ign && r.alliance===entry.alliance; });
         statusHtml += '<div style="background:rgba(255,157,77,.08);border:1px solid rgba(255,157,77,.35);border-radius:8px;padding:12px 14px">'+
-          '<div style="font-weight:600;color:#ff9d4d">'+m.icon+' '+m.label+' — '+(wasRejected?'no slot this round':'not run yet')+'</div>'+
+          '<div style="font-weight:600;color:#ff9d4d">'+m.icon+' '+m.label+' — '+(wasRejected?'No slot this round':'Result pending for this board')+'</div>'+  
         '</div>';
       }
     });
     statusHtml += '</div>';
   } else {
     statusHtml = '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px">'+
-      '<div style="font-size:13px;color:var(--text2)">⏳ Your submission is in. Slot assignments are not finalised yet — check back later.</div>'+
+      '<div style="font-size:13px;color:var(--text2)">✅ Your submission has been received. Allocation results will appear here once each board you applied for has been processed.</div>'+
     '</div>';
   }
 
@@ -3458,7 +3546,7 @@ function msRenderOverview(entry) {
     const h = entry.committedHours[cat]||0;
     const pct = entry.commit[cat]||50;
     html += '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:8px 12px;min-width:140px">' +
-      '<div style="font-size:11px;color:var(--text3)">' + MS_CATEGORY_LABELS[cat] + '</div>' +
+      '<div style="font-size:11px;color:var(--text3)">' + MS_CATEGORY_ICONS[cat] + ' ' + MS_CATEGORY_LABELS[cat] + '</div>' +
       '<div style="font-weight:600;color:var(--accent2)">' + h.toFixed(1) + 'h</div>' +
       '<div style="font-size:11px;color:var(--text3)">' + pct + '% of ' + (v?v.hours.toFixed(1):0) + 'h total</div>' +
       '</div>';
@@ -3489,6 +3577,7 @@ function msEditSubmission() {
       truegold: cur.truegold||0, dust: cur.dust||0,
       picksByBoard: JSON.parse(JSON.stringify(cur.picksByBoard||{})),
       favByBoard: JSON.parse(JSON.stringify(cur.favByBoard||{})),
+      generalSplit: JSON.parse(JSON.stringify(cur.generalSplit||{})),
       applyAll: (cur.applyAll!==undefined?cur.applyAll:true)
     };
   } else {
@@ -3499,14 +3588,39 @@ function msEditSubmission() {
   const tab0 = document.getElementById('msStepTab0');
   if(tab0) tab0.style.display = '';
   msRenderStepTabs();
-  msGoStep(1);
+  msShowBoardPick(); // land on "Which minister spots are you applying for?" with current picks pre-checked
 }
 
 // ── STEP 5: ALLOCATION ──
+function msFmtCountdown(ms){
+  var totalMin = Math.max(0, Math.floor(ms/60000));
+  var days = Math.floor(totalMin/1440);
+  var hours = Math.floor((totalMin%1440)/60);
+  return days+'d '+hours+'h';
+}
+function msRenderBoardTimers(){
+  var host = document.getElementById('msBoardTimersPanel'); if(!host) return;
+  var now = Date.now();
+  var sched;
+  try { sched = msSchedule(now); } catch(e){ host.innerHTML=''; return; }
+  host.innerHTML = MS_BOARDS.map(function(b){
+    var m = MS_BOARD_META[b]; var bs = sched.boards[b];
+    var allocMs = bs.allocAt - now, dlMs = bs.deadline - now;
+    var allocDone = !!(MS._allocByBoard && MS._allocByBoard[b]);
+    var allocStr = allocDone ? 'Already run' : (allocMs>0 ? 'Happens in '+msFmtCountdown(allocMs) : 'Overdue — pending next check');
+    var dlStr = dlMs>0 ? 'Closes in '+msFmtCountdown(dlMs) : 'Closed';
+    return '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px 12px">'+
+      '<div style="font-weight:700;color:'+m.color+';font-size:13px;margin-bottom:4px">'+m.icon+' '+m.label+' Minister Spot</div>'+
+      '<div style="font-size:12px;color:var(--text2)">⚙️ Automatic assignment: <strong style="color:'+(allocDone?'var(--green)':(allocMs>0?'#ff9d4d':'#ff7070'))+'">'+allocStr+'</strong></div>'+
+      '<div style="font-size:12px;color:var(--text2)">⏰ Submission deadline: <strong style="color:'+(dlMs>0?'#ff9d4d':'#ff7070')+'">'+dlStr+'</strong></div>'+
+    '</div>';
+  }).join('');
+}
 function msRenderResultsSummary(){
   document.getElementById('msTotalSubs').textContent=MS.submissions.length;
   document.getElementById('msWinnerCount').textContent=(MS._lastAllocation?MS._lastAllocation.winners.length:0);
   document.getElementById('msRejectedCount').textContent=(MS._lastAllocation?MS._lastAllocation.rejected.length:0);
+  msRenderBoardTimers();
 }
 
 function msRunAllocationForBoard(board, prev){
@@ -3568,8 +3682,9 @@ function msRunAllocationForBoard(board, prev){
 }
 
 function msBoardsInPlay(){
-  var bs = MS_BOARDS.filter(function(b){ return MS.submissions.some(function(e){ return e.boards && e.boards.indexOf(b)>=0; }); });
-  return bs.length ? bs : ['troops'];
+  // Each minister type runs on its own KvK day, so R4/R5 need access to all three
+  // regardless of whether anyone has submitted for a given board yet.
+  return MS_BOARDS.slice();
 }
 
 function msRunAllocation(){
@@ -3615,7 +3730,10 @@ function msRenderManageBoardTabs(){
   el.style.display='flex';
   el.innerHTML=boards.map(function(b){ var m=MS_BOARD_META[b]; var on=b===MS._manageBoard;
     var n=(MS._allocByBoard&&MS._allocByBoard[b])?MS._allocByBoard[b].winners.length:0;
-    return '<button class="btn btn-sm'+(on?'':' btn-ghost')+'" onclick="msSetManageBoard('+"'"+b+"'"+')" style="'+(on?'border-color:'+m.color+';color:'+m.color:'')+'">'+m.icon+' '+m.label+' <span style="opacity:.6">('+n+'/48)</span></button>';
+    var style = on
+      ? 'background:'+m.color+'29;border:1.5px solid '+m.color+';color:'+m.color+';font-weight:700;'
+      : 'background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.14);color:var(--text2);font-weight:600;';
+    return '<button onclick="msSetManageBoard('+"'"+b+"'"+')" style="'+style+'font-family:var(--head);font-size:13px;padding:7px 14px;border-radius:6px;cursor:pointer;transition:all .15s;letter-spacing:.03em">'+m.icon+' '+m.label+' <span style="opacity:.75">('+n+'/48)</span></button>';
   }).join('');
 }
 
@@ -3822,11 +3940,18 @@ function msCopyByAlliance(){
     .filter(function(a){ return !filter || a.entry.alliance===filter; })
     .sort(function(x,y){ return x.slot - y.slot; });
   if(!rows.length){ toast('No players in '+filter+'.'); return; }
-  var d = new Date();
-  var dateStr = String(d.getUTCDate()).padStart(2,'0')+'/'+String(d.getUTCMonth()+1).padStart(2,'0')+'/'+d.getUTCFullYear();
-  var lines = ['Minister Spots — '+dateStr, 'Alliance: '+(filter||'All'), ''];
-  rows.forEach(function(a){ lines.push(msSlotLabel(a.slot).split('-')[0]+' - '+a.entry.ign); });
-  copyText(lines.join('\\n'));
+  var board = MS._manageBoard || 'troops';
+  var m = MS_BOARD_META[board] || {label:board};
+  var dayNum = {buildings:1, research:2, troops:4}[board] || '?';
+  var sched = (function(){ try { return msSchedule(Date.now()).boards[board]; } catch(e){ return null; } })();
+  var FULL_MON = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var dateStr = sched ? (function(){ var dt=new Date(sched.dayStart); return dt.getUTCDate()+' '+FULL_MON[dt.getUTCMonth()]+' '+dt.getUTCFullYear(); })() : '—';
+  var lines = ['Day '+dayNum+' – '+m.label+' Minister Spot', 'Date: '+dateStr, ''];
+  rows.forEach(function(a){
+    var range = msSlotLabel(a.slot).replace('-','–');
+    lines.push(range+' — '+a.entry.ign);
+  });
+  copyText(lines.join('\n'));
   var msg = document.getElementById('msCopiedMsg');
   if(msg){ msg.style.opacity='1'; setTimeout(function(){ msg.style.opacity='0'; }, 1500); }
 }
