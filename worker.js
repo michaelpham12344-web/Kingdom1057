@@ -2741,8 +2741,18 @@ function msShowBoardPick(){
 function msRenderBoardPick(){
   var el=document.getElementById('msBoardPickGrid'); if(!el) return;
   MS.draft.boards = MS.draft.boards || [];
+  // Can't apply fresh to a board whose deadline already passed — drop any that slipped in.
+  MS.draft.boards = MS.draft.boards.filter(function(b){ return !msBoardClosed(b); });
   el.innerHTML=MS_BOARDS.map(function(b){
     var m=MS_BOARD_META[b]; var on=MS.draft.boards.indexOf(b)>=0;
+    if(msBoardClosed(b)){
+      var dd=msBoardDeadline(b);
+      return '<div style="opacity:.55;cursor:not-allowed;border:2px solid var(--border);background:var(--bg3);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px">'+
+        '<div style="font-size:26px;filter:grayscale(1)">'+m.icon+'</div>'+
+        '<div style="flex:1"><div style="font-family:var(--head);font-weight:600;font-size:16px;color:var(--text3)">'+m.label+'</div><div style="font-size:12px;color:var(--text3)">🔒 Closed'+(dd?' — deadline '+fmtUTCDateTime(dd):'')+'</div></div>'+
+        '<div style="font-size:13px;color:#ff8080">closed</div>'+
+      '</div>';
+    }
     return '<div onclick="msToggleBoardPick('+"'"+b+"'"+')" style="cursor:pointer;border:2px solid '+(on?m.color:'var(--border)')+';background:'+(on?'rgba(61,142,240,.06)':'var(--bg3)')+';border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px">'+
       '<div style="font-size:26px">'+m.icon+'</div>'+
       '<div style="flex:1"><div style="font-family:var(--head);font-weight:600;font-size:16px;color:'+(on?m.color:'var(--text)')+'">'+m.label+'</div><div style="font-size:12px;color:var(--text3)">'+m.blurb+'</div></div>'+
@@ -2751,14 +2761,16 @@ function msRenderBoardPick(){
   }).join('');
 }
 function msToggleBoardPick(b){
+  if(msBoardClosed(b)){ toast('That minister spot is closed.'); return; }
   MS.draft = MS.draft || {}; MS.draft.boards = MS.draft.boards || [];
   var i=MS.draft.boards.indexOf(b);
   if(i>=0) MS.draft.boards.splice(i,1); else MS.draft.boards.push(b);
   msRenderBoardPick();
 }
 function msBoardPickContinue(){
-  var picked=(MS.draft&&MS.draft.boards)?MS.draft.boards:[];
-  if(!picked.length){ toast('Pick at least one minister spot'); return; }
+  var picked=((MS.draft&&MS.draft.boards)?MS.draft.boards:[]).filter(function(b){ return !msBoardClosed(b); });
+  if(!picked.length){ toast('Pick at least one open minister spot'); return; }
+  MS.draft.boards = picked;
   var bp=document.getElementById('msBoardPick'); if(bp) bp.style.display='none';
   var pt=document.querySelector('#page-minister .phase-tabs'); if(pt) pt.style.display='';
   msGoStep(1);
@@ -2839,7 +2851,7 @@ function msAppliedBoardsList(){ var b=(MS.draft&&MS.draft.boards&&MS.draft.board
 function msActiveBoard(){ MS.draft=MS.draft||{}; var b=msAppliedBoardsList(); if(!MS.draft._activeBoard||b.indexOf(MS.draft._activeBoard)<0) MS.draft._activeBoard=b[0]; return MS.draft._activeBoard; }
 function msPicks(){ MS.draft.picksByBoard=MS.draft.picksByBoard||{}; var ab=msActiveBoard(); if(!MS.draft.picksByBoard[ab]) MS.draft.picksByBoard[ab]=[]; return MS.draft.picksByBoard[ab]; }
 function msFavs(){ MS.draft.favByBoard=MS.draft.favByBoard||{}; var ab=msActiveBoard(); if(!MS.draft.favByBoard[ab]) MS.draft.favByBoard[ab]=[]; return MS.draft.favByBoard[ab]; }
-function msApplyAllSync(){ if(!MS.draft.applyAll) return; var p=msPicks().slice(), f=msFavs().slice(); msAppliedBoardsList().forEach(function(b){ MS.draft.picksByBoard[b]=p.slice(); MS.draft.favByBoard[b]=f.slice(); }); }
+function msApplyAllSync(){ if(!MS.draft.applyAll) return; var p=msPicks().slice(), f=msFavs().slice(); msAppliedBoardsList().forEach(function(b){ if(msBoardClosed(b)) return; MS.draft.picksByBoard[b]=p.slice(); MS.draft.favByBoard[b]=f.slice(); }); }
 function msSwitchBoard(b){ MS.draft._activeBoard=b; msRenderSlotGrid(); }
 function msToggleApplyAll(){ MS.draft.applyAll=!MS.draft.applyAll; if(MS.draft.applyAll) msApplyAllSync(); msRenderSlotGrid(); }
 function msRenderBoardSwitcher(){
@@ -2849,7 +2861,7 @@ function msRenderBoardSwitcher(){
   if(MS.draft.applyAll || boards.length<2){ el.style.display='none'; return; }
   el.style.display='flex';
   el.innerHTML=boards.map(function(b){ var m=MS_BOARD_META[b]; var on=b===ab;
-    return '<button class="btn btn-sm'+(on?'':' btn-ghost')+'" onclick="msSwitchBoard('+"'"+b+"'"+')" style="'+(on?'border-color:'+m.color+';color:'+m.color:'')+'">'+m.icon+' '+m.label+'</button>';
+    return '<button class="btn btn-sm'+(on?'':' btn-ghost')+'" onclick="msSwitchBoard('+"'"+b+"'"+')" style="'+(on?'border-color:'+m.color+';color:'+m.color:'')+'">'+m.icon+' '+m.label+(msBoardClosed(b)?' 🔒':'')+'</button>';
   }).join('');
 }
 function msRenderSignupSummary(){
@@ -2867,6 +2879,27 @@ function msRenderSignupSummary(){
 }
 function msRenderSlotGrid(){
   const grid=document.getElementById('msSlotGrid'); if(!grid) return;
+  // Locked board (deadline passed): show frozen picks read-only, no interaction.
+  var _ab = msActiveBoard();
+  if(msBoardClosed(_ab)){
+    var _m = MS_BOARD_META[_ab] || {label:_ab, icon:''};
+    var _dd = msBoardDeadline(_ab);
+    var _src = (MS._submittedEntry && MS._submittedEntry.picksByBoard && MS._submittedEntry.picksByBoard[_ab]) || (MS.draft.picksByBoard && MS.draft.picksByBoard[_ab]) || [];
+    var _frozen = _src.slice().sort(function(a,b){ return a-b; });
+    var _chips = _frozen.length
+      ? _frozen.map(function(i){ return '<span class="mono" style="display:inline-block;background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:4px 8px;margin:3px;font-size:11px;color:var(--text2)">'+msSlotLabel(i)+'</span>'; }).join('')
+      : '<span style="color:var(--text3);font-size:12px">No timeslots on record for this board.</span>';
+    grid.innerHTML =
+      '<div style="background:rgba(224,58,58,.08);border:1px solid rgba(224,58,58,.35);border-radius:8px;padding:12px 14px;margin-bottom:12px">'+
+        '<div style="font-weight:600;color:#ff8080">🔒 '+_m.icon+' '+_m.label+' is closed'+(_dd?' — deadline '+fmtUTCDateTime(_dd):'')+'</div>'+
+        '<div style="font-size:12px;color:var(--text2);margin-top:4px">This board is locked and can no longer be changed. Use the switcher above to edit any boards that are still open.</div>'+
+      '</div>'+
+      '<div style="font-size:11px;color:var(--text3);margin-bottom:4px">Your locked timeslots for '+_m.label+':</div>'+
+      '<div>'+_chips+'</div>';
+    if(typeof msRenderBoardSwitcher==='function') msRenderBoardSwitcher();
+    if(typeof msRenderSignupSummary==='function') msRenderSignupSummary();
+    return;
+  }
   const takenSlots=new Set();
 
 // Flexibility-weighted demand: each player contributes 1 / (slots they picked).
@@ -2998,6 +3031,22 @@ function msIsDeadlinePassed() {
   const d = msGetDeadline();
   return d ? Date.now() > d.getTime() : false;
 }
+// ── Per-board deadlines (Phase 2) ──
+// Effective deadline (epoch ms) for a board: an admin's manual global override wins if set,
+// otherwise the computed schedule deadline (36h01m before that board's KvK day).
+function msBoardDeadline(board){
+  var man = null;
+  try { man = MS.deadline ? new Date(MS.deadline).getTime() : null; } catch(e){ man = null; }
+  if(man!=null && !isNaN(man)) return man;
+  try { var bs = msSchedule(Date.now()).boards[board]; return bs ? bs.deadline : null; } catch(e){ return null; }
+}
+function msBoardClosed(board){
+  var d = msBoardDeadline(board);
+  return (d!=null) ? Date.now() >= d : false;
+}
+function msOpenBoardsList(list){ return (list||MS_BOARDS).filter(function(b){ return !msBoardClosed(b); }); }
+function msClosedBoardsList(list){ return (list||MS_BOARDS).filter(function(b){ return msBoardClosed(b); }); }
+function msAnyBoardOpen(list){ return msOpenBoardsList(list).length>0; }
 function msSetDeadline() {
   const input = document.getElementById('msDeadlineInput');
   if (!input || !input.value) { toast('Pick a date and time first.'); return; }
@@ -3014,44 +3063,64 @@ function msReopenSubmissions() {
   toast('Submissions reopened.');
 }
 function msUpdateDeadlineBanners() {
-  const passed = msIsDeadlinePassed();
-  const dl = msGetDeadline();
-  // Member banner (Step 4)
-  const memberBanner = document.getElementById('msDeadlineBanner');
-  const submitBtn = document.getElementById('msSubmitBtn');
+  var applied = msAppliedBoardsList();
+  var openB = msOpenBoardsList(applied);
+  var closedB = msClosedBoardsList(applied);
+  var lbl = function(b){ var mm=MS_BOARD_META[b]; return (mm?mm.icon+' '+mm.label:b); };
+  // Member banner (Step 4) — status of the board currently being edited
+  var memberBanner = document.getElementById('msDeadlineBanner');
+  var submitBtn = document.getElementById('msSubmitBtn');
   if (memberBanner) {
-    if (dl && passed) {
+    var ab = msActiveBoard();
+    var m = MS_BOARD_META[ab] || {label:ab, icon:''};
+    var dd = msBoardDeadline(ab);
+    if (msBoardClosed(ab)) {
       memberBanner.style.display = 'block';
-      memberBanner.innerHTML = '<div style="background:rgba(224,58,58,.1);border:1px solid rgba(224,58,58,.4);border-radius:7px;padding:10px 14px;color:var(--enemy)">🔒 Submissions are closed. The deadline has passed.</div>';
-      if (submitBtn) { submitBtn.disabled = true; submitBtn.style.opacity = '0.4'; }
-    } else if (dl) {
+      memberBanner.innerHTML = '<div style="background:rgba(224,58,58,.1);border:1px solid rgba(224,58,58,.4);border-radius:7px;padding:10px 14px;color:var(--enemy)">🔒 '+m.icon+' '+m.label+' submissions are closed'+(dd?' (deadline '+fmtUTCDateTime(dd)+')':'')+'. This board is locked — your other open boards can still be edited.</div>';
+    } else if (dd) {
       memberBanner.style.display = 'block';
-      memberBanner.innerHTML = '<div style="background:rgba(255,157,77,.08);border:1px solid rgba(255,157,77,.3);border-radius:7px;padding:10px 14px;font-size:12px;color:#ff9d4d">⏰ Submission deadline: <strong>' + new Date(dl).toUTCString() + '</strong></div>';
-      if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = ''; }
+      memberBanner.innerHTML = '<div style="background:rgba(255,157,77,.08);border:1px solid rgba(255,157,77,.3);border-radius:7px;padding:10px 14px;font-size:12px;color:#ff9d4d">⏰ '+m.icon+' '+m.label+' closes: <strong>'+fmtUTCDateTime(dd)+'</strong></div>';
     } else {
       memberBanner.style.display = 'none';
-      if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = ''; }
+    }
+    if (submitBtn) {
+      var allClosed = openB.length===0;
+      submitBtn.disabled = allClosed;
+      submitBtn.style.opacity = allClosed ? '0.4' : '';
     }
   }
-  // Admin banner (Step 5)
-  const adminBanner = document.getElementById('msDeadlineAdminBanner');
-  if (adminBanner) adminBanner.style.display = (dl && passed) ? 'block' : 'none';
-  // Pre-fill deadline input with current value
-  const dlInput = document.getElementById('msDeadlineInput');
-  if (dlInput && dl) {
-    // Convert ISO to local datetime-local format
-    const local = new Date(dl.getTime() - dl.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  // Admin banner (Step 5) — which boards are open vs closed
+  var adminBanner = document.getElementById('msDeadlineAdminBanner');
+  if (adminBanner) {
+    if (closedB.length) {
+      adminBanner.style.display = 'block';
+      adminBanner.innerHTML = '<strong style="color:#ff9d4d">⏰ Board status</strong> — Closed: '+(closedB.map(lbl).join(', ')||'none')+' · Open: '+(openB.map(lbl).join(', ')||'none');
+    } else {
+      adminBanner.style.display = 'none';
+    }
+  }
+  // Pre-fill the manual (global override) deadline input if one is set
+  var dlInput = document.getElementById('msDeadlineInput');
+  var man = null; try { man = MS.deadline ? new Date(MS.deadline) : null; } catch(e){ man = null; }
+  if (dlInput && man) {
+    var local = new Date(man.getTime() - man.getTimezoneOffset()*60000).toISOString().slice(0,16);
     dlInput.value = local;
   }
 }
 
 function msSubmitEntry(){
-  if(msIsDeadlinePassed()){ toast('Submissions are closed — the deadline has passed.'); return; }
-  var _boards=msAppliedBoardsList();
+  var _prev = MS._submittedEntry || null;
+  var _applied = msAppliedBoardsList();
+  // A board counts for this entry if it's still open, OR it's already closed but has a frozen
+  // result from a previous submission (which we preserve). Closed boards with no history are dropped.
+  var _boards = _applied.filter(function(b){ return !msBoardClosed(b) || (_prev && _prev.scores && _prev.scores[b]!==undefined); });
+  if(!_boards.length){ toast('All the minister spots you applied for are closed.'); return; }
   var _pbb=MS.draft.picksByBoard||{};
-  for(var _bi=0;_bi<_boards.length;_bi++){
-    var _bp=_pbb[_boards[_bi]]||[];
-    if(_bp.length<MS_MIN_SLOTS_PICKED){ alert('Pick at least '+MS_MIN_SLOTS_PICKED+' timeslots for '+(MS_BOARD_META[_boards[_bi]]?MS_BOARD_META[_boards[_bi]].label:_boards[_bi])+'.'); return; }
+  // Only open boards need fresh valid picks; closed boards reuse their frozen picks.
+  var _openForCheck = _boards.filter(function(b){ return !msBoardClosed(b); });
+  for(var _bi=0;_bi<_openForCheck.length;_bi++){
+    var _bp=_pbb[_openForCheck[_bi]]||[];
+    if(_bp.length<MS_MIN_SLOTS_PICKED){ alert('Pick at least '+MS_MIN_SLOTS_PICKED+' timeslots for '+(MS_BOARD_META[_openForCheck[_bi]]?MS_BOARD_META[_openForCheck[_bi]].label:_openForCheck[_bi])+'.'); return; }
   }
 
   const committedHours={};
@@ -3074,15 +3143,30 @@ function msSubmitEntry(){
     favByBoard: JSON.parse(JSON.stringify(MS.draft.favByBoard||{})),
     favourites: [...(MS.draft.favourites||[])],
     committedHours,
-    boards: [...(MS.draft.boards||[])],
+    boards: _boards.slice(),
     truegold: MS.draft.truegold||0,
     dust: MS.draft.dust||0,
     scores: (function(){
       var cm={construction:(committedHours.construction||0)*60,research:(committedHours.research||0)*60,training:(committedHours.training||0)*60,general:(committedHours.general||0)*60,truegold:MS.draft.truegold||0,dust:MS.draft.dust||0};
-      var s={}; (MS.draft.boards||[]).forEach(function(b){ s[b]=msBoardScore(b,cm); }); return s;
+      var s={}; _boards.forEach(function(b){ s[b]=msBoardScore(b,cm); }); return s;
     })(),
-    submittedAt: new Date().toISOString()
+submittedAt: new Date().toISOString()
   };
+
+  // ── Freeze: any closed board keeps its previous frozen contribution unchanged ──
+  if(_prev){
+    _boards.forEach(function(b){
+      if(!msBoardClosed(b)) return;
+      if(_prev.scores && _prev.scores[b]!==undefined) entry.scores[b] = _prev.scores[b];
+      if(_prev.picksByBoard && _prev.picksByBoard[b]) entry.picksByBoard[b] = _prev.picksByBoard[b].slice();
+      if(_prev.favByBoard && _prev.favByBoard[b]) entry.favByBoard[b] = _prev.favByBoard[b].slice();
+      // Troops allocation ranks on committedHours.training, so freeze that too.
+      if(b==='troops' && _prev.committedHours && _prev.committedHours.training!==undefined) entry.committedHours.training = _prev.committedHours.training;
+    });
+    // Rebuild the flat picks union after restoring frozen boards
+    entry.picks = (function(){ var u={}; _boards.forEach(function(b){ (entry.picksByBoard[b]||[]).forEach(function(s){ u[s]=1; }); }); return Object.keys(u).map(Number).sort(function(a,b){return a-b;}); })();
+  }
+  entry.frozenBoards = _boards.filter(function(b){ return msBoardClosed(b); });
 
   // Store keyed by Player ID if available, otherwise by IGN
   if(pid) {
@@ -3171,9 +3255,10 @@ function msRenderOverview(entry) {
     entry.boards.forEach(function(b){
       var m=MS_BOARD_META[b]; if(!m) return;
       var sc=(entry.scores&&entry.scores[b]!==undefined)?entry.scores[b]:0;
+      var _lk=((entry.frozenBoards&&entry.frozenBoards.indexOf(b)>=0)||msBoardClosed(b));
       html += '<div style="display:flex;align-items:center;gap:10px;background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:9px 12px">'+
         '<span style="font-size:18px">'+m.icon+'</span>'+
-        '<span style="flex:1;font-weight:600;color:'+m.color+'">'+m.label+'</span>'+
+        '<span style="flex:1;font-weight:600;color:'+m.color+'">'+m.label+(_lk?' <span style="font-size:11px;color:#ff8080;font-weight:500">🔒 locked</span>':'')+'</span>'+
         '<span class="mono" style="color:var(--gold)">'+msBoardScoreLabel(b,sc)+'</span>'+
       '</div>';
     });
