@@ -1106,12 +1106,13 @@ document.addEventListener('touchend',function(e){
         </div>
         <div id="msAdminPwErr" style="display:none;color:#ff7070;font-size:12px;margin-top:6px">Incorrect password.</div>
       </div>
+<div id="msR4NoticeBanner" style="display:none;background:rgba(61,142,240,.08);border:1px solid var(--border);border-radius:7px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:var(--text2)">
+        ℹ️ Running allocation, clearing submissions, and overriding the deadline or KvK schedule are <strong>Admin-only</strong>. You can still assign, swap, lock and search players in Manage Spots below.
+      </div>
       <div id="msAdminActions" style="display:none">
-        <div id="msDeadlineAdminBanner" style="display:none;background:rgba(255,157,77,.1);border:1px solid rgba(255,157,77,.4);border-radius:7px;padding:10px 14px;margin-bottom:12px">
-          <strong style="color:#ff9d4d">⏰ Deadline passed</strong> — submissions are locked. Ready to run allocation.
-        </div>
+        <div id="msDeadlineAdminBanner" style="display:none;background:rgba(255,157,77,.1);border:1px solid rgba(255,157,77,.4);border-radius:7px;padding:10px 14px;margin-bottom:12px"></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
-          <div class="field"><label style="font-size:11px">Submission deadline (UTC)</label>
+          <div class="field"><label style="font-size:11px">Manual deadline override (UTC) — closes ALL boards at once</label>
             <input type="datetime-local" id="msDeadlineInput" style="width:200px">
           </div>
           <button class="btn btn-primary btn-sm" onclick="msSetDeadline()">Set Deadline</button>
@@ -1119,6 +1120,17 @@ document.addEventListener('touchend',function(e){
         </div>
         <button class="btn btn-gold" onclick="msRunAllocation()">⚙️ Run Allocation (rank + assign slots)</button>
         <button class="btn btn-ghost btn-sm" onclick="msClearAllSubs()" style="margin-left:8px">🗑 Clear all submissions</button>
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+          <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px">🗓️ Force KvK Day 1 (overrides the computed schedule)</div>
+          <div id="msDay1OverrideCurrent" style="font-size:11.5px;color:var(--text3);margin-bottom:8px"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <div class="field"><label style="font-size:11px">New Day 1 (00:00 UTC recommended)</label>
+              <input type="datetime-local" id="msDay1OverrideInput" style="width:200px">
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="msSetDay1Override()">Force Override</button>
+            <button class="btn btn-ghost btn-sm" onclick="msClearDay1Override()">Clear Override</button>
+          </div>
+        </div>
         <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
           <div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">My alliance (to submit as a player)</div>
           <select id="msMyAllianceSelect" style="width:130px">
@@ -1242,6 +1254,8 @@ let syncSerialize = function() {
     msLastAllocation: (typeof MS!=='undefined') ? MS._lastAllocation : null,
     msAllocByBoard: (typeof MS!=='undefined') ? MS._allocByBoard : null,
     msDeadline: (typeof MS!=='undefined') ? MS.deadline : null,
+    kvkDay1Override: (typeof MS!=='undefined') ? (MS.kvkDay1Override||null) : null,
+    msActionHint: (typeof MS!=='undefined') ? (MS._pendingAction||null) : null,
     msSubmissionsByPlayer: (typeof MS!=='undefined') ? (MS.submissionsByPlayer||{}) : {},
     msAuditLog: (typeof MS!=='undefined') ? (MS.auditLog||[]) : []
   });
@@ -1270,6 +1284,7 @@ let syncApplyRemote = function(data) {
       MS._lastAllocation = data.msLastAllocation || null;
       MS._allocByBoard = data.msAllocByBoard || MS._allocByBoard || {};
       MS.deadline = data.msDeadline || null;
+      MS.kvkDay1Override = data.kvkDay1Override || null;
       if(data.msSubmissionsByPlayer) { MS.submissionsByPlayer = data.msSubmissionsByPlayer; MS.submissions = Object.values(MS.submissionsByPlayer); }
       if(data.msAuditLog) { MS.auditLog = data.msAuditLog; }
       if (typeof msRenderResultsSummary==='function') msRenderResultsSummary();
@@ -3218,13 +3233,16 @@ function msAnyBoardOpen(list){ return msOpenBoardsList(list).length>0; }
 function msSetDeadline() {
   const input = document.getElementById('msDeadlineInput');
   if (!input || !input.value) { toast('Pick a date and time first.'); return; }
+  const iso = new Date(input.value).toISOString();
+  if (!confirm('⚠️ This overrides the computed per-board schedule and closes ALL 3 boards (Buildings, Research, Troops) at once, at '+new Date(iso).toUTCString()+'.\n\nMembers will immediately see their open boards as locked once this time passes. Continue?')) return;
   // datetime-local gives local time — store as UTC ISO string
-  MS.deadline = new Date(input.value).toISOString();
+  MS.deadline = iso;
   syncQueuePush();
   msUpdateDeadlineBanners();
   toast('Deadline set: ' + new Date(MS.deadline).toUTCString());
 }
 function msReopenSubmissions() {
+  if (!confirm('⚠️ Reopen submissions for ALL boards? This clears the manual deadline override and returns each board to its normal computed deadline (or fully open if that has also passed). Continue?')) return;
   MS.deadline = null;
   syncQueuePush();
   msUpdateDeadlineBanners();
@@ -3556,12 +3574,25 @@ function msBoardsInPlay(){
 
 function msRunAllocation(){
   if(!MS.submissions.length){ toast('No submissions yet.'); return; }
+  var boardsPreview = msBoardsInPlay();
+  var already = boardsPreview.filter(function(b){ return MS._allocByBoard && MS._allocByBoard[b]; });
+  var warnMsg = '⚙️ Run allocation now for: '+boardsPreview.map(function(b){var m=MS_BOARD_META[b];return m?m.icon+' '+m.label:b;}).join(', ')+'?\n\n'+
+    'Unpinned players may be reassigned. Pinned/locked slots are kept.'+
+    (already.length ? '\n\nThis will OVERWRITE the existing result for: '+already.map(function(b){var m=MS_BOARD_META[b];return m?m.label:b;}).join(', ')+' (including any already run automatically).' : '')+
+    '\n\nContinue?';
+  if(!confirm(warnMsg)) return;
   MS._allocByBoard = MS._allocByBoard || {};
   var boards = msBoardsInPlay();
   boards.forEach(function(b){ MS._allocByBoard[b] = msRunAllocationForBoard(b, MS._allocByBoard[b]); });
   if(boards.indexOf(MS._manageBoard)<0) MS._manageBoard = boards[0];
   msSetManageBoard(MS._manageBoard);
-  syncQueuePush();
+  // Flag this push as a bulk reallocation (server requires Admin for this specific
+  // action) as distinct from a single manage-board assign/swap/pin, which R4/R5
+  // may still do and save normally. Push immediately (not debounced) so the hint
+  // is read by the server while it's still set, then clear it right after.
+  MS._pendingAction = 'runAllocation';
+  if(typeof syncPushNow==='function'){ syncPushNow().then(function(){ MS._pendingAction = null; }); }
+  else { syncQueuePush(); MS._pendingAction = null; }
   var total = boards.reduce(function(s,b){ return s + MS._allocByBoard[b].winners.length; }, 0);
   toast('Allocation complete — '+total+' placed across '+boards.length+' board'+(boards.length===1?'':'s')+'.');
 }
@@ -4004,7 +4035,7 @@ function msCopySchedule(){
 }
 
 function msClearAllSubs(){
-  if(!confirm('Clear all Minister Spots submissions? This cannot be undone.')) return;
+  if(!confirm('⚠️ Admin action: clear ALL Minister Spots submissions for every board? This cannot be undone.')) return;
   MS.submissions=[];
   MS.submissionsByPlayer={};
   MS._lastAllocation=null;
@@ -4098,9 +4129,55 @@ function msCanAccessResults() {
 function msShowAdminActions() {
   const guard = document.getElementById('msAdminGuard');
   const actions = document.getElementById('msAdminActions');
+  const r4Notice = document.getElementById('msR4NoticeBanner');
   if (guard) guard.style.display = 'none';
-  if (actions) actions.style.display = 'block';
+  if (isAdmin()) {
+    if (actions) actions.style.display = 'block';
+    if (r4Notice) r4Notice.style.display = 'none';
+    msRenderDay1OverrideCurrent();
+  } else {
+    // R4/R5 (non-admin): can still manage/assign players, but not run the
+    // destructive/global controls — those are Admin-only.
+    if (actions) actions.style.display = 'none';
+    if (r4Notice) r4Notice.style.display = 'block';
+  }
   msUpdateDeadlineBanners();
+}
+function msRenderDay1OverrideCurrent(){
+  var el = document.getElementById('msDay1OverrideCurrent'); if(!el) return;
+  if (MS.kvkDay1Override) {
+    el.innerHTML = '⚠️ Override active — Day 1 forced to <strong style="color:#ff9d4d">'+fmtUTCDateTime(new Date(MS.kvkDay1Override).getTime())+'</strong>. All deadlines/allocations are computed from this instead of the normal 28-day cycle.';
+  } else {
+    el.textContent = 'No override set — using the normal computed schedule.';
+  }
+}
+// ── Force KvK Day-1 override (Admin only, server-enforced) ──
+function msSetDay1Override(){
+  const input = document.getElementById('msDay1OverrideInput');
+  if (!input || !input.value) { toast('Pick a date and time first.'); return; }
+  const iso = new Date(input.value).toISOString();
+  const willBeInPast = new Date(iso).getTime() < Date.now();
+  const warn = '⚠️ This forces KvK Day 1 to '+new Date(iso).toUTCString()+'.\n\n'+
+    'Every deadline and allocation time for all 3 boards recalculates from this instant.\n'+
+    (willBeInPast ? 'This date is in the PAST relative to now — if the 7-day clear point has already passed for it, ALL current submissions will be auto-cleared on the next scheduled check (within ~30 minutes).\n\n' : '') +
+    'This cannot be undone automatically — you would need to clear the override manually. Continue?';
+  if (!confirm(warn)) return;
+  MS.kvkDay1Override = iso;
+  syncQueuePush();
+  msRenderDay1OverrideCurrent();
+  if (typeof msRenderScheduleStrip==='function') msRenderScheduleStrip();
+  msUpdateDeadlineBanners();
+  toast('KvK Day 1 override set.');
+}
+function msClearDay1Override(){
+  if (!MS.kvkDay1Override) { toast('No override is set.'); return; }
+  if (!confirm('Clear the Day-1 override and return to the normal computed 28-day schedule?')) return;
+  MS.kvkDay1Override = null;
+  syncQueuePush();
+  msRenderDay1OverrideCurrent();
+  if (typeof msRenderScheduleStrip==='function') msRenderScheduleStrip();
+  msUpdateDeadlineBanners();
+  toast('Override cleared — back to the normal schedule.');
 }
 
 function msInitResultsTab() {
@@ -5736,16 +5813,24 @@ Reply with ONLY one line of raw JSON, no explanation, no markdown. Use 0 for any
       let incoming; try { incoming = JSON.parse(body); } catch(e) { return json({error:'Invalid JSON'},400); }
       const oldRaw = await env.SVS_KV.get(STATE_KEY);
       let old={}; try { old = JSON.parse(oldRaw||'{}'); } catch(e){}
-      // Admin-only: running allocation, or clearing/reducing submissions
-      const allocChanged =
-        JSON.stringify(incoming.msAllocByBoard||null)   !== JSON.stringify(old.msAllocByBoard||null) ||
-        JSON.stringify(incoming.msLastAllocation||null) !== JSON.stringify(old.msLastAllocation||null);
+      
+// Admin-only: a bulk "Run Allocation" pass (flagged explicitly by the client via
+      // msActionHint, since it can reassign many unpinned players at once), clearing or
+      // reducing submissions, or changing the manual deadline / KvK Day-1 override.
+      // A single manage-board edit (assign/swap/pin/unpin/undo by R4/R5) also touches
+      // msAllocByBoard but is NOT flagged here, so those saves are allowed through —
+      // R4/R5 keep full Manage Spots editing rights; only the bulk/global actions are Admin-only.
+      const bulkAllocation = incoming.msActionHint === 'runAllocation';
       const oldSubs = old.msSubmissionsByPlayer ? Object.keys(old.msSubmissionsByPlayer).length : 0;
       const newSubs = incoming.msSubmissionsByPlayer ? Object.keys(incoming.msSubmissionsByPlayer).length : 0;
       const subsReduced = newSubs < oldSubs;
-      if ((allocChanged || subsReduced) && role !== 'admin') {
+      const deadlineChanged = (incoming.msDeadline||null) !== (old.msDeadline||null);
+      const overrideChanged = (incoming.kvkDay1Override||null) !== (old.kvkDay1Override||null);
+      if ((bulkAllocation || subsReduced || deadlineChanged || overrideChanged) && role !== 'admin') {
         return json({ok:false, error:'admin-required'}, 403);
       }
+      // The action hint is a one-shot signal for this write only — never persist it.
+      delete incoming.msActionHint;
       // Preserve server-only secrets; only an admin may change them explicitly
       incoming.pw_rallyleader = (role==='admin' && incoming.pw_rallyleader!==undefined) ? incoming.pw_rallyleader : old.pw_rallyleader;
       incoming.pw_r4r5 = (role==='admin' && incoming.pw_r4r5!==undefined) ? incoming.pw_r4r5 : old.pw_r4r5;
