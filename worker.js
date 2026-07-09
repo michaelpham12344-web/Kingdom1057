@@ -775,9 +775,11 @@ document.addEventListener('touchend',function(e){
       4. The leader runs the allocation to rank players and assign slots — highest committed hours gets priority.<br>
     </div>
   </div>
+  
+<!-- KVK SCHEDULE STRIP -->
+  <div id="msScheduleStrip" class="card" style="margin-bottom:14px;display:none"></div>
 
-  <!-- BOARD PICK GATE -->
-  <div id="msBoardPick" class="card" style="display:none;margin-bottom:18px">
+  <!-- BOARD PICK GATE -->  <div id="msBoardPick" class="card" style="display:none;margin-bottom:18px">
     <div class="card-title">👑 Which minister spots are you applying for?</div>
     <p style="color:var(--text2);font-size:12px;margin-bottom:14px">Pick one or more. The rest of the signup only asks for what each one needs.</p>
     <div id="msBoardPickGrid" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px"></div>
@@ -1211,6 +1213,51 @@ function updateKvK(){
   const s=Math.floor(diff/1000);
   el.textContent=d+'d '+String(h).padStart(2,'0')+'h '+String(m).padStart(2,'0')+'m '+String(s).padStart(2,'0')+'s';
 }
+// ════════════ KvK SCHEDULE (Minister Spots automation timing) ════════════
+// Board → day offset from KvK Day 1.  Day 1 Construction=buildings, Day 2 Research, Day 4 Troops.
+const MS_BOARD_DAY_OFFSET = { buildings:0, research:1, troops:3 };
+const _MS_DAY = 86400000, _MS_H = 3600000;
+// Admin override for the next KvK Day-1 start (setter arrives in a later phase). Read-only here.
+function msDay1Override(){
+  try { return (typeof MS!=='undefined' && MS.kvkDay1Override) ? new Date(MS.kvkDay1Override).getTime() : null; } catch(e){ return null; }
+}
+// Day-1 start (00:00 UTC) of the currently-active or next KvK. Unlike nextKvKStart, this stays
+// anchored to the CURRENT KvK during the event window, so mid-event allocation (e.g. Troops on
+// Day 4) computes against the right cycle instead of rolling forward to the next one.
+function currentKvKDay1(now){
+  var o = msDay1Override(); if(o) return o;
+  var k = Math.floor((now - KVK_ANCHOR_UTC) / KVK_CYCLE_MS);
+  for(var i=k; i<=k+1; i++){
+    var day1 = KVK_ANCHOR_UTC + i*KVK_CYCLE_MS;
+    if(now >= day1 - 8*_MS_DAY && now < day1 + 6*_MS_DAY) return day1;
+  }
+  return nextKvKStart(now);
+}
+// Full computed schedule for the active/next KvK. All values are epoch ms (UTC).
+function msSchedule(now){
+  if(now===undefined) now = Date.now();
+  var day1 = currentKvKDay1(now);
+  var sched = { day1:day1, clearAt: day1 - 7*_MS_DAY, openAt: day1 - 7*_MS_DAY, boards:{} };
+  Object.keys(MS_BOARD_DAY_OFFSET).forEach(function(b){
+    var dStart = day1 + MS_BOARD_DAY_OFFSET[b]*_MS_DAY;
+    sched.boards[b] = {
+      dayStart: dStart,
+      deadline: dStart - (36*_MS_H + 60000), // submissions close 36h01m before the day
+      allocAt:  dStart - 36*_MS_H            // allocation runs 36h before the day (1 min after close)
+    };
+  });
+  return sched;
+}
+var _MS_MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fmtUTCDate(ms){
+  var d = new Date(ms);
+  return d.getUTCDate()+' '+_MS_MON[d.getUTCMonth()]+' '+d.getUTCFullYear();
+}
+function fmtUTCDateTime(ms){
+  var d = new Date(ms);
+  return fmtUTCDate(ms)+', '+String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0')+' UTC';
+}
+
 setInterval(updateClock,1000); updateClock();
 
 // ════════════ HELPERS ════════════
@@ -2272,7 +2319,50 @@ function msSlotLabel(i){
   return \`\${String(h).padStart(2,'0')}:\${String(m).padStart(2,'0')}-\${String(h2).padStart(2,'0')}:\${String(m2).padStart(2,'0')}\`;
 }
 
+// Slot label carrying the board's real calendar date, e.g. "13 Jul 2026, 14:00-14:30 UTC".
+function msSlotDateTimeLabel(board, slotIdx){
+  var s = msSchedule(Date.now());
+  var dStart = (s.boards[board] ? s.boards[board].dayStart : s.day1);
+  return fmtUTCDate(dStart)+', '+msSlotLabel(slotIdx)+' UTC';
+}
+
+// One row of the KvK schedule strip.  tone: 'done' | 'open' | 'closed'
+function msSchedChip(icon, label, val, tone){
+  var col = tone==='done' ? 'var(--green)' : (tone==='closed' ? '#ff8080' : '#ff9d4d');
+  var bg  = tone==='done' ? 'rgba(46,204,113,.08)' : (tone==='closed' ? 'rgba(224,58,58,.08)' : 'rgba(255,157,77,.08)');
+  var bd  = tone==='done' ? 'rgba(46,204,113,.3)' : (tone==='closed' ? 'rgba(224,58,58,.3)' : 'rgba(255,157,77,.3)');
+  return '<div style="display:flex;align-items:center;gap:10px;background:'+bg+';border:1px solid '+bd+';border-radius:7px;padding:8px 12px">'+
+    '<span style="font-size:15px;width:20px;text-align:center">'+icon+'</span>'+
+    '<span style="flex:1;font-size:12px;color:var(--text2)">'+label+'</span>'+
+    '<span class="mono" style="font-size:12px;font-weight:600;color:'+col+'">'+val+'</span>'+
+  '</div>';
+}
+// Read-only KvK schedule strip on the Minister page. All times UTC. Purely informational.
+function msRenderScheduleStrip(){
+  var el = document.getElementById('msScheduleStrip'); if(!el) return;
+  var now, s;
+  try { now = Date.now(); s = msSchedule(now); } catch(e){ el.style.display='none'; return; }
+  var rows = '';
+  rows += msSchedChip('📂','Old submissions cleared / signups open', fmtUTCDate(s.openAt), now>=s.openAt?'done':'open');
+  MS_BOARDS.forEach(function(b){
+    var m = MS_BOARD_META[b]; var bs = s.boards[b]; if(!bs) return;
+    rows += msSchedChip(m.icon, m.label+' — submissions close', fmtUTCDateTime(bs.deadline), now>=bs.deadline?'closed':'open');
+    rows += msSchedChip(m.icon, m.label+' — allocation runs', fmtUTCDateTime(bs.allocAt), now>=bs.allocAt?'done':'open');
+  });
+  var openMsg = '';
+  if(now >= s.openAt && now < s.boards.buildings.deadline){
+    openMsg = '<div style="background:rgba(46,204,113,.1);border:1px solid rgba(46,204,113,.4);border-radius:7px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:var(--green)">✅ <strong>Submissions are open</strong> for Minister Spots.</div>';
+  }
+  el.style.display = 'block';
+  el.innerHTML =
+    '<div class="card-title" style="margin-bottom:10px">🗓️ KvK Schedule <span style="font-weight:400;font-size:11px;color:var(--text3)">— all times UTC</span></div>'+
+    openMsg +
+    '<div style="display:flex;flex-direction:column;gap:6px">'+ rows +'</div>'+
+    '<div style="font-size:10.5px;color:var(--text3);margin-top:10px;line-height:1.5">Days feed: 🏛️ Day 1 ('+fmtUTCDate(s.boards.buildings.dayStart)+') · 🔬 Day 2 ('+fmtUTCDate(s.boards.research.dayStart)+') · ⚔️ Day 4 ('+fmtUTCDate(s.boards.troops.dayStart)+')</div>';
+}
+
 function msInit(){
+  if(typeof msRenderScheduleStrip==='function') msRenderScheduleStrip();
   if(MS._unlockedStep===undefined) MS._unlockedStep=1;
   const pid = verifiedPlayer ? String(verifiedPlayer.id) : null;
   // Restore the member's OWN submission for display only.
@@ -3043,15 +3133,17 @@ function msRenderOverview(entry) {
     myBoards.forEach(function(b){
       const alloc = byBoard[b]; const m = MS_BOARD_META[b];
       if(!alloc){
+        var _sb = (function(){ try { return msSchedule(Date.now()).boards[b]; } catch(e){ return null; } })();
+        var _runInfo = _sb ? '<div style="font-size:12px;color:var(--text3);margin-top:3px">Allocation runs: <strong class="mono" style="color:#ff9d4d">'+fmtUTCDateTime(_sb.allocAt)+'</strong></div>' : '';
         statusHtml += '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px 14px">'+
-          '<div style="font-size:13px;color:var(--text2)">⏳ '+m.icon+' '+m.label+' — not run yet.</div></div>';
+          '<div style="font-size:13px;color:var(--text2)">⏳ '+m.icon+' '+m.label+' — not run yet.</div>'+_runInfo+'</div>';
         return;
       }
       const mine = alloc.assignments.find(function(a){ return a.entry.ign===entry.ign && a.entry.alliance===entry.alliance; });
       if(mine){
         statusHtml += '<div style="background:rgba(46,204,113,.1);border:1px solid rgba(46,204,113,.4);border-radius:8px;padding:12px 14px">'+
           '<div style="font-weight:600;color:var(--green)">✅ '+m.icon+' '+m.label+' — you got a slot!</div>'+
-          '<div style="font-size:13px;color:var(--text);margin-top:4px">Time: <strong class="mono" style="color:var(--gold)">'+msSlotLabel(mine.slot)+' UTC</strong></div>'+
+          '<div style="font-size:13px;color:var(--text);margin-top:4px">Time: <strong class="mono" style="color:var(--gold)">'+msSlotDateTimeLabel(b, mine.slot)+'</strong></div>'+
         '</div>';
       } else {
         const wasRejected = alloc.rejected.some(function(r){ return r.ign===entry.ign && r.alliance===entry.alliance; });
