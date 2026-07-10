@@ -970,13 +970,6 @@ document.addEventListener('touchend',function(e){
     <div id="msScheduleStrip" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"></div>
   </div>
 
-  <!-- BOARD PICK GATE -->  <div id="msBoardPick" class="card" style="display:none;margin-bottom:18px">
-    <div class="card-title">👑 Step 1 — Apply: which minister spots are you applying for?</div>
-    <p style="color:var(--text2);font-size:12px;margin-bottom:14px">Pick one or more. The rest of the signup only asks for what each one needs.</p>
-    <div id="msBoardPickGrid" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px"></div>
-    <button class="btn btn-primary" onclick="msBoardPickContinue()">Continue →</button>
-  </div>
-
   <!-- STEP TABS -->
   <div class="phase-tabs" style="margin-bottom:18px;align-items:center">
     <button class="tab ms-step-tab" id="msStepTab0" onclick="msGoStep(0)" style="display:none">📋 My Submission</button>
@@ -985,7 +978,15 @@ document.addEventListener('touchend',function(e){
     <button class="tab ms-step-tab" id="msStepTab2" onclick="msGoStep(2)">3. Verify</button>
     <button class="tab ms-step-tab" id="msStepTab3" onclick="msGoStep(3)">4. Commitment</button>
     <button class="tab ms-step-tab" id="msStepTab4" onclick="msGoStep(4)">5. Timeslots &amp; Submit</button>
-    <button class="tab ms-step-tab" id="msStepTab5" onclick="msGoStep(5)" style="display:none;color:var(--gold);border-color:var(--gold);margin-left:auto">👑 Manage Spots <span title="Leader controls for Minister Spots. Lock players into specific slots, manually assign or move anyone (even non-submitters), and review who wasn't selected and why." style="cursor:help;opacity:.7;font-size:11px">ⓘ</span></button>
+    <button class="tab ms-step-tab" id="msStepTab5" onclick="msOpenManage()" style="display:none;color:var(--gold);border-color:var(--gold);margin-left:auto">👑 Manage Spots <span title="Leader controls for Minister Spots. Lock players into specific slots, manually assign or move anyone (even non-submitters), and review who wasn't selected and why." style="cursor:help;opacity:.7;font-size:11px">ⓘ</span></button>
+  </div>
+
+  <!-- STEP 1: APPLY / BOARD PICK (rendered below the step tabs, like every other step) -->
+  <div id="msBoardPick" class="card" style="display:none;margin-bottom:18px">
+    <div class="card-title">👑 Step 1 — Apply: which minister spots are you applying for?</div>
+    <p style="color:var(--text2);font-size:12px;margin-bottom:14px">Pick one or more. The rest of the signup only asks for what each one needs.</p>
+    <div id="msBoardPickGrid" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px"></div>
+    <button class="btn btn-primary" onclick="msBoardPickContinue()">Continue →</button>
   </div>
 
   <!-- STEP 0: MY SUBMISSION OVERVIEW -->
@@ -2958,7 +2959,11 @@ if(hasSubmission && !MS._editing && n>=1 && n<=4){ toast('Click "Edit my submiss
   if(n===2) msRenderVerifyGrid();
   if(n===3) msRenderSliderGrid();
   if(n===4) msRenderSlotGrid();
-  if(n===5){ msRenderResultsSummary(); msInitResultsTab(); if(typeof msShowManagePanel==='function') msShowManagePanel(); }
+  if(n===5){
+    var _bp=document.getElementById('msBoardPick'); if(_bp) _bp.style.display='none';
+    var _s5=document.getElementById('msStep5'); if(_s5) _s5.style.display='block';
+    msRenderResultsSummary(); msInitResultsTab(); if(typeof msShowManagePanel==='function') msShowManagePanel();
+  }
   msRenderStepTabs();
 }
 
@@ -3294,6 +3299,23 @@ function msBoardPickContinue(){
 function msGoApply(){
   if(MS._submittedEntry && !MS._editing){ toast('Click "Edit my submission" to make changes.'); msGoStep(0); return; }
   msShowBoardPick();
+}
+// Manage Spots opens directly for R4/R5/Admin — it must NEVER be gated behind picking
+// boards or completing the signup, since leaders use it without applying themselves.
+function msOpenManage(){
+  if(!msCanAccessResults()){ toast('Manage Spots is for R4/R5 and Admin.'); return; }
+  var bp=document.getElementById('msBoardPick'); if(bp) bp.style.display='none';
+  var pt=document.querySelector('#page-minister .phase-tabs'); if(pt) pt.style.display='';
+  MS._currentStep=5;
+  for(var i=0;i<=5;i++){
+    var el=document.getElementById('msStep'+i);
+    if(el) el.style.display=(i===5)?'block':'none';
+  }
+  document.querySelectorAll('#page-minister .ms-step-tab').forEach(function(t){ t.classList.remove('active'); });
+  var t5=document.getElementById('msStepTab5'); if(t5) t5.classList.add('active');
+  msRenderResultsSummary(); msInitResultsTab();
+  if(typeof msShowManagePanel==='function') msShowManagePanel();
+  msRenderStepTabs();
 }
 function msChangeBoards(){ msGoApply(); }
 function msRenderVerifyGrid(){
