@@ -9,5 +9,9 @@ id = "885986c8129340b18a86126582ad5def"
 [ai]
 binding = "AI"
 
+[[r2_buckets]]
+binding = "IMG"
+bucket_name = "kingdom1057-img"
+
 [triggers]
 crons = ["*/30 * * * *"]
