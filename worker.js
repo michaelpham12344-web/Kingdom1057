@@ -388,48 +388,52 @@ const SITE_HTML=`<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kingdom 1057 — Kingshot</title>
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg:#0a0d14;--bg2:#111520;--bg3:#161c2a;--bg4:#1c2436;
-  --border:rgba(100,140,220,0.15);--border2:rgba(100,140,220,0.28);
-  --accent:#3d8ef0;--accent2:#5ba3ff;
-  --garrison:#2a7fff;--attack:#2ecc71;
-  --enemy:#e03a3a;--gold:#f0a500;--green:#2ecc71;
-  --text:#d0daf0;--text2:#7a8aaa;--text3:#4a5570;
-  --mono:'Share Tech Mono',monospace;--head:'Rajdhani',sans-serif;--body:'Barlow',sans-serif;
+  --bg:#171210;--bg2:#1e1712;--bg3:#251c15;--bg4:#2f241a;
+  --border:rgba(201,165,92,0.16);--border2:rgba(201,165,92,0.34);
+  --accent:#a8322c;--accent2:#e08d5e;
+  --garrison:#4a7fd4;--attack:#2ecc71;
+  --enemy:#e04545;--gold:#d9a648;--green:#2ecc71;
+  --text:#eadfc9;--text2:#a5947a;--text3:#6e5f4c;
+  --mono:'Share Tech Mono',monospace;--head:'Cinzel',serif;--body:'Barlow',sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14px;min-height:100vh;}
-.nav{display:flex;align-items:center;gap:0;border-bottom:1px solid var(--border);background:var(--bg2);padding:0 24px;overflow-x:auto;-webkit-overflow-scrolling:touch;}
-.nav-logo{font-family:var(--head);font-size:20px;font-weight:700;color:var(--accent2);letter-spacing:.08em;margin-right:32px;padding:14px 0;white-space:nowrap;}
+body{background:radial-gradient(1100px 480px at 50% -8%,rgba(168,50,44,.12),transparent 62%),radial-gradient(900px 520px at 50% 112%,rgba(217,166,72,.05),transparent 60%),var(--bg);background-attachment:fixed;color:var(--text);font-family:var(--body);font-size:14px;min-height:100vh;}
+.nav{display:flex;align-items:center;gap:0;border-bottom:1px solid var(--border2);background:linear-gradient(180deg,#241a12,#1c1510);padding:0 24px;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.nav-logo{display:flex;align-items:center;gap:9px;font-family:var(--head);font-size:16px;font-weight:700;color:var(--text);letter-spacing:.05em;margin-right:28px;padding:11px 0;white-space:nowrap;}
 .nav-logo span{color:var(--gold);}
-.tab{font-family:var(--head);font-size:15px;font-weight:600;letter-spacing:.06em;padding:16px 20px;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;}
+.tab{position:relative;font-family:var(--head);font-size:12.5px;font-weight:600;letter-spacing:.03em;padding:17px 18px;cursor:pointer;color:var(--text2);border-top:2px solid transparent;transition:all .2s;white-space:nowrap;}
 .tab:hover{color:var(--text);}
-.tab.active{color:var(--accent2);border-bottom-color:var(--accent2);}
+.tab.active{color:var(--gold);border-top-color:var(--gold);background:linear-gradient(180deg,rgba(168,50,44,.32),rgba(168,50,44,0) 88%);}
+.tab.active::after{content:"";position:absolute;left:50%;transform:translateX(-50%);bottom:-1px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid var(--gold);}
 .utc-clock{margin-left:auto;font-family:var(--mono);font-size:16px;color:var(--gold);letter-spacing:.08em;}
 .page{display:none;padding:28px;max-width:1300px;margin:0 auto;}
 .page.active{display:block;}
-.sec-title{font-family:var(--head);font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;border-left:3px solid var(--accent);padding-left:10px;}
-.card{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:18px 20px;margin-bottom:18px;}
-.card-title{font-family:var(--head);font-size:16px;font-weight:600;color:var(--accent2);margin-bottom:14px;letter-spacing:.04em;}
+.sec-title{font-family:var(--head);font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text2);margin-bottom:10px;border-left:3px solid var(--gold);padding-left:10px;}
+.card{background:linear-gradient(180deg,var(--bg4) 0%,var(--bg3) 100%);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:18px;box-shadow:0 2px 12px rgba(0,0,0,.35);}
+.card-title{font-family:var(--head);font-size:14px;font-weight:600;color:var(--gold);margin-bottom:14px;letter-spacing:.03em;}
 input[type=text],input[type=number],input[type=time],input[type=date],select{background:var(--bg4);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-family:var(--body);font-size:13px;padding:7px 10px;outline:none;transition:border-color .2s;}
-input:focus,select:focus{border-color:var(--accent);}
+input:focus,select:focus{border-color:var(--gold);}
+button:focus-visible,.tab:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;}}
 select{cursor:pointer;}select option{background:var(--bg4);}
 label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px;}
 .field{display:flex;flex-direction:column;}
 .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;}
-.btn{font-family:var(--head);font-size:13px;font-weight:600;letter-spacing:.05em;padding:7px 16px;border-radius:5px;border:none;cursor:pointer;transition:all .15s;white-space:nowrap;}
-.btn-primary{background:var(--accent);color:#fff;}.btn-primary:hover{background:var(--accent2);}
+.btn{font-family:var(--body);font-size:13px;font-weight:600;letter-spacing:.03em;padding:7px 16px;border-radius:6px;border:none;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.btn:active{transform:translateY(1px);}
+.btn-primary{background:linear-gradient(180deg,#b8423a,#962b25);color:#fff;box-shadow:0 1px 6px rgba(150,43,37,.4);}.btn-primary:hover{background:linear-gradient(180deg,#c94e45,#a8322c);}
 .btn-danger{background:rgba(220,50,50,.15);color:#e05555;border:1px solid rgba(220,50,50,.3);}.btn-danger:hover{background:rgba(220,50,50,.28);}
 .btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border2);}.btn-ghost:hover{border-color:var(--accent);color:var(--accent2);}
-.btn-gold{background:rgba(240,165,0,.15);color:var(--gold);border:1px solid rgba(240,165,0,.3);}.btn-gold:hover{background:rgba(240,165,0,.28);}
+.btn-gold{background:rgba(217,166,72,.15);color:var(--gold);border:1px solid rgba(217,166,72,.35);}.btn-gold:hover{background:rgba(217,166,72,.28);}
 .btn-garrison{background:rgba(42,127,255,.15);color:#6ab0ff;border:1px solid rgba(42,127,255,.35);}.btn-garrison:hover{background:rgba(42,127,255,.28);}
 .btn-attack{background:rgba(46,204,113,.12);color:#5ddb8a;border:1px solid rgba(46,204,113,.3);}.btn-attack:hover{background:rgba(46,204,113,.22);}
 .btn-sm{padding:5px 11px;font-size:12px;}
 .badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:3px;letter-spacing:.05em;}
-.badge-tg5{background:rgba(240,165,0,.18);color:var(--gold);border:1px solid rgba(240,165,0,.35);}
-.badge-tg4{background:rgba(61,142,240,.18);color:#6ab0ff;border:1px solid rgba(61,142,240,.35);}
+.badge-tg5{background:rgba(217,166,72,.18);color:var(--gold);border:1px solid rgba(217,166,72,.35);}
+.badge-tg4{background:rgba(201,165,92,.18);color:#6ab0ff;border:1px solid rgba(201,165,92,.35);}
 .badge-tg3{background:rgba(100,200,100,.12);color:#7dc87d;border:1px solid rgba(100,200,100,.25);}
 table{width:100%;border-collapse:collapse;}
 th{font-family:var(--head);font-size:11px;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;}
@@ -439,7 +443,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .mono{font-family:var(--mono);}
 .launch-time{font-family:var(--mono);font-size:18px;color:var(--gold);letter-spacing:.08em;}
 .copy-line{background:var(--bg4);border:1px solid var(--border);border-radius:5px;padding:10px 14px;font-family:var(--mono);font-size:13px;color:var(--accent2);margin:4px 0;cursor:pointer;transition:background .15s;display:flex;justify-content:space-between;align-items:center;}
-.copy-line:hover{background:rgba(61,142,240,.12);}
+.copy-line:hover{background:rgba(217,166,72,.10);}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;}
 .dot-free{background:var(--green);}
 .dot-locked{background:var(--enemy);animation:blink 1.2s infinite;}
@@ -468,7 +472,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .leader-chip:hover{border-color:var(--accent);}
 .leader-chip.can-launch{border-color:rgba(46,204,113,.4);}
 .leader-chip.can-launch:hover{background:rgba(46,204,113,.1);border-color:var(--green);}
-.leader-chip.garrisoned{opacity:.5;cursor:not-allowed;border-color:rgba(240,165,0,.3);}
+.leader-chip.garrisoned{opacity:.5;cursor:not-allowed;border-color:rgba(217,166,72,.3);}
 .leader-chip.in-flight{border-color:rgba(168,85,247,.5);background:rgba(168,85,247,.08);}
 .leader-chip.disabled{opacity:.35;cursor:not-allowed;}
 .chip-name{font-weight:600;font-size:13px;flex:1;}
@@ -517,7 +521,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
 
 #toast{position:fixed;bottom:24px;right:24px;background:var(--accent);color:#fff;font-family:var(--head);font-size:14px;font-weight:600;letter-spacing:.06em;padding:10px 20px;border-radius:6px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:9999;}
 #toast.show{opacity:1;}
-.drop-zone.drag-over{border-color:var(--accent)!important;background:rgba(61,142,240,.06);}
+.drop-zone.drag-over{border-color:var(--accent)!important;background:rgba(201,165,92,.06);}
 .team-mgmt:active{cursor:grabbing;}
 
 /* TURRETS */
@@ -535,9 +539,9 @@ tr:hover td{background:rgba(255,255,255,.02);}
 /* PET BUFFS */
 .pet-card{background:var(--bg4);border:1.5px solid var(--border);border-radius:8px;padding:12px 14px;min-width:140px;flex:1;max-width:180px;transition:border-color .2s;}
 .pet-card.active{border-color:rgba(168,85,247,.5);background:rgba(168,85,247,.07);}
-.pet-card.expiring{border-color:rgba(240,165,0,.6);background:rgba(240,165,0,.06);animation:pulse-gold .8s infinite;}
+.pet-card.expiring{border-color:rgba(217,166,72,.6);background:rgba(217,166,72,.06);animation:pulse-gold .8s infinite;}
 .pet-card.expired{border-color:rgba(224,58,58,.4);background:rgba(224,58,58,.05);}
-@keyframes pulse-gold{0%,100%{border-color:rgba(240,165,0,.6)}50%{border-color:rgba(240,165,0,.2)}}
+@keyframes pulse-gold{0%,100%{border-color:rgba(217,166,72,.6)}50%{border-color:rgba(217,166,72,.2)}}
 .pet-name{font-weight:600;font-size:13px;margin-bottom:3px;}
 .pet-tier{font-size:11px;color:var(--text3);margin-bottom:8px;}
 .pet-timer{font-family:var(--mono);font-size:18px;font-weight:600;margin-bottom:8px;min-height:24px;}
@@ -551,10 +555,10 @@ tr:hover td{background:rgba(255,255,255,.02);}
 
 /* BATTLE STRATEGY */
 .bs-slot{background:var(--bg4);border:2px dashed var(--border);border-radius:8px;padding:10px;min-height:90px;transition:all .15s;}
-.bs-slot.drag-over{border-color:var(--accent);background:rgba(61,142,240,.08);border-style:solid;}
+.bs-slot.drag-over{border-color:var(--accent);background:rgba(201,165,92,.08);border-style:solid;}
 .bs-slot-label{font-family:var(--head);font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--text2);margin-bottom:8px;text-align:center;}
 .bs-team-zone{min-height:120px;border:2px dashed var(--border);border-radius:8px;padding:10px;display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;transition:all .15s;}
-.bs-team-zone.drag-over{border-color:var(--accent);background:rgba(61,142,240,.06);border-style:solid;}
+.bs-team-zone.drag-over{border-color:var(--accent);background:rgba(201,165,92,.06);border-style:solid;}
 .bs-team-header{font-family:var(--head);font-size:13px;font-weight:700;letter-spacing:.05em;color:var(--text2);margin-bottom:6px;}
 .bs-leader-card{background:var(--bg3);border:1.5px solid var(--border);border-radius:7px;padding:8px 10px;cursor:grab;width:140px;transition:border-color .15s,opacity .15s;user-select:none;}
 .bs-leader-card:hover{border-color:var(--accent2);}
@@ -595,7 +599,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
 /* MINISTER SPOTS */
 .ms-slot-btn{font-family:var(--mono);font-size:11px;padding:8px 4px;border-radius:5px;border:1px solid var(--border2);background:var(--bg4);color:var(--text2);cursor:pointer;transition:all .15s;text-align:center;}
 .ms-slot-btn:hover{border-color:var(--accent);}
-.ms-slot-btn.selected{background:rgba(61,142,240,.25);color:var(--accent2);border-color:var(--accent);font-weight:600;}
+.ms-slot-btn.selected{background:rgba(201,165,92,.25);color:var(--accent2);border-color:var(--accent);font-weight:600;}
 .ms-slot-btn.taken{background:rgba(224,58,58,.12);color:#ff8080;border-color:rgba(224,58,58,.3);cursor:not-allowed;opacity:.6;}
 .ms-verify-field{background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:12px 14px;}
 .ms-verify-field label{margin-bottom:6px;font-size:15px;font-weight:700;color:var(--gold);letter-spacing:.01em;}
@@ -608,9 +612,14 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .ms-rank-row.rejected{background:rgba(224,58,58,.05);opacity:.7;}
 .phase-tabs{display:flex;flex-wrap:wrap;gap:6px;}
 .phase-tabs .tab{border:1px solid var(--border);border-radius:6px;padding:8px 14px;}
-.phase-tabs .tab.active{background:rgba(61,142,240,.12);}
+.phase-tabs .tab.active{background:rgba(201,165,92,.12);}
 
-@media(max-width:900px){.sim-layout{grid-template-columns:1fr;}.page{padding:14px 12px;}.grid2,.grid3{grid-template-columns:1fr;}#msSlotGrid{grid-template-columns:repeat(4,1fr)!important;}#msVerifyGrid{grid-template-columns:1fr!important;}.nav{padding:0 10px;}.nav-logo{margin-right:14px;font-size:16px;}.tab{padding:14px 12px;font-size:13px;}#syncStatus{margin-right:8px;font-size:10px!important;}.utc-clock{font-size:13px!important;}.phase-tabs .tab{padding:7px 10px;font-size:12px;}.landing-grid{grid-template-columns:1fr!important;}}
+@media(max-width:900px){.sim-layout{grid-template-columns:1fr;}.page{padding:14px 12px;}.grid2,.grid3{grid-template-columns:1fr;}#msSlotGrid{grid-template-columns:repeat(4,1fr)!important;}#msVerifyGrid{grid-template-columns:1fr!important;}.nav{padding:0 10px;}.nav-logo{margin-right:14px;font-size:16px;}.tab{padding:14px 12px;font-size:13px;}#syncStatus{margin-right:8px;font-size:10px!important;}.utc-clock{font-size:13px!important;}.phase-tabs .tab{padding:7px 10px;font-size:12px;}.landing-grid{grid-template-columns:1fr!important;}#bsTurretGrid{grid-template-columns:repeat(2,1fr)!important;}#page-strategy{padding-bottom:74px!important;}}
+@media(max-width:480px){#bsTurretGrid{grid-template-columns:1fr!important;}}
+#bsStickyBar{position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--bg4);border-top:1px solid var(--border2);padding:10px 14px;align-items:center;gap:10px;box-shadow:0 -4px 14px rgba(0,0,0,.35)}
+.bs-launch-soon{animation:bsPulse 1s infinite}
+@keyframes bsPulse{0%,100%{background:transparent}50%{background:rgba(255,80,80,.16)}}
+.bs-launch-go{background:rgba(60,200,120,.12);border-radius:4px}
 </style>
 <script>
 // DragDropTouch polyfill — enables HTML5 drag-and-drop on iOS and Android
@@ -647,7 +656,6 @@ document.addEventListener('touchend',function(e){
 },true);
 })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js';document.head.appendChild(s);"></script>
 </head>
 <body>
 <!-- LANDING PAGE -->
@@ -656,12 +664,14 @@ document.addEventListener('touchend',function(e){
 
     <!-- Hero header -->
     <div style="text-align:center;margin-bottom:32px">
-      <div style="font-family:var(--head);font-size:11px;font-weight:600;letter-spacing:.3em;color:var(--text3);margin-bottom:12px;text-transform:uppercase">⚔️ KvK Alliance Command</div>
-      <div style="font-family:var(--head);font-size:18px;font-weight:400;color:var(--text3);letter-spacing:.15em;margin-bottom:4px">WELCOME TO</div>
-      <div style="font-family:var(--head);font-size:58px;font-weight:700;color:var(--accent2);letter-spacing:.06em;line-height:1;margin-bottom:8px">KINGDOM <span style="color:var(--gold)">1057</span></div>
-      <div style="font-family:var(--head);font-size:13px;color:var(--text3);letter-spacing:.2em;margin-bottom:28px">✦ &nbsp; THE GREATEST KINGDOM OF ALL TIME &nbsp; ✦</div>
+      <svg width="84" height="96" viewBox="0 0 60 68" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:14px;filter:drop-shadow(0 4px 14px rgba(217,166,72,.25))" aria-hidden="true"><path d="M14 12 L20 4 L30 10 L40 4 L46 12 Z" fill="#d9a648"/><path d="M8 16 H52 V38 C52 52 42 60 30 66 C18 60 8 52 8 38 Z" fill="#7e1f26" stroke="#d9a648" stroke-width="2.5"/><path d="M14 32 L30 22 L46 32 V39 L30 29 L14 39 Z" fill="#d9a648" opacity="0.92"/><text x="30" y="56" text-anchor="middle" font-family="Cinzel,serif" font-size="13" font-weight="700" fill="#d9a648">1057</text></svg>
+      <div style="font-family:var(--head);font-size:11px;font-weight:600;letter-spacing:.3em;color:var(--text2);margin-bottom:10px;text-transform:uppercase">KvK Alliance Command</div>
+      <div style="font-family:var(--head);font-size:15px;font-weight:500;color:var(--text3);letter-spacing:.2em;margin-bottom:6px">WELCOME TO</div>
+      <div style="font-family:var(--head);font-size:clamp(32px,8.5vw,50px);font-weight:700;color:var(--text);letter-spacing:.04em;line-height:1.05;margin-bottom:10px;text-shadow:0 2px 18px rgba(217,166,72,.18)">KINGDOM <span style="color:var(--gold)">1057</span></div>
+      <div style="font-family:var(--head);font-size:11.5px;color:var(--text2);letter-spacing:.18em">✦ &nbsp; THE GREATEST KINGDOM OF ALL TIME &nbsp; ✦</div>
+      <div style="width:180px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:18px auto 26px"></div>
       <!-- Story card -->
-      <div class="card" style="text-align:left;border:1px solid rgba(61,142,240,.25);background:rgba(61,142,240,.04);margin-bottom:0">
+      <div class="card" style="text-align:left;border:1px solid rgba(201,165,92,.25);background:rgba(201,165,92,.04);margin-bottom:0">
         <div style="font-size:13px;color:var(--text);line-height:1.9;font-family:var(--body)">
           This site is your <strong style="color:var(--accent2)">KvK coordination hub</strong> — built to give Kingdom 1057 the edge it deserves.<br><br>
           Minister Spots are <strong style="color:var(--gold)">scarce and powerful</strong>. Submit your speedup inventory and pick timeslots to compete for a position.<br><br>
@@ -763,14 +773,14 @@ document.addEventListener('touchend',function(e){
     <span id="userBarPlayerId" style="font-size:10px;color:var(--text3);font-family:monospace"></span>
   </div>
   <span id="userBarKingdom" style="color:var(--text3);font-size:11px"></span>
-  <span id="userBarRole" style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(61,142,240,.15);color:var(--accent2);margin-left:4px"></span>
+  <span id="userBarRole" style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(201,165,92,.15);color:var(--accent2);margin-left:4px"></span>
   <span style="flex:1"></span>
   <span id="syncStatus" style="font-size:11px;color:var(--text3);margin-right:8px"></span>
   <button class="btn btn-ghost btn-sm" onclick="logOut()" style="font-size:11px;padding:3px 10px;opacity:.8">Sign Out</button>
 </div>
 
 <nav class="nav" id="mainNav" style="display:none">
-  <div class="nav-logo">KINGDOM<span>·</span>1057</div>
+  <div class="nav-logo"><svg width="26" height="30" viewBox="0 0 60 68" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0" aria-hidden="true"><path d="M14 12 L20 4 L30 10 L40 4 L46 12 Z" fill="#d9a648"/><path d="M8 16 H52 V38 C52 52 42 60 30 66 C18 60 8 52 8 38 Z" fill="#7e1f26" stroke="#d9a648" stroke-width="3"/><path d="M14 34 L30 24 L46 34 V42 L30 32 L14 42 Z" fill="#d9a648" opacity="0.92"/></svg>KINGDOM<span>1057</span></div>
   <div class="tab active" onclick="showPage('strategy')">Battle Strategy</div>
   <div class="tab" onclick="showPage('minister')">Minister Spots</div>
   <div class="tab" id="tabSwordland" onclick="showPage('swordland')" style="display:none">Swordland</div>
@@ -814,8 +824,12 @@ document.addEventListener('touchend',function(e){
   <aside class="bs-sidebar" id="bsSidebar"><div class="side-brand"><div style="font-family:var(--head);font-weight:700;letter-spacing:.06em;font-size:16px;color:var(--accent2)">KINGDOM·1057</div><div style="font-size:11px;color:var(--text3)">Battle Strategy</div></div></aside>
   <div class="bs-main">
   <div class="card" style="margin-bottom:14px">
-    <div class="sim-info" style="margin:0">
-      <strong style="color:var(--text)">How to use:</strong> Add leaders by Player ID in the sidebar, then place them with the <b>+ Add leader</b> buttons on turrets and teams, or the ⇄ button on any leader card. A leader can only occupy one slot at a time. The purple bar shows their 2.5h pet buff countdown.
+    <div onclick="bsToggleHowTo()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none">
+      <strong style="color:var(--text);font-size:13px">ℹ️ How to use</strong>
+      <span id="bsHowToChevron" style="color:var(--text3);font-size:12px">▼</span>
+    </div>
+    <div class="sim-info" id="bsHowToBody" style="margin:10px 0 0 0">
+      Add leaders by Player ID in the sidebar, then tap <b>+ Add leader</b> on a turret or team — or the ⇄ button on any leader card — to place them. (On desktop you can also drag cards.) A leader can only occupy one slot at a time. The purple bar is the 2.5h pet buff — tap it to start or stop.
     </div>
   </div>
 
@@ -860,6 +874,7 @@ document.addEventListener('touchend',function(e){
             <button class="btn btn-primary btn-sm" onclick="bsSetOffsetManual()">Set</button>
           </div>
         </div>
+        <div id="bsOffsetPreview" class="mono" style="font-size:12px;color:var(--gold);margin-top:8px"></div>
       </div>
     </div>
   </div>
@@ -896,6 +911,10 @@ document.addEventListener('touchend',function(e){
  <div id="bsLeaderPool"
       style="display:flex;flex-wrap:wrap;gap:10px;min-height:70px;border:2px dashed var(--border);border-radius:8px;padding:12px">
     </div>
+  </div>
+  <div id="bsStickyBar" style="display:none">
+    <span id="bsStickyInfo" style="flex:1;font-size:12px;color:var(--text2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+    <button class="btn btn-gold btn-sm" onclick="bsCopySelectedTeam()">📋 Copy</button>
   </div>
   </div>
   </div>
@@ -980,7 +999,7 @@ document.addEventListener('touchend',function(e){
       </div>
       <div id="msOverviewContent"></div>
     </div>
-    <div style="background:rgba(61,142,240,.06);border:1px solid rgba(61,142,240,.2);border-radius:7px;padding:12px 14px;font-size:12px;color:var(--text2)">
+    <div style="background:rgba(201,165,92,.06);border:1px solid rgba(201,165,92,.2);border-radius:7px;padding:12px 14px;font-size:12px;color:var(--text2)">
     💡 <strong>Want to change your entry?</strong> Click "Edit my submission" above. You'll start from "Which minister spots are you applying for?" and need to complete all steps again. Your current submission will be kept until you submit a new one.
     </div>
   </div>
@@ -1019,7 +1038,12 @@ document.addEventListener('touchend',function(e){
           <div style="margin-top:6px;font-size:12px;color:var(--text3)">💡 <strong>Tip:</strong> The screenshot doesn't need to be perfect — as long as the 4 speedup rows and their numbers are visible, the scanner will pick them up automatically.</div>
         </div>
       </div>
-      <input type="file" id="msFileInput" accept="image/*" style="margin-bottom:10px">
+      <label for="msFileInput" id="msUploadZone" style="display:block;border:2px dashed var(--border2);border-radius:10px;padding:22px 14px;text-align:center;cursor:pointer;margin-bottom:10px;background:var(--bg3)">
+        <div style="font-size:22px">📸</div>
+        <div style="font-size:13px;color:var(--text);font-weight:600;margin-top:4px">Upload your Speedups screenshot</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">Tap to take a photo or choose from your gallery</div>
+      </label>
+      <input type="file" id="msFileInput" accept="image/*" style="display:none">
       <div id="msImgPreviewWrap" style="display:none;margin:12px 0">
         <img id="msImgPreview" style="max-width:280px;border-radius:8px;border:1px solid var(--border)">
       </div>
@@ -1090,6 +1114,7 @@ document.addEventListener('touchend',function(e){
 
       <div id="msDeadlineBanner" style="display:none;margin:12px 0"></div>
       <button class="btn btn-primary" id="msSubmitBtn" onclick="msSubmitEntry()" style="margin-top:4px">✅ Submit My Entry</button>
+    <div id="msSubmitHint" style="font-size:12px;margin-top:8px"></div>
     </div>
   </div>
 
@@ -1105,7 +1130,7 @@ document.addEventListener('touchend',function(e){
         </div>
         <div id="msBoardTimersPanel" style="display:flex;flex-direction:column;gap:8px;min-width:260px"></div>
       </div>
-      <div id="msAdminGuard" style="display:none;background:rgba(61,142,240,.08);border:1px solid var(--border);border-radius:7px;padding:14px;margin-bottom:10px">
+      <div id="msAdminGuard" style="display:none;background:rgba(201,165,92,.08);border:1px solid var(--border);border-radius:7px;padding:14px;margin-bottom:10px">
         <div style="font-size:13px;color:var(--text2);margin-bottom:10px">🔒 Admin password required to manage results.</div>
         <div style="display:flex;gap:8px">
           <input type="password" id="msAdminPwInput" placeholder="Admin password" style="width:160px" onkeydown="if(event.key==='Enter')msUnlockAdmin()">
@@ -1113,7 +1138,7 @@ document.addEventListener('touchend',function(e){
         </div>
         <div id="msAdminPwErr" style="display:none;color:#ff7070;font-size:12px;margin-top:6px">Incorrect password.</div>
       </div>
-<div id="msR4NoticeBanner" style="display:none;background:rgba(61,142,240,.08);border:1px solid var(--border);border-radius:7px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:var(--text2)">
+<div id="msR4NoticeBanner" style="display:none;background:rgba(201,165,92,.08);border:1px solid var(--border);border-radius:7px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:var(--text2)">
         ℹ️ Running allocation, clearing submissions, and overriding the deadline or KvK schedule are <strong>Admin-only</strong>. You can still assign, swap, lock and search players in Manage Spots below.
       </div>
       <div id="msAdminActions" style="display:none">
@@ -1858,7 +1883,7 @@ function tickPets(){
     const bsFill=document.getElementById('bspetfill-'+l.id);
     const bsLabel=document.getElementById('bspetlabel-'+l.id);
     if(bsFill&&bsLabel){
-      if(expired){ bsFill.className='bs-pet-bar-fill off'; bsFill.style.width='0%'; bsLabel.className='bs-pet-label off'; bsLabel.textContent='No pet — tap'; }
+      if(expired){ bsFill.className='bs-pet-bar-fill off'; bsFill.style.width='0%'; bsLabel.className='bs-pet-label off'; bsLabel.textContent='No pet — tap to start'; }
       else { const cls=expiring?'warn':'on'; bsFill.className='bs-pet-bar-fill '+cls; bsFill.style.width=Math.max(0,Math.min(100,rem/PET_DUR*100))+'%'; bsLabel.className='bs-pet-label '+cls; bsLabel.textContent=txt; }
     }
   });
@@ -1894,7 +1919,7 @@ function renderPetPlanChips(){
   const el=document.getElementById('bsPetSelChips'); if(!el) return;
   el.innerHTML = S.leaders.length ? S.leaders.map(function(l){
     const on=bsPetSel.indexOf(l.id)>=0;
-    return '<span onclick="bsPetSelToggle('+"'"+l.id+"'"+')" style="cursor:pointer;user-select:none;font-size:12px;padding:4px 10px;border-radius:14px;border:1px solid '+(on?'var(--accent)':'var(--border)')+';background:'+(on?'rgba(61,142,240,.15)':'var(--bg3)')+';color:'+(on?'var(--accent2)':'var(--text2)')+'">'+l.name+'</span>';
+    return '<span onclick="bsPetSelToggle('+"'"+l.id+"'"+')" style="cursor:pointer;user-select:none;font-size:12px;padding:4px 10px;border-radius:14px;border:1px solid '+(on?'var(--accent)':'var(--border)')+';background:'+(on?'rgba(201,165,92,.15)':'var(--bg3)')+';color:'+(on?'var(--accent2)':'var(--text2)')+'">'+l.name+'</span>';
   }).join('') : '<span style="color:var(--text3);font-size:12px">No leaders yet.</span>';
 }
 function renderPetPlanList(){
@@ -1913,7 +1938,7 @@ function renderPetPlanList(){
         '<span style="color:var(--text2);font-size:12px">'+p.leaderIds.length+' leader'+(p.leaderIds.length===1?'':'s')+'</span>'+
         '<span style="font-size:12px">'+status+'</span>'+
         '<span style="flex:1"></span>'+
-        '<span onclick="bsRemovePetPlan('+"'"+p.id+"'"+')" style="cursor:pointer;color:var(--text3);font-size:14px" title="Remove">✕</span>'+
+        '<span onclick="bsRemovePetPlan('+"'"+p.id+"'"+')" style="cursor:pointer;color:var(--text3);font-size:14px;padding:6px 8px" title="Remove">✕</span>'+
       '</div>'+
       '<div style="color:var(--text3);font-size:11px;margin-top:4px;line-height:1.5">'+names+'</div>'+
     '</div>';
@@ -1940,7 +1965,7 @@ function bsRemoveFromSlot(leaderId){
 
 function bsLeaderCardHTML(l){
   const p=l.pet||{active:false,startMs:null};
-  let petCls='off',petTxt='No pet — tap',petPct=0;
+  let petCls='off',petTxt='No pet — tap to start',petPct=0;
   if(p.active&&p.startMs){
     const rem=PET_DUR-(Date.now()-p.startMs);
     if(rem>0){ petCls=(rem<=WARN_MS)?'warn':'on'; petTxt=fmtSec(Math.ceil(rem/1000)); petPct=Math.max(0,Math.min(100,rem/PET_DUR*100)); }
@@ -1951,13 +1976,13 @@ function bsLeaderCardHTML(l){
   let placedTeam=null;
   if(l.bsSlot && l.bsSlot.slotType==='team'){ bsEnsureTeamColors(); placedTeam=S.teams.find(t=>t.id===l.bsSlot.slotId); }
   const accent = placedTeam ? ('border-left:4px solid '+placedTeam.color+';') : '';
-  const removeBtn = inPool ? '' : '<span onclick="event.stopPropagation();bsRemoveFromSlot(\''+l.id+'\')" title="Remove — back to pool" style="cursor:pointer;color:#ff8080;font-size:13px;padding:0 2px">✕</span>';
-  return `<div class="bs-leader-card" id="bsleader-${l.id}" style="${accent}">
-    <div class="bs-leader-name" style="display:flex;align-items:center;gap:4px"><span style="flex:1">${l.name} <span class="badge badge-${l.tier.toLowerCase()}" style="margin-left:3px">${l.tier}</span></span>${removeBtn}<span onclick="event.stopPropagation();bsOpenMoveModal('${l.id}')" title="Move" style="cursor:pointer;color:var(--text3);font-size:13px;padding:0 2px">⇄</span></div>
-    <div class="bs-leader-meta">${placedTeam?placedTeam.name+' · ':''}${l.march}s march</div>
-    <div class="bs-pet-bar" style="cursor:pointer" onclick="bsTogglePet(event,'${l.id}')" title="Click to toggle 2.5h pet buff"><div class="bs-pet-bar-fill ${petCls}" id="bspetfill-${l.id}" style="width:${petPct}%"></div></div>
-    <div class="bs-pet-label ${petCls}" id="bspetlabel-${l.id}" style="cursor:pointer" onclick="bsTogglePet(event,'${l.id}')">${petTxt}</div>
-  </div>`;
+  const removeBtn = inPool ? '' : '<span onclick="event.stopPropagation();bsRemoveFromSlot(\\''+l.id+'\\')" title="Remove — back to pool" style="cursor:pointer;color:#ff8080;font-size:14px;padding:6px 8px">✕</span>';
+  return \`<div class="bs-leader-card" id="bsleader-\${l.id}" style="\${accent}">
+    <div class="bs-leader-name" style="display:flex;align-items:center;gap:4px"><span style="flex:1">\${l.name} <span class="badge badge-\${l.tier.toLowerCase()}" style="margin-left:3px">\${l.tier}</span></span>\${removeBtn}<span onclick="event.stopPropagation();bsOpenMoveModal('\${l.id}')" title="Move" style="cursor:pointer;color:var(--text3);font-size:14px;padding:6px 8px">⇄</span></div>
+    <div class="bs-leader-meta">\${placedTeam?placedTeam.name+' · ':''}\${l.march}s march</div>
+    <div class="bs-pet-bar" style="cursor:pointer" onclick="bsTogglePet(event,'\${l.id}')" title="Click to toggle 2.5h pet buff"><div class="bs-pet-bar-fill \${petCls}" id="bspetfill-\${l.id}" style="width:\${petPct}%"></div></div>
+    <div class="bs-pet-label \${petCls}" id="bspetlabel-\${l.id}" style="cursor:pointer" onclick="bsTogglePet(event,'\${l.id}')">\${petTxt}</div>
+  </div>\`;
 }
 
 function bsTogglePet(e,leaderId){
@@ -2036,14 +2061,14 @@ function teamBoxHTML(t){
       : ('background:var(--bg4);color:var(--text2);border-color:var(--border2);');
     return '<span class="ally-pill" style="'+st+'" onclick="bsSetTeamAlliance('+"'"+t.id+"'"+','+"'"+a.id+"'"+')">'+a.name+'</span>';
   }).join('');
-  return `<div class="bs-team-box" id="bsteam-${t.id}" style="background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px">
-      <div class="bs-team-header" style="display:flex;align-items:center;gap:6px"><span style="flex:1;font-weight:600">${t.name}</span><span onclick="bsRenameTeam('${t.id}')" title="Rename" style="cursor:pointer;color:var(--text3);font-size:12px">✎</span><span onclick="bsDeleteTeam('${t.id}')" title="Delete team" style="cursor:pointer;color:#e0685f;font-size:13px">✕</span></div>
-      <div class="bs-alliance-toggle" style="display:flex;gap:5px;flex-wrap:wrap;margin:7px 0 8px">${pills}</div>
-      <button style="width:100%;margin-bottom:8px;background:rgba(61,142,240,.15);border:1.5px solid var(--accent);color:var(--accent2);font-weight:700;font-size:12px;padding:7px;border-radius:6px;cursor:pointer;font-family:var(--head);letter-spacing:.03em" onclick="bsOpenAddModal('team','${t.id}')">➕ Add Leader</button>
+  return \`<div class="bs-team-box" id="bsteam-\${t.id}" style="background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px">
+      <div class="bs-team-header" style="display:flex;align-items:center;gap:6px"><span style="flex:1;font-weight:600">\${t.name}</span><span onclick="bsRenameTeam('\${t.id}')" title="Rename" style="cursor:pointer;color:var(--text3);font-size:12px">✎</span><span onclick="bsDeleteTeam('\${t.id}')" title="Delete team" style="cursor:pointer;color:#e0685f;font-size:13px">✕</span></div>
+      <div class="bs-alliance-toggle" style="display:flex;gap:5px;flex-wrap:wrap;margin:7px 0 8px">\${pills}</div>
+      <button style="width:100%;margin-bottom:8px;background:rgba(201,165,92,.15);border:1.5px solid var(--accent);color:var(--accent2);font-weight:700;font-size:12px;padding:7px;border-radius:6px;cursor:pointer;font-family:var(--head);letter-spacing:.03em" onclick="bsOpenAddModal('team','\${t.id}')">➕ Add Leader</button>
       <div class="bs-team-zone">
-        ${occupants.length?occupants.map(o=>bsLeaderCardHTML(o)).join(''):'<div style="color:var(--text3);font-size:12px;padding:8px">No leaders yet.</div>'}
+        \${occupants.length?occupants.map(o=>bsLeaderCardHTML(o)).join(''):'<div style="color:var(--text3);font-size:12px;padding:8px">No leaders yet.</div>'}
       </div>
-    </div>`;
+    </div>\`;
 }
 function renderBsAllianceZones(){
   bsEnsureAlliances();
@@ -2225,14 +2250,14 @@ function renderBsSidebar(){
       '<div style="display:flex;gap:6px;align-items:flex-end"><div style="width:80px"><label style="display:block;font-size:10px;color:var(--text2);margin-bottom:3px">March (s)</label><input type="number" id="bsAddMarch" min="0" placeholder="35" style="width:100%"></div><button class="btn btn-primary btn-sm" style="flex:1" onclick="bsAddLeaderById()">+ Add Leader</button></div>'+
     '</div>'+
     '<div class="side-sec"><h3>⚔️ Alliance</h3>'+
-      '<div style="background:rgba(61,142,240,.1);border:2px solid var(--accent);border-radius:8px;padding:10px;margin-bottom:10px">'+
+      '<div style="background:rgba(201,165,92,.1);border:2px solid var(--accent);border-radius:8px;padding:10px;margin-bottom:10px">'+
         '<label style="display:block;font-size:11px;font-weight:700;color:var(--accent2);margin-bottom:5px">＋ Add New Alliance</label>'+
         '<div style="display:flex;gap:6px"><input id="bsNewAllianceName" placeholder="e.g. Attack 2" style="flex:1"><button class="btn btn-primary" onclick="bsAddAlliance()">+ Add</button></div>'+
       '</div>'+
       '<div id="bsAllianceList"></div>'+
     '</div>'+
     '<div class="side-sec"><h3>🛡️ Team</h3>'+
-      '<div style="background:rgba(61,142,240,.06);border:2px solid var(--border2);border-radius:8px;padding:10px;margin-bottom:10px">'+
+      '<div style="background:rgba(201,165,92,.06);border:2px solid var(--border2);border-radius:8px;padding:10px;margin-bottom:10px">'+
         '<label style="display:block;font-size:11px;font-weight:700;color:var(--text);margin-bottom:5px">＋ Add New Team</label>'+
         '<div style="display:flex;gap:6px"><input id="bsNewTeamName" placeholder="e.g. Team 5" style="flex:1"><button class="btn btn-primary" onclick="bsAddTeam()">+ Add</button></div>'+
       '</div>'+
@@ -2247,8 +2272,8 @@ function renderBsTeamList(){
   el.innerHTML=S.teams.map(function(t){
     return '<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">'+
       '<span style="width:10px;height:10px;border-radius:50%;background:'+t.color+';flex-shrink:0"></span>'+
-      '<input value="'+(t.name||'').replace(/"/g,'&quot;')+'" onchange="bsRenameTeamInput(\''+t.id+'\',this.value)" style="flex:1;font-size:12px;padding:4px 7px">'+
-      '<span onclick="bsDeleteTeam(\''+t.id+'\')" style="cursor:pointer;color:var(--text3);font-size:13px" title="Remove team">✕</span>'+
+      '<input value="'+(t.name||'').replace(/"/g,'&quot;')+'" onchange="bsRenameTeamInput(\\''+t.id+'\\',this.value)" style="flex:1;font-size:12px;padding:4px 7px">'+
+      '<span onclick="bsDeleteTeam(\\''+t.id+'\\')" style="cursor:pointer;color:var(--text3);font-size:14px;padding:6px 8px" title="Remove team">✕</span>'+
     '</div>';
   }).join('');
 }
@@ -2256,6 +2281,7 @@ function bsRenameTeamInput(teamId, val){
   var t=S.teams.find(function(x){return x.id===teamId;}); if(!t) return;
   var name=(val||'').trim(); if(!name) return;
   t.name=name; renderBattleStrategy(); if(typeof renderSetup==='function') renderSetup(); syncQueuePush();
+  toast('Team renamed');
 }
 function bsOnDrop(e,slotType,slotId){
   e.preventDefault();
@@ -2327,13 +2353,13 @@ const turretGrid=document.getElementById('bsTurretGrid');
   if(turretGrid){
     turretGrid.innerHTML=BS_TURRETS.map((t,i)=>{
       const occupants=S.leaders.filter(l=>l.bsSlot&&l.bsSlot.slotType==='turret'&&l.bsSlot.slotId===i);
-      return `<div>
-        <div class="bs-slot-label">🗼 ${t.name}</div>
+      return \`<div>
+        <div class="bs-slot-label">🗼 \${t.name}</div>
         <div class="bs-slot" style="display:flex;flex-direction:column;gap:8px">
-          ${occupants.length?occupants.map(o=>bsLeaderCardHTML(o)).join(''):'<div style="color:var(--text3);font-size:11px;text-align:center;padding:6px 0">No leaders yet.</div>'}
+          \${occupants.length?occupants.map(o=>bsLeaderCardHTML(o)).join(''):'<div style="color:var(--text3);font-size:11px;text-align:center;padding:6px 0">No leaders yet.</div>'}
           <button class="btn btn-ghost btn-sm" style="width:100%;font-size:11px" onclick="bsOpenAddModal('+"'"+'turret'+"'"+','+i+')">+ Add leader</button>
         </div>
-      </div>`;
+      </div>\`;
     }).join('');
   }
 
@@ -2343,7 +2369,7 @@ const turretGrid=document.getElementById('bsTurretGrid');
   const poolEl=document.getElementById('bsLeaderPool');
   if(poolEl){
     const poolLeaders=S.leaders.filter(l=>l.bsSlot&&l.bsSlot.slotType==='pool');
-    poolEl.innerHTML=poolLeaders.length?poolLeaders.map(l=>bsLeaderCardHTML(l)).join(''):'<div style="color:var(--text3);font-size:12px">No leaders in the pool.</div>';
+    poolEl.innerHTML=poolLeaders.length?poolLeaders.map(l=>bsLeaderCardHTML(l)).join(''):'<div style="color:var(--text3);font-size:12px">No unassigned leaders. Add new ones with a Player ID in the "Add Rally Leader" panel.</div>';
   }
 
 bsRenderTeamButtons();
@@ -2356,7 +2382,7 @@ if(typeof renderPetPlans==='function') renderPetPlans();
 renderBattleStrategy();
 
 // ════════════ BATTLE STRATEGY — SHARED SETUP & FINAL CALCULATION ════════════
-const BS_CALC = { offsetSec: null, selectedTeamId: null };
+const BS_CALC = { offsetSec: null, selectedTeamId: null, frozen: null };
 
 function bsTickClock(){
   const hh=document.getElementById('bsClockHH');
@@ -2365,10 +2391,20 @@ function bsTickClock(){
   document.getElementById('bsClockHH').textContent=String(n.getUTCHours()).padStart(2,'0');
   document.getElementById('bsClockMM').textContent=String(n.getUTCMinutes()).padStart(2,'0');
   document.getElementById('bsClockSS').textContent=String(n.getUTCSeconds()).padStart(2,'0');
-  // Live-recalculate launch times every second so they never show a past time
+  // Live-recalculate launch times every second so they never show a past time.
+  // If a copied schedule is frozen, show countdowns against it instead of re-sliding the times.
   if(BS_CALC.offsetSec!==null && BS_CALC.selectedTeamId!==null){
-    bsCalcTeam(BS_CALC.selectedTeamId, BS_CALC.offsetSec, false);
+    if(BS_CALC.frozen && BS_CALC.frozen.teamId===BS_CALC.selectedTeamId) bsRenderFrozen();
+    else bsCalcTeam(BS_CALC.selectedTeamId, BS_CALC.offsetSec, false);
   }
+  var prev=document.getElementById('bsOffsetPreview');
+  if(prev){
+    if(BS_CALC.offsetSec!==null){
+      var lbl=BS_CALC.offsetSec<60?BS_CALC.offsetSec+'s':Math.floor(BS_CALC.offsetSec/60)+'m';
+      prev.textContent='Marker +'+lbl+' → first launch at '+s2hms(nowUTCSec()+BS_CALC.offsetSec)+' UTC';
+    } else prev.textContent='';
+  }
+  if(typeof bsRenderStickyBar==='function') bsRenderStickyBar();
 }
 setInterval(bsTickClock,1000); bsTickClock();
 
@@ -2396,17 +2432,18 @@ function bsSetOffsetManual(){
   BS_CALC.offsetSec=v;
   bsClearOffsetHighlight();
   var wrap=document.getElementById('bsCustomOffsetWrap');
-  if(wrap){ wrap.style.borderColor='var(--gold)'; wrap.style.background='rgba(240,165,0,.15)'; }
+  if(wrap){ wrap.style.borderColor='var(--gold)'; wrap.style.background='rgba(217,166,72,.15)'; }
   if(BS_CALC.selectedTeamId!==null) bsCalcTeam(BS_CALC.selectedTeamId, v, true);
   else toast('Offset set to '+(v<60?v+'s':Math.floor(v/60)+'m'+(v%60?' '+(v%60)+'s':''))+' — now click a team');
 }
 function bsSetOffset(sec){
   BS_CALC.offsetSec=sec;
+  BS_CALC.frozen=null;
   bsClearOffsetHighlight();
   var btn=document.getElementById('bsOffsetBtn-'+sec);
-  if(btn){ btn.style.background='var(--gold)'; btn.style.color='#1a1206'; btn.style.boxShadow='0 0 0 3px rgba(240,165,0,.35)'; }
+  if(btn){ btn.style.background='var(--gold)'; btn.style.color='#1a1206'; btn.style.boxShadow='0 0 0 3px rgba(217,166,72,.35)'; }
   if(BS_CALC.selectedTeamId!==null) bsCalcTeam(BS_CALC.selectedTeamId, sec, true);
-  else toast(`Offset set to +${sec<60?sec+'s':Math.floor(sec/60)+'m'} — now click a team`);
+  else toast(\`Offset set to +\${sec<60?sec+'s':Math.floor(sec/60)+'m'} — now click a team\`);
 }
 
 // Per-team rally state (transient, not synced — driven by the land timer in the rally flow)
@@ -2426,10 +2463,11 @@ el.innerHTML=S.teams.map(t=>{
     const dot='<span class="team-dot '+(rallying?'rallying':'free')+'"></span>';
     let meta='<span style="opacity:.6;font-size:11px">('+leaderCount+')</span>';
     if(rallying){ const rem=(bsTeamRally[t.id].landEnd-Date.now())/1000; meta='<span class="mono" style="color:#ff7070;font-size:12px;margin-left:2px">lands '+bsFmtLand(rem)+'</span>'; }
-    return \`<button class="btn \${allianceColor}" style="\${selected}" onclick="bsSelectTeam('\${t.id}')">\${dot}\${t.name} \${meta}</button>\`;
+    return \`<button class="btn \${allianceColor}" style="\${selected}" onclick="bsSelectTeam('\${t.id}')">\${bsTeamColorDot(t.id)}\${dot}\${t.name} \${meta}</button>\`;
   }).join('');
 }
 function bsSelectTeam(teamId){
+  if(BS_CALC.frozen && BS_CALC.frozen.teamId!==teamId) BS_CALC.frozen=null;
   BS_CALC.selectedTeamId=teamId;
   bsRenderTeamButtons();
   if(BS_CALC.offsetSec!==null) bsCalcTeam(teamId, BS_CALC.offsetSec, true);
@@ -2462,7 +2500,7 @@ function bsCalcTeam(teamId, offsetSec, logToast){
   const header=\`\${t.name}\`;
   const resultEl=document.getElementById('bsFinalResult');
   resultEl.innerHTML=\`<div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:14px 16px">
-    <div style="font-weight:600;font-size:13px;color:var(--text);margin-bottom:10px">\${header}</div>
+    <div style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;color:var(--text);margin-bottom:10px">\${bsTeamColorDot(t.id)}\${header}</div>
     \${results.map((r,i)=>\`
       <div class="copy-line" style="margin-bottom:5px" onclick="copyText('\${r.name} | Time: \${s2hms(r.launchSec)}')">
         <span>
@@ -2481,6 +2519,10 @@ function bsCalcTeam(teamId, offsetSec, logToast){
   // Show the persistent quick-copy button above the result
 
   if(logToast) toast(\`\${t.name} — rally times calculated!\`);
+  if(logToast && window.innerWidth<=900){
+    var _r=document.getElementById('bsFinalResult');
+    if(_r && _r.scrollIntoView) _r.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
 }
 
 function bsCopySelectedTeam(){
@@ -2498,8 +2540,94 @@ function bsCopyTeamResult(teamId){
   // Start (or reset) this team's land timer: rally duration + longest march + marker (= selected offset)
   const dur=t._bsLastCalc.dur||300, mm=t._bsLastCalc.maxMarch||0, mk=(BS_CALC.offsetSec!=null?BS_CALC.offsetSec:0);
   bsTeamRally[teamId]={landEnd:Date.now()+(dur+mm+mk)*1000};
+  // Freeze the copied schedule so the screen matches what was pasted in chat,
+  // and switch the result panel to live per-leader launch countdowns.
+  BS_CALC.frozen={teamId:teamId, results:results.map(function(r){ return {name:r.name, march:r.march, launchSec:r.launchSec, _fired:false}; })};
+  bsRenderFrozen();
   if(typeof bsRenderTeamButtons==='function') bsRenderTeamButtons();
 }
+// ── Team color dot (matches the leader-card accent) ──
+function bsTeamColorDot(teamId){
+  if(typeof bsEnsureTeamColors==='function') bsEnsureTeamColors();
+  var t=S.teams.find(function(x){return x.id===teamId;});
+  if(!t||!t.color) return '';
+  return '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+t.color+';flex-shrink:0;margin-right:2px"></span>';
+}
+
+// ── Frozen (copied) schedule with live per-leader launch countdowns ──
+function bsRenderFrozen(){
+  var f=BS_CALC.frozen; if(!f) return;
+  var el=document.getElementById('bsFinalResult'); if(!el) return;
+  var t=S.teams.find(function(x){return x.id===f.teamId;});
+  var now=nowUTCSec();
+  var rows=f.results.map(function(r){
+    var rem=r.launchSec-now;
+    var st, cls='';
+    if(rem>10){ st='<span class="mono" style="color:var(--text2);font-size:13px">in '+rem+'s</span>'; }
+    else if(rem>0){ cls=' bs-launch-soon'; st='<span class="mono" style="color:#ff7070;font-size:14px;font-weight:700">in '+rem+'s</span>'; }
+    else {
+      cls=' bs-launch-go'; st='<span style="color:var(--green);font-size:13px;font-weight:700">GO!</span>';
+      if(!r._fired){ r._fired=true; if(navigator.vibrate){ try{ navigator.vibrate([200,100,200]); }catch(e){} } }
+    }
+    return '<div class="copy-line'+cls+'" style="margin-bottom:5px;display:flex;justify-content:space-between;align-items:center">'+
+      '<span><strong style="color:var(--text)">'+r.name+'</strong>'+
+      '<span style="color:var(--text3);margin:0 8px">|</span>'+
+      '<span class="mono" style="color:var(--gold);font-size:16px">'+s2hms(r.launchSec)+'</span>'+
+      '<span style="color:var(--text3);font-size:11px;margin-left:8px">(march '+r.march+'s)</span></span>'+st+'</div>';
+  }).join('');
+  el.innerHTML='<div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:14px 16px">'+
+    '<div style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;color:var(--text);margin-bottom:10px">'+bsTeamColorDot(f.teamId)+(t?t.name:'')+
+    '<span style="color:var(--gold);font-size:11px;font-weight:600">● LOCKED — copied schedule</span></div>'+rows+
+    '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+    '<button class="btn btn-gold btn-sm" onclick="bsCopyTeamResult(&quot;'+f.teamId+'&quot;)">📋 Copy again</button>'+
+    '<button class="btn btn-ghost btn-sm" onclick="bsUnfreezeSchedule()">↺ Recalculate live</button>'+
+    '<span id="bsCopyMsg" style="font-size:12px;font-weight:600"></span></div></div>';
+}
+function bsUnfreezeSchedule(){
+  BS_CALC.frozen=null;
+  if(BS_CALC.selectedTeamId!==null && BS_CALC.offsetSec!==null) bsCalcTeam(BS_CALC.selectedTeamId, BS_CALC.offsetSec, false);
+}
+
+// ── Collapsible "How to use" card (state remembered) ──
+function bsToggleHowTo(){
+  var body=document.getElementById('bsHowToBody');
+  var chev=document.getElementById('bsHowToChevron');
+  if(!body) return;
+  var collapsed = body.style.display==='none';
+  body.style.display = collapsed ? '' : 'none';
+  if(chev) chev.textContent = collapsed ? String.fromCharCode(9660) : String.fromCharCode(9654);
+  try{ localStorage.setItem('bsHowToCollapsed', collapsed ? '0' : '1'); }catch(e){}
+}
+(function(){
+  try{
+    if(localStorage.getItem('bsHowToCollapsed')==='1'){
+      var body=document.getElementById('bsHowToBody');
+      var chev=document.getElementById('bsHowToChevron');
+      if(body) body.style.display='none';
+      if(chev) chev.textContent=String.fromCharCode(9654);
+    }
+  }catch(e){}
+})();
+
+// ── Mobile sticky quick bar: current team + offset + copy, pinned at the bottom ──
+function bsRenderStickyBar(){
+  var bar=document.getElementById('bsStickyBar'); if(!bar) return;
+  var pg=document.getElementById('page-strategy');
+  var show = pg && pg.classList.contains('active') && window.innerWidth<=900 && BS_CALC.selectedTeamId!==null && BS_CALC.offsetSec!==null;
+  bar.style.display = show ? 'flex' : 'none';
+  if(!show) return;
+  var t=S.teams.find(function(x){return x.id===BS_CALC.selectedTeamId;});
+  var info=document.getElementById('bsStickyInfo'); if(!info) return;
+  var lbl=BS_CALC.offsetSec<60?BS_CALC.offsetSec+'s':Math.floor(BS_CALC.offsetSec/60)+'m';
+  var txt=(t?t.name:'')+' +'+lbl;
+  if(BS_CALC.frozen && BS_CALC.frozen.teamId===BS_CALC.selectedTeamId){
+    var now=nowUTCSec(); var next=null;
+    BS_CALC.frozen.results.forEach(function(r){ var rem=r.launchSec-now; if(rem>0 && (next===null||rem<next)) next=rem; });
+    txt += next!==null ? ' — next launch in '+next+'s' : ' — all launched';
+  }
+  info.textContent=txt;
+}
+
 function bsCopyFeedback(ok){
   const el=document.getElementById('bsCopyMsg'); if(!el) return;
   el.textContent=ok?'Copied ✓':'Copy failed ✗';
@@ -2643,6 +2771,18 @@ function msInit(){
     msUpdateDeadlineBanners();
     return;
   }
+  // Restore an unfinished draft (survives refresh/navigation; expires after 7 days)
+  if(!MS._submittedEntry && !MS._editing && !(MS.draft && MS.draft.boards && MS.draft.boards.length) && !MS._draftRestoreTried){
+    MS._draftRestoreTried = true;
+    const _saved = pid ? lsGet('ms_draft_' + pid) : null;
+    if(_saved && _saved.draft && _saved.draft.boards && _saved.draft.boards.length && (Date.now() - (_saved.ts||0)) < 7*86400000){
+      MS.draft = _saved.draft;
+      MS._unlockedStep = _saved.unlocked || 1;
+      MS._currentStep = _saved.step || 1;
+      MS._completedSteps = _saved.completed || [];
+      toast('Draft restored — continuing where you left off ✓');
+    }
+  }
   // Board-pick gate: applying fresh must choose boards first — identical for R4/R5
   if(!MS._editing && !(MS.draft && MS.draft.boards && MS.draft.boards.length)){
     msShowBoardPick();
@@ -2659,9 +2799,18 @@ function msInit(){
   msUpdateDeadlineBanners();
 }
 
+function msSaveDraft(){
+  try {
+    const pid = verifiedPlayer ? String(verifiedPlayer.id) : 'anon';
+    lsSet('ms_draft_' + pid, { draft: MS.draft, unlocked: MS._unlockedStep||1, step: MS._currentStep||1, completed: MS._completedSteps||[], ts: Date.now() });
+  } catch(e) {}
+}
 function msMarkStepComplete(n){
   MS._unlockedStep=Math.max(MS._unlockedStep||1, n+1);
+  MS._completedSteps=MS._completedSteps||[];
+  if(MS._completedSteps.indexOf(n)<0) MS._completedSteps.push(n);
   msRenderStepTabs();
+  msSaveDraft();
 }
 
 function msRenderStepTabs(){
@@ -2677,6 +2826,7 @@ function msRenderStepTabs(){
   const tab5 = document.getElementById('msStepTab5');
   if(tab5) tab5.style.display = isR4 ? '' : 'none';
 
+  const baseLabels={1:'1. Upload',2:'2. Verify',3:'3. Commitment',4:'4. Timeslots & Submit'};
   for(let i=1;i<=4;i++){
     const tab=document.getElementById('msStepTab'+i);
     if(!tab) continue;
@@ -2685,6 +2835,10 @@ function msRenderStepTabs(){
     tab.style.opacity=isLocked?'0.4':'1';
     tab.style.cursor=isLocked?'not-allowed':'pointer';
     tab.title=isLocked?'Complete the previous step first':'';
+    const done=(MS._completedSteps||[]).indexOf(i)>=0;
+    tab.textContent=(done?'✓ ':'')+baseLabels[i];
+    if(done && !tab.classList.contains('active')) tab.style.color='var(--green)';
+    else if(!isLocked) tab.style.color='';
   }
 }
 
@@ -2726,6 +2880,12 @@ document.addEventListener('change',function(e){
       const img=document.getElementById('msImgPreview');
       const wrap=document.getElementById('msImgPreviewWrap');
       if(img&&wrap){ img.src=msUploadedImageData; wrap.style.display='block'; }
+      var z=document.getElementById('msUploadZone');
+      if(z){
+        var fn=String(file.name||'screenshot').replace(/[<>&"]/g,'');
+        z.innerHTML='<div style="font-size:20px">✅</div><div style="font-size:13px;color:var(--green);font-weight:600;margin-top:4px">'+fn+'</div><div style="font-size:11px;color:var(--text3);margin-top:2px">Tap to choose a different screenshot</div>';
+        z.style.borderColor='var(--green)';
+      }
     };
     reader.readAsDataURL(file);
   }
@@ -2753,7 +2913,7 @@ async function msRunOCR(){
   const identity=msValidateIdentity();
   if(!identity) return;
   const {alliance,ign}=identity;
-  if(!msUploadedImageData){ alert('Upload a screenshot first, or click "Skip — enter manually".'); return; }
+  if(!msUploadedImageData){ toast('Upload a screenshot first, or tap "Skip — enter manually".'); return; }
   MS.draft.alliance=alliance; MS.draft.ign=ign;
 
   const statusEl=document.getElementById('msOCRStatus');
@@ -2774,7 +2934,7 @@ const base64 = msUploadedImageData.split(',')[1];
 
     const res = await fetch('/ocr-speedups', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: (typeof stateHeaders==='function' ? stateHeaders({ 'Content-Type': 'application/json' }) : { 'Content-Type': 'application/json' }),
       body: JSON.stringify({ image: base64 })
     });
 
@@ -2826,7 +2986,28 @@ const base64 = msUploadedImageData.split(',')[1];
   msGoStep(2);
 }
 
+// Lazy-load Tesseract.js only when OCR fallback is actually needed (saves ~2MB on every page load)
+function ensureTesseract(){
+  if (typeof Tesseract !== 'undefined') return Promise.resolve();
+  if (window._tessLoading) return window._tessLoading;
+  window._tessLoading = new Promise(function(resolve){
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js';
+    s.onload = function(){ resolve(); };
+    s.onerror = function(){
+      var s2 = document.createElement('script');
+      s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js';
+      s2.onload = function(){ resolve(); };
+      s2.onerror = function(){ resolve(); };
+      document.head.appendChild(s2);
+    };
+    document.head.appendChild(s);
+  });
+  return window._tessLoading;
+}
+
 async function msRunOCRTesseract(statusEl, pctEl, barEl) {
+  await ensureTesseract();
   if(typeof Tesseract==='undefined'){
     statusEl.textContent='⚠ OCR engine not available — please enter values manually';
     statusEl.style.color='#ff7070';
@@ -2990,7 +3171,7 @@ function msRenderBoardPick(){
         '<div style="font-size:13px;color:#ff8080">closed</div>'+
       '</div>';
     }
-    return '<div onclick="msToggleBoardPick('+"'"+b+"'"+')" style="cursor:pointer;border:2px solid '+(on?m.color:'var(--border)')+';background:'+(on?'rgba(61,142,240,.06)':'var(--bg3)')+';border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px">'+
+    return '<div onclick="msToggleBoardPick('+"'"+b+"'"+')" style="cursor:pointer;border:2px solid '+(on?m.color:'var(--border)')+';background:'+(on?'rgba(201,165,92,.06)':'var(--bg3)')+';border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px">'+
       '<div style="font-size:26px">'+m.icon+'</div>'+
       '<div style="flex:1"><div style="font-family:var(--head);font-weight:600;font-size:16px;color:'+(on?m.color:'var(--text)')+'">'+m.label+'</div><div style="font-size:12px;color:var(--text3)">'+m.blurb+'</div></div>'+
       '<div style="font-size:18px;color:'+(on?m.color:'var(--text3)')+'">'+(on?'✓':'○')+'</div>'+
@@ -3038,6 +3219,7 @@ function msRenderVerifyGrid(){
   }).join('');
 }
 function msUpdateVerify(cat){
+  clearTimeout(window._msDraftT); window._msDraftT = setTimeout(msSaveDraft, 400);
   const amt=parseFloat(document.getElementById('msVerifyAmt-'+cat).value)||0;
   const unit=document.getElementById('msVerifyUnit-'+cat).value;
   const hours=amt*MS_UNIT_TO_HOURS[unit];
@@ -3098,11 +3280,11 @@ function msRenderGeneralSplit(){
   host.style.display='block';
   var rows = genBoards.map(function(b){
     var m=MS_BOARD_META[b];
-    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="width:120px;font-size:12px;color:'+m.color+'">'+m.icon+' '+m.label+'</span><input type="number" min="0" step="0.1" value="'+(MS.draft.generalSplit[b]||0)+'" style="width:90px" oninput="msUpdateGeneralSplit(\''+b+'\',this.value)"><span style="font-size:11px;color:var(--text3)">hours</span></div>';
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="width:120px;font-size:12px;color:'+m.color+'">'+m.icon+' '+m.label+'</span><input type="number" min="0" step="0.1" value="'+(MS.draft.generalSplit[b]||0)+'" style="width:90px" oninput="msUpdateGeneralSplit(\\''+b+'\\',this.value)"><span style="font-size:11px;color:var(--text3)">hours</span></div>';
   }).join('');
   host.innerHTML =
     '<div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">⚖️ Split your General Speedup between boards</div>'+
-    '<div style="font-size:11.5px;color:var(--text3);margin-bottom:8px">You picked more than one board that uses General Speedup. Tell us how many of your '+committedH.toFixed(1)+'h committed hours go to each — otherwise the same hours get counted toward both boards\' KvK points.</div>'+
+    '<div style="font-size:11.5px;color:var(--text3);margin-bottom:8px">You picked more than one board that uses General Speedup. Tell us how many of your '+committedH.toFixed(1)+'h committed hours go to each — otherwise the same hours get counted toward both boards\\' KvK points.</div>'+
     rows+
     '<div id="msGeneralSplitSummary" style="font-size:12px;margin-top:4px"></div>'+
     '<button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="msSplitGeneralEvenly()">Split evenly</button>';
@@ -3118,6 +3300,7 @@ function msRenderGeneralSplitSummary(){
   else { el.innerHTML = '<span style="color:#ff7070">'+used.toFixed(1)+'h of '+committedH.toFixed(1)+'h allocated — '+(-diff).toFixed(1)+'h over budget</span>'; }
 }
 function msUpdateGeneralSplit(board, val){
+  clearTimeout(window._msDraftT); window._msDraftT = setTimeout(msSaveDraft, 400);
   MS.draft.generalSplit = MS.draft.generalSplit || {};
   var n = parseFloat(val); if(isNaN(n)||n<0) n=0;
   MS.draft.generalSplit[board] = n;
@@ -3134,6 +3317,7 @@ function msSplitGeneralEvenly(){
 function msUpdateTG(v){ MS.draft=MS.draft||{}; var n=parseInt(v,10); MS.draft.truegold=(isNaN(n)||n<0)?0:n; }
 function msUpdateDust(v){ MS.draft=MS.draft||{}; var n=parseInt(v,10); MS.draft.dust=(isNaN(n)||n<0)?0:n; }
 function msUpdateSlider(cat){
+  clearTimeout(window._msDraftT); window._msDraftT = setTimeout(msSaveDraft, 400);
   const pct=parseInt(document.getElementById('msSlider-'+cat).value);
   MS.draft.commit[cat]=pct;
   const hours=MS.draft.verify[cat]?MS.draft.verify[cat].hours:0;
@@ -3272,6 +3456,7 @@ function msClearPicks(){
 }
 
 function msTogglePick(i){
+  clearTimeout(window._msDraftT); window._msDraftT = setTimeout(msSaveDraft, 400);
   const P=msPicks();
   const idx=P.indexOf(i);
   if(idx>=0){
@@ -3303,6 +3488,30 @@ function msUpdateSlotCount(){
   const n=msPicks().length;
   el.textContent=n+' slot'+(n===1?'':'s')+' selected '+(n<MS_MIN_SLOTS_PICKED?'(need at least '+MS_MIN_SLOTS_PICKED+')':'✓');
   el.style.color=n<MS_MIN_SLOTS_PICKED?'#ff9d4d':'var(--green)';
+  msUpdateSubmitState();
+}
+function msUpdateSubmitState(){
+  var btn=document.getElementById('msSubmitBtn');
+  var hint=document.getElementById('msSubmitHint');
+  if(!btn) return;
+  var boards=(typeof msAppliedBoardsList==='function')?msAppliedBoardsList():[];
+  if(!boards.length){ btn.disabled=false; btn.style.opacity='1'; if(hint) hint.textContent=''; return; }
+  var open=boards.filter(function(b){ return !msBoardClosed(b); });
+  if(!open.length){
+    btn.disabled=true; btn.style.opacity='0.5';
+    if(hint){ hint.style.color='#ff7070'; hint.textContent='🔒 All boards you applied for are closed — submissions are locked.'; }
+    return;
+  }
+  btn.disabled=false; btn.style.opacity='1';
+  var pbb=MS.draft.picksByBoard||{}; var short=[];
+  open.forEach(function(b){
+    var nn=(pbb[b]||[]).length;
+    if(nn<MS_MIN_SLOTS_PICKED){ var m=MS_BOARD_META[b]; short.push((m?m.label:b)+': pick '+(MS_MIN_SLOTS_PICKED-nn)+' more'); }
+  });
+  if(hint){
+    if(short.length){ hint.style.color='#ff9d4d'; hint.textContent='⏳ '+short.join(' · '); }
+    else { hint.style.color='var(--green)'; hint.textContent='✓ Ready to submit'; }
+  }
 }
 
 function msFillRangeDropdowns(){
@@ -3348,7 +3557,7 @@ function msSetDeadline() {
   const input = document.getElementById('msDeadlineInput');
   if (!input || !input.value) { toast('Pick a date and time first.'); return; }
   const iso = new Date(input.value).toISOString();
-  if (!confirm('⚠️ This overrides the computed per-board schedule and closes ALL 3 boards (Construction, Research, Troops) at once, at '+new Date(iso).toUTCString()+'.\n\nMembers will immediately see their open boards as locked once this time passes. Continue?')) return;
+  if (!confirm('⚠️ This overrides the computed per-board schedule and closes ALL 3 boards (Construction, Research, Troops) at once, at '+new Date(iso).toUTCString()+'.\\n\\nMembers will immediately see their open boards as locked once this time passes. Continue?')) return;
   // datetime-local gives local time — store as UTC ISO string
   MS.deadline = iso;
   syncQueuePush();
@@ -3363,6 +3572,7 @@ function msReopenSubmissions() {
   toast('Submissions reopened.');
 }
 function msUpdateDeadlineBanners() {
+  if(typeof msUpdateSubmitState==='function') msUpdateSubmitState();
   var applied = msAppliedBoardsList();
   var openB = msOpenBoardsList(applied);
   var closedB = msClosedBoardsList(applied);
@@ -3420,7 +3630,12 @@ function msSubmitEntry(){
   var _openForCheck = _boards.filter(function(b){ return !msBoardClosed(b); });
 for(var _bi=0;_bi<_openForCheck.length;_bi++){
     var _bp=_pbb[_openForCheck[_bi]]||[];
-    if(_bp.length<MS_MIN_SLOTS_PICKED){ alert('Pick at least '+MS_MIN_SLOTS_PICKED+' timeslots for '+(MS_BOARD_META[_openForCheck[_bi]]?MS_BOARD_META[_openForCheck[_bi]].label:_openForCheck[_bi])+'.'); return; }
+    if(_bp.length<MS_MIN_SLOTS_PICKED){
+      toast('Pick at least '+MS_MIN_SLOTS_PICKED+' timeslots for '+(MS_BOARD_META[_openForCheck[_bi]]?MS_BOARD_META[_openForCheck[_bi]].label:_openForCheck[_bi])+'.');
+      if(typeof msSwitchBoard==='function') msSwitchBoard(_openForCheck[_bi]);
+      msUpdateSubmitState();
+      return;
+    }
   }
   // If 2+ applied boards share "General Speedup", the split must be filled in and add up —
   // otherwise the same hours would silently get double-counted toward both boards' KvK points.
@@ -3430,7 +3645,7 @@ for(var _bi=0;_bi<_openForCheck.length;_bi++){
     var _gSplit = MS.draft.generalSplit||{};
     var _gUsed = _genBoards.reduce(function(a,b){ return a+(parseFloat(_gSplit[b])||0); },0);
     if(Math.abs(_gCommitted-_gUsed) > 0.05){
-      alert('Please split your General Speedup hours between '+_genBoards.map(function(b){return MS_BOARD_META[b].label;}).join(' and ')+' in Step 3 — the split must add up to your '+_gCommitted.toFixed(1)+'h committed.');
+      toast('General Speedup split must add up to '+_gCommitted.toFixed(1)+'h — fix it in Step 3.');
       msGoStep(3);
       return;
     }
@@ -3503,6 +3718,7 @@ submittedAt: new Date().toISOString()
   // Save to localStorage so it survives navigation
   if(pid) {
     lsSet('ms_submitted_' + pid, entry);
+    lsClear('ms_draft_' + pid);
   }
 
   syncQueuePush();
@@ -3603,9 +3819,18 @@ function msRenderOverview(entry) {
   html += '<div><div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text)">Preferred Timeslots (' + (entry.picks||[]).length + ')</div>';
   html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
   (entry.picks||[]).sort((a,b)=>a-b).forEach(s => {
-    html += '<span style="background:rgba(61,142,240,.15);color:var(--accent2);border:1px solid var(--accent);border-radius:5px;padding:3px 8px;font-size:12px;font-family:monospace">' + msSlotLabel(s) + '</span>';
+    html += '<span style="background:rgba(201,165,92,.15);color:var(--accent2);border:1px solid var(--accent);border-radius:5px;padding:3px 8px;font-size:12px;font-family:monospace">' + msSlotLabel(s) + '</span>';
   });
   html += '</div></div>';
+  // What happens next
+  var _nextClose = null;
+  (entry.boards || []).forEach(function(b){
+    var d = (typeof msBoardDeadline==='function') ? msBoardDeadline(b) : null;
+    if (d && d > Date.now() && (_nextClose === null || d < _nextClose)) _nextClose = d;
+  });
+  html += '<div style="margin-top:14px;background:rgba(201,165,92,.08);border:1px solid var(--border);border-radius:7px;padding:10px 14px;font-size:12px;color:var(--text2)">📅 <strong style="color:var(--text)">What happens next:</strong> ' +
+    (_nextClose ? 'You can still edit this submission until <span class="mono" style="color:var(--gold)">' + new Date(_nextClose).toUTCString().replace('GMT','UTC') + '</span>. ' : '') +
+    'After each board closes, the leaders run the allocation — your result will appear right here, so check back after the deadline.</div>';
   el.innerHTML = html;
 }
 
@@ -3738,10 +3963,10 @@ function msRunAllocation(){
   if(!MS.submissions.length){ toast('No submissions yet.'); return; }
   var boardsPreview = msBoardsInPlay();
   var already = boardsPreview.filter(function(b){ return MS._allocByBoard && MS._allocByBoard[b]; });
-  var warnMsg = '⚙️ Run allocation now for: '+boardsPreview.map(function(b){var m=MS_BOARD_META[b];return m?m.icon+' '+m.label:b;}).join(', ')+'?\n\n'+
+  var warnMsg = '⚙️ Run allocation now for: '+boardsPreview.map(function(b){var m=MS_BOARD_META[b];return m?m.icon+' '+m.label:b;}).join(', ')+'?\\n\\n'+
     'Unpinned players may be reassigned. Pinned/locked slots are kept.'+
-    (already.length ? '\n\nThis will OVERWRITE the existing result for: '+already.map(function(b){var m=MS_BOARD_META[b];return m?m.label:b;}).join(', ')+' (including any already run automatically).' : '')+
-    '\n\nContinue?';
+    (already.length ? '\\n\\nThis will OVERWRITE the existing result for: '+already.map(function(b){var m=MS_BOARD_META[b];return m?m.label:b;}).join(', ')+' (including any already run automatically).' : '')+
+    '\\n\\nContinue?';
   if(!confirm(warnMsg)) return;
   MS._allocByBoard = MS._allocByBoard || {};
   var boards = msBoardsInPlay();
@@ -3928,7 +4153,7 @@ function msRenderBench(){
     }
     var hrs = (p.committedHours && p.committedHours[MS_RANK_CATEGORY]) ? p.committedHours[MS_RANK_CATEGORY].toFixed(0) : '0';
     var reasonTag = reason ? '<span title="'+reasonFull.replace(/"/g,'&quot;')+'" style="cursor:help">'+reason+' ⓘ</span>' : '';
-    html += '<div onclick="msBenchClick('+"'"+encodeURIComponent(p.ign)+"','"+encodeURIComponent(p.alliance)+"'"+')" style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:6px;cursor:pointer;min-width:0;border:1px solid '+(sel?'var(--accent)':'var(--border)')+';background:'+(sel?'rgba(61,142,240,.12)':'var(--bg3)')+'">'+
+    html += '<div onclick="msBenchClick('+"'"+encodeURIComponent(p.ign)+"','"+encodeURIComponent(p.alliance)+"'"+')" style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:6px;cursor:pointer;min-width:0;border:1px solid '+(sel?'var(--accent)':'var(--border)')+';background:'+(sel?'rgba(201,165,92,.12)':'var(--bg3)')+'">'+
       '<div style="min-width:0;flex:1"><div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.ign+'</div>'+
       '<div style="font-size:10px;color:var(--text3)">'+hrs+'h'+(reasonTag?' · '+reasonTag:'')+'</div></div>'+
       msAllianceChip(p.alliance)+
@@ -3998,7 +4223,7 @@ function msCopyByAlliance(){
     var range = msSlotLabel(a.slot).replace('-','–');
     lines.push(range+' — '+a.entry.ign);
   });
-  copyText(lines.join('\n'));
+  copyText(lines.join('\\n'));
   var msg = document.getElementById('msCopiedMsg');
   if(msg){ msg.style.opacity='1'; setTimeout(function(){ msg.style.opacity='0'; }, 1500); }
 }
@@ -4142,7 +4367,7 @@ function msDragStart(e, idx) {
 }
 function msDragOver(e) {
   e.preventDefault(); e.dataTransfer.dropEffect = 'move';
-  e.currentTarget.style.background = 'rgba(61,142,240,.15)';
+  e.currentTarget.style.background = 'rgba(201,165,92,.15)';
 }
 function msDragLeave(e) { e.currentTarget.style.background = ''; }
 function msDrop(e, targetIdx) {
@@ -4329,9 +4554,9 @@ function msSetDay1Override(){
   if (!input || !input.value) { toast('Pick a date and time first.'); return; }
   const iso = new Date(input.value).toISOString();
   const willBeInPast = new Date(iso).getTime() < Date.now();
-  const warn = '⚠️ This forces KvK Day 1 to '+new Date(iso).toUTCString()+'.\n\n'+
-    'Every deadline and allocation time for all 3 boards recalculates from this instant.\n'+
-    (willBeInPast ? 'This date is in the PAST relative to now — if the 7-day clear point has already passed for it, ALL current submissions will be auto-cleared on the next scheduled check (within ~30 minutes).\n\n' : '') +
+  const warn = '⚠️ This forces KvK Day 1 to '+new Date(iso).toUTCString()+'.\\n\\n'+
+    'Every deadline and allocation time for all 3 boards recalculates from this instant.\\n'+
+    (willBeInPast ? 'This date is in the PAST relative to now — if the 7-day clear point has already passed for it, ALL current submissions will be auto-cleared on the next scheduled check (within ~30 minutes).\\n\\n' : '') +
     'This cannot be undone automatically — you would need to clear the override manually. Continue?';
   if (!confirm(warn)) return;
   MS.kvkDay1Override = iso;
@@ -4730,8 +4955,8 @@ function showUserBar(player, role) {
   const rl = document.getElementById('userBarRole');
   if (rl) {
     if (role === 'admin') { rl.textContent = '⚙️ Admin'; rl.style.background = 'rgba(255,200,0,.15)'; rl.style.color = 'var(--gold)'; }
-    else if (role === 'r4r5') { rl.textContent = '🛡 R4/R5'; rl.style.background = 'rgba(61,142,240,.15)'; rl.style.color = 'var(--accent2)'; }
-    else if (role === 'rallyleader') { rl.textContent = '⚔️ Rally Leader'; rl.style.background = 'rgba(61,142,240,.15)'; rl.style.color = 'var(--accent2)'; }
+    else if (role === 'r4r5') { rl.textContent = '🛡 R4/R5'; rl.style.background = 'rgba(201,165,92,.15)'; rl.style.color = 'var(--accent2)'; }
+    else if (role === 'rallyleader') { rl.textContent = '⚔️ Rally Leader'; rl.style.background = 'rgba(201,165,92,.15)'; rl.style.color = 'var(--accent2)'; }
     else { rl.textContent = '👤 Member'; rl.style.background = 'rgba(46,204,113,.1)'; rl.style.color = 'var(--green)'; }
   }
 }
@@ -4840,13 +5065,15 @@ function bsRenderResults() {
 
 async function adminRedeemNow() {
   const statusEl = document.getElementById('giftRedeemStatus');
-  const logEl = document.getElementById('giftRedeemLog');
+  const btn = document.getElementById('adminRedeemBtn');
+  if (btn && btn.disabled) return; // guard against double-fire
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; btn.textContent = '⏳ Running…'; }
   if (statusEl) statusEl.textContent = '⏳ Redeeming… this may take a minute.';
   try {
     const res = await fetch('/admin-redeem', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adminKey: getPassword('admin') })
+      headers: stateHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
     });
     const data = await res.json();
     if (statusEl) statusEl.textContent = data.message || 'Done.';
@@ -4854,28 +5081,32 @@ async function adminRedeemNow() {
   } catch(e) {
     if (statusEl) statusEl.textContent = '⚠ Error: ' + e.message;
   }
+  if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = '🎁 Redeem Now for All Members'; }
 }
 
 async function adminLoadGiftLog() {
   const logEl = document.getElementById('giftRedeemLog');
   if (!logEl) return;
   try {
-    const res = await fetch('/gift-log');
+    const res = await fetch('/gift-log', { headers: stateHeaders() });
     const data = await res.json();
     if (!data.log || !data.log.length) {
       logEl.innerHTML = '<div style="color:var(--text3)">No redemptions yet.</div>';
       return;
     }
-    logEl.innerHTML = data.log.slice().reverse().map(entry =>
-      '<div style="border-bottom:1px solid var(--border);padding:6px 0;font-size:12px">' +
+    logEl.innerHTML = data.log.slice().reverse().map(entry => {
+      const _ok = (entry.results||[]).filter(r => r.ok).length;
+      const _bad = (entry.results||[]).length - _ok;
+      return '<div style="border-bottom:1px solid var(--border);padding:6px 0;font-size:12px">' +
       '<span style="color:var(--text3)">' + entry.time + '</span> ' +
-      '<strong>' + (entry.code || '—') + '</strong> — ' +
+      '<strong>' + (entry.code || '—') + '</strong> ' +
+      '<span style="color:var(--green)">' + _ok + '✓</span>' + (_bad ? ' <span style="color:var(--enemy)">' + _bad + '✗</span>' : '') + ' — ' +
       (entry.results || []).map(r =>
         '<span style="color:' + (r.ok ? 'var(--green)' : 'var(--enemy)') + '">' +
         r.name + ' (' + (r.ok ? '✓' : r.err || 'fail') + ')</span>'
       ).join(', ') +
-      '</div>'
-    ).join('');
+      '</div>';
+    }).join('');
   } catch(e) {
     logEl.innerHTML = '<div style="color:var(--enemy)">Could not load log.</div>';
   }
@@ -4903,40 +5134,59 @@ async function adminLoadMembers() {
   try {
     const res = await fetch('/player-list');
     const data = await res.json();
-    const players = Object.values(data.players || {});
-    if (!players.length) { el.innerHTML = '<div style="color:var(--text3)">No registered players yet.</div>'; return; }
-    // Group by alliance
-    const byAlliance = {};
-    players.forEach(p => {
-      const a = p.alliance || 'Unknown';
-      if (!byAlliance[a]) byAlliance[a] = [];
-      byAlliance[a].push(p);
-    });
-    let html = '';
-    Object.keys(byAlliance).sort().forEach(alliance => {
-      html += '<div style="margin-bottom:16px">';
-      html += '<div class="sec-title" style="margin-bottom:8px">' + alliance + ' <span style="color:var(--text3);font-weight:400">(' + byAlliance[alliance].length + ')</span></div>';
+    window._adminPlayers = Object.values(data.players || {});
+    adminRenderMembers();
+  } catch(e) { el.innerHTML = '<div style="color:var(--enemy)">Error loading members.</div>'; }
+}
+function _escHtml(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function adminRenderMembers() {
+  const el = document.getElementById('adminMemberList');
+  if (!el) return;
+  let players = window._adminPlayers || [];
+  const cntEl = document.getElementById('adminMemberCount');
+  if (cntEl) cntEl.textContent = '(' + players.length + ')';
+  const q = (document.getElementById('adminMemberSearch') || {value:''}).value.trim().toLowerCase();
+  if (q) players = players.filter(p => String(p.name||'').toLowerCase().indexOf(q) >= 0 || String(p.id||'').indexOf(q) >= 0);
+  if (!players.length) { el.innerHTML = '<div style="color:var(--text3)">' + (q ? 'No members match "' + _escHtml(q) + '".' : 'No registered players yet.') + '</div>'; return; }
+  const byAlliance = {};
+  players.forEach(p => { const a = p.alliance || 'Unknown'; (byAlliance[a] = byAlliance[a] || []).push(p); });
+  const roleLabels = { admin:'⚙️ Admin', r4r5:'🛡 R4/R5', rallyleader:'⚔️ Rally Leader', member:'👤 Member' };
+  const mobile = window.innerWidth <= 900;
+  let html = '';
+  Object.keys(byAlliance).sort().forEach(alliance => {
+    html += '<div style="margin-bottom:16px">';
+    html += '<div class="sec-title" style="margin-bottom:8px">' + _escHtml(alliance) + ' <span style="color:var(--text3);font-weight:400">(' + byAlliance[alliance].length + ')</span></div>';
+    if (mobile) {
+      html += byAlliance[alliance].map(p => {
+        const opts = ALLIANCES.map(a => '<option value="' + a + '"' + (a === p.alliance ? ' selected' : '') + '>' + a + '</option>').join('');
+        return '<div style="display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:6px">' +
+          '<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _escHtml(p.name) + '</div>' +
+          '<div class="mono" style="font-size:11px;color:var(--text3)">' + _escHtml(p.id) + ' · ' + (roleLabels[p.role] || '👤 Member') + '</div></div>' +
+          '<select onchange="adminChangeAlliance(&quot;' + _escHtml(p.id) + '&quot;,this.value)" style="width:72px;font-size:12px">' + opts + '</select>' +
+          '<button class="btn btn-danger btn-sm" style="padding:6px 10px" onclick="adminRemovePlayer(&quot;' + _escHtml(p.id) + '&quot;)">✕</button></div>';
+      }).join('');
+    } else {
       html += '<table style="min-width:500px"><thead><tr><th>IGN</th><th>Player ID</th><th>Role</th><th>Alliance</th><th></th></tr></thead><tbody>';
       html += byAlliance[alliance].map(p => {
-        const roleLabel = { admin:'⚙️ Admin', r4r5:'🛡 R4/R5', rallyleader:'⚔️ Rally Leader', member:'👤 Member' }[p.role] || '👤 Member';
-        const allianceOpts = ALLIANCES.map(a => '<option value="' + a + '"' + (a === p.alliance ? ' selected' : '') + '>' + a + '</option>').join('');
+        const opts = ALLIANCES.map(a => '<option value="' + a + '"' + (a === p.alliance ? ' selected' : '') + '>' + a + '</option>').join('');
         return '<tr>' +
-          '<td><strong>' + p.name + '</strong></td>' +
-          '<td class="mono" style="color:var(--text3)">' + p.id + '</td>' +
-          '<td>' + roleLabel + '</td>' +
-          '<td><select onchange="adminChangeAlliance(\\'' + p.id + '\\',this.value)" style="width:80px">' + allianceOpts + '</select></td>' +
-          '<td><button class="btn btn-danger btn-sm" onclick="adminRemovePlayer(\\'' + p.id + '\\')">✕</button></td>' +
+          '<td><strong>' + _escHtml(p.name) + '</strong></td>' +
+          '<td class="mono" style="color:var(--text3)">' + _escHtml(p.id) + '</td>' +
+          '<td>' + (roleLabels[p.role] || '👤 Member') + '</td>' +
+          '<td><select onchange="adminChangeAlliance(&quot;' + _escHtml(p.id) + '&quot;,this.value)" style="width:80px">' + opts + '</select></td>' +
+          '<td><button class="btn btn-danger btn-sm" onclick="adminRemovePlayer(&quot;' + _escHtml(p.id) + '&quot;)">✕</button></td>' +
           '</tr>';
       }).join('');
-      html += '</tbody></table></div>';
-    });
-    el.innerHTML = '<div style="overflow-x:auto">' + html + '</div>';
-  } catch(e) { el.innerHTML = '<div style="color:var(--enemy)">Error loading members.</div>'; }
+      html += '</tbody></table>';
+    }
+    html += '</div>';
+  });
+  el.innerHTML = mobile ? html : '<div style="overflow-x:auto">' + html + '</div>';
 }
 
 async function adminChangeAlliance(playerId, newAlliance) {
   try {
-    await fetch('/update-player', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: playerId, alliance: newAlliance }) });
+    await fetch('/update-player', { method: 'POST', headers: stateHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ id: playerId, alliance: newAlliance }) });
     toast('Alliance updated.');
   } catch(e) { toast('Error updating alliance.'); }
 }
@@ -4958,22 +5208,72 @@ function msSetMyAlliance(){
 }
 
 async function adminRemovePlayer(playerId) {
-  if (!confirm('Remove this player? They will need to re-register.')) return;
+  var _p = (window._adminPlayers || []).find(function(x){ return String(x.id) === String(playerId); });
+  if (!confirm('Remove ' + (_p ? _p.name + ' (' + playerId + ')' : 'this player') + '? They will need to re-register.')) return;
   try {
-    await fetch('/remove-player', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: playerId }) });
+    await fetch('/remove-player', { method: 'POST', headers: stateHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ id: playerId }) });
     toast('Player removed.');
     adminLoadMembers();
   } catch(e) { toast('Error removing player.'); }
 }
 
 async function adminReset(what) {
-  if (!confirm('Are you sure? This cannot be undone.')) return;
-  if (what === 'ministers' || what === 'all') { MS.submissions = []; MS._lastAllocation = null; }
+  var labels = { ministers:'minister submissions', leaders:'rally leaders', teams:'teams', attendance:'attendance data', all:'EVERYTHING' };
+  var nSubs = (MS.submissions||[]).length, nLead = (S.leaders||[]).length, nTeams = (S.teams||[]).length;
+  var detail;
+  if (what === 'ministers') detail = nSubs + ' submission' + (nSubs===1?'':'s');
+  else if (what === 'leaders') detail = nLead + ' leader' + (nLead===1?'':'s');
+  else if (what === 'teams') detail = nTeams + ' team' + (nTeams===1?'':'s');
+  else if (what === 'attendance') detail = 'all Swordland + Tri Alliance events';
+  else detail = nSubs + ' submissions, ' + nLead + ' leaders, ' + nTeams + ' teams and all attendance';
+  if (what === 'all') {
+    var typed = prompt('⚠️ This wipes ' + detail + '.\\n\\nType RESET to confirm.');
+    if (typed !== 'RESET') { toast('Reset cancelled.'); return; }
+  } else {
+    if (!confirm('Reset ' + labels[what] + '? This deletes ' + detail + '.')) return;
+  }
+  // Snapshot for one-shot undo (kept in memory for 10 seconds)
+  window._adminResetSnapshot = { what: what,
+    ms: JSON.parse(JSON.stringify({ subs: MS.submissions||[], byPlayer: MS.submissionsByPlayer||{}, alloc: MS._lastAllocation||null })),
+    leaders: JSON.parse(JSON.stringify(S.leaders||[])),
+    teams: JSON.parse(JSON.stringify(S.teams||[])),
+    att: JSON.parse(JSON.stringify(ATT)) };
+  if (what === 'ministers' || what === 'all') { MS.submissions = []; MS.submissionsByPlayer = {}; MS._lastAllocation = null; }
   if (what === 'leaders' || what === 'all') { S.leaders = []; if (typeof renderLeaderTable==='function') renderLeaderTable(); }
   if (what === 'teams' || what === 'all') { S.teams = []; if (typeof renderSetup==='function') renderSetup(); if (typeof renderBattleStrategy==='function') renderBattleStrategy(); }
   if (what === 'attendance' || what === 'all') { ATT.sw = { members:[], events:[] }; ATT.ta = { members:[], events:[] }; }
   syncQueuePush();
   toast('Reset complete.');
+  adminShowUndo();
+}
+function adminShowUndo() {
+  var el = document.getElementById('adminResetUndo'); if (!el) return;
+  var secs = 10;
+  el.innerHTML = '<button class="btn btn-ghost btn-sm" style="border-color:var(--gold);color:var(--gold)" onclick="adminUndoReset()">↩ Undo (' + secs + 's)</button>';
+  clearInterval(window._adminUndoTimer);
+  window._adminUndoTimer = setInterval(function() {
+    secs--;
+    var b = el.querySelector('button');
+    if (secs <= 0) { clearInterval(window._adminUndoTimer); el.innerHTML = ''; window._adminResetSnapshot = null; return; }
+    if (b) b.textContent = '↩ Undo (' + secs + 's)';
+  }, 1000);
+}
+function adminUndoReset() {
+  var s = window._adminResetSnapshot; if (!s) { toast('Nothing to undo.'); return; }
+  var w = s.what;
+  if (w === 'ministers' || w === 'all') { MS.submissions = s.ms.subs; MS.submissionsByPlayer = s.ms.byPlayer; MS._lastAllocation = s.ms.alloc; }
+  if (w === 'leaders' || w === 'all') { S.leaders = s.leaders; if (typeof renderLeaderTable==='function') renderLeaderTable(); }
+  if (w === 'teams' || w === 'all') { S.teams = s.teams; if (typeof renderSetup==='function') renderSetup(); if (typeof renderBattleStrategy==='function') renderBattleStrategy(); }
+  if (w === 'attendance' || w === 'all') { ATT.sw = s.att.sw; ATT.ta = s.att.ta; }
+  window._adminResetSnapshot = null;
+  clearInterval(window._adminUndoTimer);
+  var el = document.getElementById('adminResetUndo'); if (el) el.innerHTML = '';
+  syncQueuePush();
+  toast('Reset undone ✓');
+}
+function adminTogglePw(id) {
+  var i = document.getElementById(id); if (!i) return;
+  i.type = i.type === 'password' ? 'text' : 'password';
 }
 
 // ════════════════════════════════════════════════════════
@@ -4993,7 +5293,7 @@ function attSwitchTab(prefix, tab) {
     if (panel) panel.style.display = t === tab ? 'block' : 'none';
     if (btn) {
       btn.className = t === tab ? 'btn' : 'btn btn-ghost';
-      btn.style.background = t === tab ? 'rgba(61,142,240,.2)' : '';
+      btn.style.background = t === tab ? 'rgba(201,165,92,.2)' : '';
       btn.style.color = t === tab ? 'var(--accent2)' : '';
       btn.style.border = t === tab ? '1px solid var(--accent)' : '';
     }
@@ -5075,7 +5375,7 @@ function attRenderEventTabs(prefix, evt, canEdit) {
   return '<div>' +
     '<div style="display:flex;gap:6px;margin-bottom:10px">' +
     '<button class="btn btn-sm" id="etab-su-' + tabId + '" onclick="attShowEventTab(\\'' + prefix + '\\',\\'' + evt.id + '\\',\\'signedUp\\')" ' +
-    'style="background:rgba(61,142,240,.2);color:var(--accent2);border:1px solid var(--accent)">📋 Signed Up (' + (evt.signedUp||[]).length + ')</button>' +
+    'style="background:rgba(201,165,92,.2);color:var(--accent2);border:1px solid var(--accent)">📋 Signed Up (' + (evt.signedUp||[]).length + ')</button>' +
     '<button class="btn btn-ghost btn-sm" id="etab-sh-' + tabId + '" onclick="attShowEventTab(\\'' + prefix + '\\',\\'' + evt.id + '\\',\\'showedUp\\')">✅ Showed Up (' + (evt.showedUp||[]).length + ')</button>' +
     '</div>' +
     '<div id="epanel-su-' + tabId + '">' + attRenderEventPanel(prefix, evt, 'signedUp', canEdit) + '</div>' +
@@ -5091,7 +5391,7 @@ function attShowEventTab(prefix, eventId, panel) {
     if (pEl) pEl.style.display = p === panel ? 'block' : 'none';
     if (tEl) {
       tEl.className = p === panel ? 'btn btn-sm' : 'btn btn-ghost btn-sm';
-      tEl.style.background = p === panel ? 'rgba(61,142,240,.2)' : '';
+      tEl.style.background = p === panel ? 'rgba(201,165,92,.2)' : '';
       tEl.style.color = p === panel ? 'var(--accent2)' : '';
       tEl.style.border = p === panel ? '1px solid var(--accent)' : '';
     }
@@ -5199,6 +5499,7 @@ async function attRunOCR(prefix, eventId, field, fileInput) {
   }
   if (previewEl) { previewEl.style.display = 'block'; previewEl.innerHTML = '<div style="color:var(--text3);font-size:12px">🔍 Scanning ' + files.length + ' image(s)…</div>'; }
   try {
+    await ensureTesseract();
     if (typeof Tesseract === 'undefined') throw new Error('OCR not loaded');
     let allNames = [];
     if (field === 'signedUp') {
@@ -5553,29 +5854,30 @@ document.addEventListener('DOMContentLoaded', initApp);
   <div class="grid2" style="margin-bottom:14px">
     <div class="card">
       <div class="card-title">⚔️ Rally Leader Password</div>
-      <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Current: <span class="mono" id="currentRallyPw" style="color:var(--gold)">loading…</span></div>
-      <div class="row" style="margin-bottom:8px"><div class="field" style="flex:1"><label>New password</label><input type="password" id="newRallyPw" style="width:100%"></div></div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Current: <span class="mono">•••••</span> <span style="font-size:11px">(hidden — server never sends passwords)</span></div>
+      <div class="row" style="margin-bottom:8px"><div class="field" style="flex:1"><label>New password</label><input type="password" id="newRallyPw" style="width:100%"></div><button class="btn btn-ghost btn-sm" style="align-self:flex-end;margin-left:6px" onclick="adminTogglePw('newRallyPw')" title="Show/hide">👁</button></div>
       <button class="btn btn-primary btn-sm" onclick="adminChangePassword('rallyleader')">Save</button>
     </div>
     <div class="card">
       <div class="card-title">🛡 R4/R5 Password</div>
-      <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Current: <span class="mono" id="currentR4R5Pw" style="color:var(--gold)">loading…</span></div>
-      <div class="row" style="margin-bottom:8px"><div class="field" style="flex:1"><label>New password</label><input type="password" id="newR4R5Pw" style="width:100%"></div></div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Current: <span class="mono">•••••</span> <span style="font-size:11px">(hidden — server never sends passwords)</span></div>
+      <div class="row" style="margin-bottom:8px"><div class="field" style="flex:1"><label>New password</label><input type="password" id="newR4R5Pw" style="width:100%"></div><button class="btn btn-ghost btn-sm" style="align-self:flex-end;margin-left:6px" onclick="adminTogglePw('newR4R5Pw')" title="Show/hide">👁</button></div>
       <button class="btn btn-primary btn-sm" onclick="adminChangePassword('r4r5')">Save</button>
     </div>
     <div class="card">
       <div class="card-title">⚙️ Admin Password</div>
-      <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Current: <span class="mono" id="currentAdminPw" style="color:var(--gold)">loading…</span></div>
-      <div class="row" style="margin-bottom:8px"><div class="field" style="flex:1"><label>New password</label><input type="password" id="newAdminPw" style="width:100%"></div></div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Current: <span class="mono">•••••</span> <span style="font-size:11px">(hidden — server never sends passwords)</span></div>
+      <div class="row" style="margin-bottom:8px"><div class="field" style="flex:1"><label>New password</label><input type="password" id="newAdminPw" style="width:100%"></div><button class="btn btn-ghost btn-sm" style="align-self:flex-end;margin-left:6px" onclick="adminTogglePw('newAdminPw')" title="Show/hide">👁</button></div>
       <button class="btn btn-primary btn-sm" onclick="adminChangePassword('admin')">Save</button>
     </div>
   </div>
   <!-- Members by Alliance -->
   <div class="card" style="margin-bottom:14px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <div class="card-title" style="margin:0">👥 Registered Members by Alliance</div>
+      <div class="card-title" style="margin:0">👥 Registered Members <span id="adminMemberCount" style="font-weight:400;font-size:12px;color:var(--text3)"></span></div>
       <button class="btn btn-ghost btn-sm" onclick="adminLoadMembers()">🔄 Refresh</button>
     </div>
+    <input id="adminMemberSearch" placeholder="🔍 Search name or Player ID" oninput="adminRenderMembers()" style="width:100%;max-width:320px;margin-bottom:12px;font-size:13px">
     <div id="adminMemberList"><div style="color:var(--text3);font-size:13px">Loading…</div></div>
   </div>
   <!-- Gift Code -->
@@ -5583,21 +5885,22 @@ document.addEventListener('DOMContentLoaded', initApp);
     <div class="card-title">🎁 Gift Code Auto-Redemption</div>
     <p style="color:var(--text2);font-size:12px;margin-bottom:14px">Redeems all active gift codes every 30 minutes for registered members.</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-      <button class="btn btn-primary" onclick="adminRedeemNow()">🎁 Redeem Now for All Members</button>
+      <button class="btn btn-primary" id="adminRedeemBtn" onclick="adminRedeemNow()">🎁 Redeem Now for All Members</button>
       <button class="btn btn-ghost" onclick="adminLoadGiftLog()">📋 Refresh Log</button>
     </div>
     <div id="giftRedeemStatus" style="font-size:12px;color:var(--text3);margin-bottom:10px"></div>
     <div id="giftRedeemLog" style="font-size:12px;max-height:300px;overflow-y:auto"></div>
   </div>
   <!-- Reset -->
-  <div class="card">
-    <div class="card-title">🗑 Reset Data</div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
+  <div class="card" style="border:1px solid rgba(224,58,58,.45)">
+    <div class="card-title" style="color:#ff8080">🗑 Reset Data — danger zone</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <button class="btn btn-danger" onclick="adminReset('ministers')">Reset All Minister Submissions</button>
       <button class="btn btn-danger" onclick="adminReset('leaders')">Reset All Rally Leaders</button>
       <button class="btn btn-danger" onclick="adminReset('teams')">Reset All Teams</button>
       <button class="btn btn-danger" onclick="adminReset('attendance')">Reset All Attendance</button>
       <button class="btn btn-danger" onclick="adminReset('all')">⚠️ Reset EVERYTHING</button>
+      <span id="adminResetUndo"></span>
     </div>
   </div>
 </div>
@@ -5608,7 +5911,7 @@ document.addEventListener('DOMContentLoaded', initApp);
     <div class="card-title" style="font-size:20px">⚔️ Swordland Attendance</div>
     <p style="color:var(--text2);font-size:13px;margin-bottom:14px">Track attendance for Swordland events. R4/R5 manage events and mark attendance.</p>
     <div style="display:flex;gap:8px">
-      <button class="btn" id="swTab-register" onclick="attSwitchTab('sw','register')" style="background:rgba(61,142,240,.2);color:var(--accent2);border:1px solid var(--accent)">📝 Register Attendance</button>
+      <button class="btn" id="swTab-register" onclick="attSwitchTab('sw','register')" style="background:rgba(201,165,92,.2);color:var(--accent2);border:1px solid var(--accent)">📝 Register Attendance</button>
       <button class="btn btn-ghost" id="swTab-summary" onclick="attSwitchTab('sw','summary')">📊 Overall Summary</button>
     </div>
   </div>
@@ -5640,7 +5943,7 @@ document.addEventListener('DOMContentLoaded', initApp);
     <div class="card-title" style="font-size:20px">🤝 Tri Alliance Attendance</div>
     <p style="color:var(--text2);font-size:13px;margin-bottom:14px">Track attendance for Tri Alliance meetings. R4/R5 manage events and mark attendance.</p>
     <div style="display:flex;gap:8px">
-      <button class="btn" id="taTab-register" onclick="attSwitchTab('ta','register')" style="background:rgba(61,142,240,.2);color:var(--accent2);border:1px solid var(--accent)">📝 Register Attendance</button>
+      <button class="btn" id="taTab-register" onclick="attSwitchTab('ta','register')" style="background:rgba(201,165,92,.2);color:var(--accent2);border:1px solid var(--accent)">📝 Register Attendance</button>
       <button class="btn btn-ghost" id="taTab-summary" onclick="attSwitchTab('ta','summary')">📊 Overall Summary</button>
     </div>
   </div>
@@ -5752,7 +6055,30 @@ export default {
     }
 
     // Update player alliance (admin)
+    // ── Images from R2 bucket: GET /img/<key>  (e.g. /img/pets/cave-bear.png) ──
+    if (url.pathname.startsWith('/img/') && request.method==='GET') {
+      if (!env.IMG) return new Response('Image storage not configured (R2 binding "IMG" missing)', {status:500});
+      const key = decodeURIComponent(url.pathname.slice(5));
+      if (!key || key.includes('..')) return new Response('Bad key', {status:400});
+      const inm = request.headers.get('If-None-Match');
+      const obj = await env.IMG.get(key);
+      if (!obj) return new Response('Image not found: ' + key, {status:404});
+      if (inm && obj.httpEtag && inm === obj.httpEtag) {
+        return new Response(null, {status:304, headers:{'ETag':obj.httpEtag,'Cache-Control':'public, max-age=86400, s-maxage=604800'}});
+      }
+      const ext = key.split('.').pop().toLowerCase();
+      const types = {png:'image/png',webp:'image/webp',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',svg:'image/svg+xml',avif:'image/avif'};
+      const ct = (obj.httpMetadata && obj.httpMetadata.contentType) || types[ext] || 'application/octet-stream';
+      return new Response(obj.body, { headers: {
+        'Content-Type': ct,
+        'Cache-Control': 'public, max-age=86400, s-maxage=604800',
+        'ETag': obj.httpEtag || ''
+      }});
+    }
+
     if (url.pathname==='/update-player' && request.method==='POST') {
+      const _role = await verifyToken(env, bearer(request));
+      if (_role!=='admin' && _role!=='r4r5') return json({ok:false,error:'unauthorized'},401);
       try {
         const {id,alliance} = await request.json();
         const raw = await env.SVS_KV.get(PLAYERS_KEY);
@@ -5765,6 +6091,8 @@ export default {
 
     // Remove player (admin)
     if (url.pathname==='/remove-player' && request.method==='POST') {
+      const _role = await verifyToken(env, bearer(request));
+      if (_role!=='admin' && _role!=='r4r5') return json({ok:false,error:'unauthorized'},401);
       try {
         const {id} = await request.json();
         const raw = await env.SVS_KV.get(PLAYERS_KEY);
@@ -5778,42 +6106,21 @@ export default {
     // Manual admin redeem (runs full queue)
     if (url.pathname==='/admin-redeem' && request.method==='POST') {
       try {
-        const {adminKey} = await request.json();
+        let adminKey = null; try { adminKey = (await request.json()).adminKey; } catch(e) {}
         const state = await env.SVS_KV.get(STATE_KEY);
         const stateData = state ? JSON.parse(state) : {};
-        if (adminKey !== (stateData.pw_admin||'kvk1057admin')) return json({ok:false,message:'Unauthorized'},401);
+        const _tokRole = await verifyToken(env, bearer(request));
+        const _keyOk = adminKey && adminKey === (stateData.pw_admin||'kvk1057admin');
+        if (_tokRole !== 'admin' && !_keyOk) return json({ok:false,message:'Unauthorized'},401);
         const result = await runFull(env);
         return json(result);
       } catch(e) { return json({ok:false,message:e.message},500); }
     }
     
-// ── TEMP TEST: check what Century Games player endpoint returns ──
-    if (url.pathname==='/test-cg-player' && request.method==='GET') {
-      const fid = url.searchParams.get('id');
-      if (!fid) return json({error:'add ?id=YOURID'}, 400);
-      const time = Date.now();
-      const sign = signRequest(fid, time);
-      const body = new URLSearchParams({ fid: String(fid), time: String(time), sign });
-      try {
-      const res = await fetch(GIFTCODE_API + '/player', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Accept': 'application/json, text/plain, */*',
-            'Origin': 'https://ks-giftcode.centurygame.com',
-            'Referer': 'https://ks-giftcode.centurygame.com/',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-          },
-          body: body.toString()
-        });
-        const textBody = await res.text();
-        return json({ status: res.status, body: textBody.slice(0, 500) });
-      } catch(e) {
-        return json({ error: e.message }, 500);
-      }
-    }
     // Gift redemption log
     if (url.pathname==='/gift-log' && request.method==='GET') {
+      const _role = await verifyToken(env, bearer(request));
+      if (!_role) return json({ok:false, error:'unauthorized'}, 401);
       const raw = await env.SVS_KV.get(GIFT_LOG_KEY);
       const log = raw ? JSON.parse(raw) : [];
       const display = log.map(e=>({
@@ -5826,6 +6133,8 @@ export default {
 
     // ── AI Vision OCR for speedup screenshots ──
     if (url.pathname==='/ocr-speedups' && request.method==='POST') {
+      const _role = await verifyToken(env, bearer(request));
+      if (!_role) return json({ok:false, error:'unauthorized'}, 401);
       try {
         if (!env.AI) return json({ok:false, error:'AI binding not configured'}, 500);
 
