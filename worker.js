@@ -966,10 +966,9 @@ document.addEventListener('touchend',function(e){
       3. Pick your preferred timeslots (minimum 4) — these are UTC 30-minute windows across a full day.<br>
       4. The leader runs the allocation to rank players and assign slots — highest committed hours gets priority.<br>
     </div>
+    <!-- KvK schedule (embedded, same design as the Manage Spots board timers) -->
+    <div id="msScheduleStrip" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"></div>
   </div>
-  
-<!-- KVK SCHEDULE STRIP -->
-  <div id="msScheduleStrip" class="card" style="margin-bottom:14px;display:none"></div>
 
   <!-- BOARD PICK GATE -->  <div id="msBoardPick" class="card" style="display:none;margin-bottom:18px">
     <div class="card-title">👑 Which minister spots are you applying for?</div>
@@ -2184,7 +2183,7 @@ function bsRenameAlliance(id,val){
   bsEnsureAlliances();
   var a=S.alliances.find(function(x){return x.id===id;}); if(!a) return;
   var name=(val||'').trim(); if(!name) return;
-  t.name=name; t.customName=true; renderBattleStrategy(); syncQueuePush();
+  a.name=name; renderBattleStrategy(); syncQueuePush();
 }
 function bsRemoveAlliance(id){
   bsEnsureAlliances();
@@ -2351,7 +2350,7 @@ function renderBsTeamList(){
 function bsRenameTeamInput(teamId, val){
   var t=S.teams.find(function(x){return x.id===teamId;}); if(!t) return;
   var name=(val||'').trim(); if(!name) return;
-  t.name=name; renderBattleStrategy(); if(typeof renderSetup==='function') renderSetup(); syncQueuePush();
+  t.name=name; t.customName=true; renderBattleStrategy(); if(typeof renderSetup==='function') renderSetup(); syncQueuePush();
   toast('Team renamed');
 }
 function bsOnDrop(e,slotType,slotId){
@@ -3291,7 +3290,7 @@ function msRenderVerifyGrid(){
         </select>
       </div>
       <div style="margin-top:6px;font-size:12px;color:var(--text2)">= <span class="mono" id="msVerifyHours-\${cat}" style="color:var(--gold)">\${v.hours.toFixed(1)}</span> hours</div>
-      \${flagged?'<div style="color:#ff9d4d;font-size:11px;margin-top:4px">⚠ \${flagged?'<div style="color:#ff9d4d;font-size:11px;margin-top:4px">⚠ Differs from OCR by more than 20% — please double-check</div>':''}
+      \${flagged?'<div style="color:#ff9d4d;font-size:11px;margin-top:4px">⚠ Differs from OCR by more than 20% — please double-check</div>':''}
     </div>\`;
   }).join('');
   // ── TrueGold / TrueGold Dust inventory (only for boards that use them) ──
@@ -3447,30 +3446,6 @@ function msSplitGeneralEvenly(){
   clearTimeout(window._msDraftT); window._msDraftT = setTimeout(msSaveDraft, 400);
   MS.draft.generalSplit = {};
   msNormalizeGeneralSplit();
-  msRenderGeneralSplit();
-}
-function msRenderGeneralSplitSummary(){
-  var el=document.getElementById('msGeneralSplitSummary'); if(!el) return;
-  var committedH = msGeneralCommittedHours();
-  var used = Object.keys(MS.draft.generalSplit||{}).reduce(function(a,k){ return a+(parseFloat(MS.draft.generalSplit[k])||0); },0);
-  var diff = committedH - used;
-  if(Math.abs(diff)<0.05){ el.innerHTML = '<span style="color:var(--green)">✓ '+used.toFixed(1)+'h of '+committedH.toFixed(1)+'h allocated</span>'; }
-  else if(diff>0){ el.innerHTML = '<span style="color:#ff9d4d">'+used.toFixed(1)+'h of '+committedH.toFixed(1)+'h allocated — '+diff.toFixed(1)+'h unassigned</span>'; }
-  else { el.innerHTML = '<span style="color:#ff7070">'+used.toFixed(1)+'h of '+committedH.toFixed(1)+'h allocated — '+(-diff).toFixed(1)+'h over budget</span>'; }
-}
-function msUpdateGeneralSplit(board, val){
-  clearTimeout(window._msDraftT); window._msDraftT = setTimeout(msSaveDraft, 400);
-  MS.draft.generalSplit = MS.draft.generalSplit || {};
-  var n = parseFloat(val); if(isNaN(n)||n<0) n=0;
-  MS.draft.generalSplit[board] = n;
-  msRenderGeneralSplitSummary();
-}
-function msSplitGeneralEvenly(){
-  var genBoards = msGeneralSplitBoards();
-  var committedH = msGeneralCommittedHours();
-  var each = genBoards.length ? committedH/genBoards.length : 0;
-  MS.draft.generalSplit = {};
-  genBoards.forEach(function(b){ MS.draft.generalSplit[b]=Math.round(each*10)/10; });
   msRenderGeneralSplit();
 }
 function msUpdateTG(v){ clearTimeout(window._msDraftT); window._msDraftT=setTimeout(msSaveDraft,400); MS.draft=MS.draft||{}; var n=parseInt(v,10); if(isNaN(n)||n<0)n=0; var mx=MS.draft.tgOwned||0; if(mx>0&&n>mx)n=mx; MS.draft.truegold=n; }
