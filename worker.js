@@ -3373,7 +3373,7 @@ function msRenderSliderGrid(){
     return \`<div class="ms-slider-row">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px">
         <strong style="font-size:14px">\${MS_CATEGORY_ICONS[cat]} \${MS_CATEGORY_LABELS[cat]}</strong>
-        <span style="font-size:12px;color:var(--text3)">\${hours.toFixed(1)}h available</span>
+        <span style="font-size:12px;color:\${hours>0?'var(--text3)':'#ff9d4d'}">\${hours>0?hours.toFixed(1)+'h available':'0h — set this in Step 3 (Verify) first'}</span>
       </div>
       <input type="range" min="0" max="100" value="\${pct}" id="msSlider-\${cat}" oninput="msUpdateSlider('\${cat}')">
       <div style="display:flex;justify-content:space-between;font-size:12px">
@@ -3385,8 +3385,18 @@ function msRenderSliderGrid(){
 var _b=(MS.draft&&MS.draft.boards)?MS.draft.boards:[];
   var _extra='';
   if(_b.indexOf('buildings')>=0){
-    var _tgMax=(MS.draft.tgOwned||0);
-    _extra+='<div class="ms-slider-row" style="display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap"><strong style="font-size:14px">🟨 TrueGold to use</strong><span style="display:flex;align-items:center;gap:8px"><input type="number" min="0" '+(_tgMax>0?'max="'+_tgMax+'" ':'')+'value="'+(MS.draft.truegold||0)+'" style="width:100px" oninput="msUpdateTG(this.value)">'+(_tgMax>0?'<span style="font-size:11px;color:var(--text3)">of '+_tgMax+' verified</span>':'')+'</span></div>';
+    var _tgOwn=(MS.draft.tgOwned||0);
+    if(_tgOwn>0){
+      var _tgPct=(MS.draft.tgPct!==undefined?MS.draft.tgPct:50);
+      MS.draft.truegold=Math.round(_tgOwn*_tgPct/100);
+      _extra+='<div class="ms-slider-row">'+
+        '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><strong style="font-size:14px">🟨 TrueGold</strong><span style="font-size:12px;color:var(--text3)">'+_tgOwn+' available</span></div>'+
+        '<input type="range" min="0" max="100" value="'+_tgPct+'" id="msSlider-tg" oninput="msUpdateTGPct(this.value)">'+
+        '<div style="display:flex;justify-content:space-between;font-size:12px"><span class="mono" style="color:var(--accent2)" id="msSliderPct-tg">'+_tgPct+'%</span><span class="mono" style="color:var(--gold)" id="msSliderCnt-tg">'+MS.draft.truegold+' pieces ('+(MS.draft.truegold*2000).toLocaleString()+' pts)</span></div>'+
+      '</div>';
+    } else {
+      _extra+='<div class="ms-slider-row" style="display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap"><strong style="font-size:14px">🟨 TrueGold to use</strong><span style="display:flex;align-items:center;gap:8px"><input type="number" min="0" value="'+(MS.draft.truegold||0)+'" style="width:100px" oninput="msUpdateTG(this.value)"><span style="font-size:11px;color:var(--text3)">tip: enter what you own in Step 3 (Verify) to get a slider</span></span></div>';
+    }
   }
   if(_b.indexOf('research')>=0){
     var _dOwn=(MS.draft.dustOwned||0);
@@ -3506,7 +3516,15 @@ function msUpdateDustPct(v){
   var a=document.getElementById('msSliderPct-dust'); if(a)a.textContent=p+'%';
   var b=document.getElementById('msSliderCnt-dust'); if(b)b.textContent=MS.draft.dust+' pieces ('+(MS.draft.dust*1000).toLocaleString()+' pts)';
 }
-function msUpdateTGOwned(v){ clearTimeout(window._msDraftT); window._msDraftT=setTimeout(msSaveDraft,400); MS.draft=MS.draft||{}; var n=parseInt(v,10); MS.draft.tgOwned=(isNaN(n)||n<0)?0:n; if(MS.draft.tgOwned>0&&(MS.draft.truegold||0)>MS.draft.tgOwned) MS.draft.truegold=MS.draft.tgOwned; }
+function msUpdateTGPct(v){
+  clearTimeout(window._msDraftT); window._msDraftT=setTimeout(msSaveDraft,400);
+  MS.draft=MS.draft||{}; var p=parseInt(v,10); if(isNaN(p)||p<0)p=0; if(p>100)p=100;
+  MS.draft.tgPct=p;
+  MS.draft.truegold=Math.round((MS.draft.tgOwned||0)*p/100);
+  var a=document.getElementById('msSliderPct-tg'); if(a)a.textContent=p+'%';
+  var b=document.getElementById('msSliderCnt-tg'); if(b)b.textContent=MS.draft.truegold+' pieces ('+(MS.draft.truegold*2000).toLocaleString()+' pts)';
+}
+function msUpdateTGOwned(v){ clearTimeout(window._msDraftT); window._msDraftT=setTimeout(msSaveDraft,400); MS.draft=MS.draft||{}; var n=parseInt(v,10); MS.draft.tgOwned=(isNaN(n)||n<0)?0:n; if(MS.draft.tgOwned>0) MS.draft.truegold=Math.round(MS.draft.tgOwned*((MS.draft.tgPct!==undefined?MS.draft.tgPct:50))/100); }
 function msUpdateDustOwned(v){ clearTimeout(window._msDraftT); window._msDraftT=setTimeout(msSaveDraft,400); MS.draft=MS.draft||{}; var n=parseInt(v,10); MS.draft.dustOwned=(isNaN(n)||n<0)?0:n; if(MS.draft.dustOwned>0) MS.draft.dust=Math.round(MS.draft.dustOwned*((MS.draft.dustPct!==undefined?MS.draft.dustPct:50))/100); }
 function msUpdateSlider(cat){
   clearTimeout(window._msDraftT); window._msDraftT = setTimeout(msSaveDraft, 400);
@@ -3866,6 +3884,7 @@ for(var _bi=0;_bi<_openForCheck.length;_bi++){
     tgOwned: MS.draft.tgOwned||0,
     dustOwned: MS.draft.dustOwned||0,
     dustPct: (MS.draft.dustPct!==undefined?MS.draft.dustPct:50),
+    tgPct: (MS.draft.tgPct!==undefined?MS.draft.tgPct:50),
     generalSplit: (_genBoards.length>=2) ? JSON.parse(JSON.stringify(MS.draft.generalSplit||{})) : null,
     scores: (function(){
       var splitMode = _genBoards.length>=2;
@@ -4039,7 +4058,7 @@ function msEditSubmission() {
       picks: (cur.picks||[]).slice(),
       boards: (cur.boards||[]).slice(),
       truegold: cur.truegold||0, dust: cur.dust||0,
-      tgOwned: cur.tgOwned||0, dustOwned: cur.dustOwned||0, dustPct: (cur.dustPct!==undefined?cur.dustPct:50),
+      tgOwned: cur.tgOwned||0, dustOwned: cur.dustOwned||0, dustPct: (cur.dustPct!==undefined?cur.dustPct:50), tgPct: (cur.tgPct!==undefined?cur.tgPct:50),
       picksByBoard: JSON.parse(JSON.stringify(cur.picksByBoard||{})),
       favByBoard: JSON.parse(JSON.stringify(cur.favByBoard||{})),
       generalSplit: JSON.parse(JSON.stringify(cur.generalSplit||{})),
@@ -4198,10 +4217,13 @@ function msSetManageBoard(board){
   var res = MS._allocByBoard[board] || {winners:[],rejected:[],assignments:[],rejectReasons:{}};
   if(res.rejectReasons){ res.rejected.forEach(function(e){ e._rejectReason = res.rejectReasons[e.ign]; }); }
   MS._lastAllocation = res;
+  _msSelected = null;   // drop any half-finished assign when switching boards
   msRenderManageBoardTabs();
   msRenderResultsSummary();
   msRenderFinalSchedule();
   msRenderRejectedList();
+  if(typeof msRenderBench==='function') msRenderBench();
+  if(typeof msRenderBoard==='function') msRenderBoard();   // ← redraw the 48 slots for THIS board
 }
 
 function msRenderManageBoardTabs(){
@@ -4645,6 +4667,8 @@ function msClearAllSubs(){
   MS.submissionsByPlayer={};
   MS._lastAllocation=null;
   MS._submittedEntry=null;
+  MS._allocByBoard={};   // clear every board's ranked winners too — otherwise stale
+  MS._auto=null;         // results (e.g. "2/48", instant slot on resubmit) survive the wipe
   try {
     for(let i=localStorage.length-1; i>=0; i--){
       const k=localStorage.key(i);
