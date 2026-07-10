@@ -1088,9 +1088,10 @@ document.addEventListener('touchend',function(e){
     <div class="card">
       <div class="card-title" style="display:flex;align-items:center;gap:10px">🕐 Step 4 — Signup <span onclick="msGoStep(3)" style="margin-left:auto;font-size:11px;font-weight:400;color:var(--accent2);cursor:pointer;letter-spacing:0;text-transform:none">← Back</span></div>
       <div id="msSignupSummary" style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px"></div>
-      <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);cursor:pointer;margin-bottom:10px"><input type="checkbox" id="msApplyAllChk" checked onchange="msToggleApplyAll()"> Use the same timeslots for all my boards</label>
-      <div id="msBoardSwitcher" style="display:none;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
+      <div id="msBoardSwitcher" style="display:none;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>
+      <p id="msPerBoardHint" style="display:none;color:var(--text2);font-size:12px;margin-bottom:10px">Each minister spot has its <strong style="color:var(--text)">own timeslot board</strong> — use the tabs above to fill in every board you applied for.</p>
       <p style="color:var(--text2);font-size:12px;margin-bottom:6px">Select at least <strong style="color:var(--text)">4 timeslots</strong> that work best for you (UTC).</p>
+      <div style="background:rgba(201,165,92,.08);border:1px solid var(--border);border-radius:7px;padding:8px 12px;font-size:12px;color:var(--text2);margin-bottom:10px">⭐ <strong style="color:var(--gold)">What the star means:</strong> after selecting a slot, tap its ☆ to mark it as a <strong style="color:var(--text)">priority favourite</strong> (max 2 per board). When spots are assigned, the system tries to give you one of your starred slots first — before falling back to your other picks.</div>
       <div id="msSlotPickCount" style="font-size:12px;color:var(--text3);margin-bottom:10px">0 slots selected</div>
 
       <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">
@@ -1498,17 +1499,47 @@ function copyText(text, silent){
   const done=()=>{ if(!silent) toast('Copied!'); };
   const fallback=()=>{
     try{
-      const el=document.createElement('textarea'); el.value=text; el.style.position='fixed'; el.style.opacity='0';
-      document.body.appendChild(el); el.select();
+      const el=document.createElement('textarea'); el.value=text;
+      el.setAttribute('readonly','');
+      el.style.position='fixed'; el.style.top='0'; el.style.left='0'; el.style.opacity='0';
+      document.body.appendChild(el);
+      if(/ipad|iphone|ipod/i.test(navigator.userAgent)){
+        // iOS Safari: plain select() does not work — need a real Range + setSelectionRange
+        el.contentEditable=true;
+        const range=document.createRange(); range.selectNodeContents(el);
+        const sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+        el.setSelectionRange(0,999999);
+      } else { el.select(); }
       const ok=document.execCommand('copy'); document.body.removeChild(el);
       if(ok){ done(); return Promise.resolve(); }
+      copyShowManual(text);
       return Promise.reject(new Error('copy failed'));
-    }catch(e){ return Promise.reject(e); }
+    }catch(e){ copyShowManual(text); return Promise.reject(e); }
   };
-  if(navigator.clipboard&&navigator.clipboard.writeText){
+  // Clipboard API silently fails when the page is not focused (e.g. user just
+  // came back from the game app) — skip straight to the fallback in that case.
+  if(navigator.clipboard&&navigator.clipboard.writeText&&window.isSecureContext&&document.hasFocus()){
     return navigator.clipboard.writeText(text).then(()=>{ done(); }).catch(()=>fallback());
   }
   return fallback();
+}
+// Last-resort manual copy: show the text in a modal so nothing is ever lost mid-battle.
+function copyShowManual(text){
+  let ov=document.getElementById('copyManualOverlay');
+  if(!ov){
+    ov=document.createElement('div'); ov.id='copyManualOverlay';
+    ov.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px';
+    ov.onclick=function(e){ if(e.target===ov) ov.style.display='none'; };
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML='<div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;max-width:420px;width:100%">'+
+    '<div style="font-weight:700;color:var(--accent2);margin-bottom:8px;font-family:var(--head)">Automatic copy failed</div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:8px">Tap and hold (or Ctrl+C) the text below, then choose Copy.</div>'+
+    '<textarea id="copyManualText" readonly style="width:100%;height:120px;font-family:var(--mono);font-size:12px;background:var(--bg4);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px"></textarea>'+
+    '<button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%" onclick="document.getElementById(&quot;copyManualOverlay&quot;).style.display=&quot;none&quot;">Close</button></div>';
+  const ta=document.getElementById('copyManualText'); if(ta){ ta.focus(); ta.select(); }
+  ov.style.display='flex';
+  const _ta=document.getElementById('copyManualText'); if(_ta) _ta.value=text;
 }
 function uid(){return Math.random().toString(36).slice(2,8);}
 
@@ -1917,9 +1948,15 @@ function bsFirePetPlans(){
 }
 function renderPetPlanChips(){
   const el=document.getElementById('bsPetSelChips'); if(!el) return;
+  const planned={};
+  bsPetPlans.forEach(function(p){ if(!p.fired) p.leaderIds.forEach(function(id){ planned[id]=true; }); });
   el.innerHTML = S.leaders.length ? S.leaders.map(function(l){
     const on=bsPetSel.indexOf(l.id)>=0;
-    return '<span onclick="bsPetSelToggle('+"'"+l.id+"'"+')" style="cursor:pointer;user-select:none;font-size:12px;padding:4px 10px;border-radius:14px;border:1px solid '+(on?'var(--accent)':'var(--border)')+';background:'+(on?'rgba(201,165,92,.15)':'var(--bg3)')+';color:'+(on?'var(--accent2)':'var(--text2)')+'">'+l.name+'</span>';
+    const has=!!planned[l.id];
+    const bd=on?'var(--accent)':(has?'var(--green)':'var(--border)');
+    const bg=on?'rgba(201,165,92,.15)':(has?'rgba(124,200,121,.12)':'var(--bg3)');
+    const cl=on?'var(--accent2)':(has?'var(--green)':'var(--text2)');
+    return '<span onclick="bsPetSelToggle('+"'"+l.id+"'"+')" title="'+(has?'Already in a pet activation plan':'')+'" style="cursor:pointer;user-select:none;font-size:12px;padding:4px 10px;border-radius:14px;border:1px solid '+bd+';background:'+bg+';color:'+cl+'">'+(has?'🐾 ':'')+l.name+'</span>';
   }).join('') : '<span style="color:var(--text3);font-size:12px">No leaders yet.</span>';
 }
 function renderPetPlanList(){
@@ -2091,7 +2128,7 @@ function bsRenameTeam(teamId){
   var t=S.teams.find(function(x){return x.id===teamId;}); if(!t) return;
   var n=prompt('Rename team', t.name); if(n===null) return;
   n=n.trim(); if(!n) return;
-  t.name=n; renderBattleStrategy(); if(typeof renderSetup==='function') renderSetup(); syncQueuePush();
+  t.name=n; t.customName=true; renderBattleStrategy(); if(typeof renderSetup==='function') renderSetup(); syncQueuePush();
 }
 function bsDeleteTeam(teamId){
   var t=S.teams.find(function(x){return x.id===teamId;}); if(!t) return;
@@ -2113,7 +2150,7 @@ function bsRenameAlliance(id,val){
   bsEnsureAlliances();
   var a=S.alliances.find(function(x){return x.id===id;}); if(!a) return;
   var name=(val||'').trim(); if(!name) return;
-  a.name=name; renderBattleStrategy(); syncQueuePush();
+  t.name=name; t.customName=true; renderBattleStrategy(); syncQueuePush();
 }
 function bsRemoveAlliance(id){
   bsEnsureAlliances();
@@ -2336,9 +2373,23 @@ function bsAutoScroll(e){
 }
 document.addEventListener('dragover',bsAutoScroll);
 
+// ── Auto team names: "Leader1 & Leader2 & Leader3", unless manually renamed (customName) ──
+function bsAutoNameTeams(){
+  let changed=false;
+  S.teams.forEach(function(t){
+    if(t.customName) return;
+    const members=S.leaders.filter(function(l){return l.bsSlot&&l.bsSlot.slotType==='team'&&l.bsSlot.slotId===t.id;});
+    if(!members.length) return;
+    const auto=members.map(function(l){return l.name;}).join(' & ');
+    if(t.name!==auto){ t.name=auto; changed=true; }
+  });
+  if(changed && typeof syncQueuePush==='function') syncQueuePush();
+}
+
 function renderBattleStrategy(){
   // init bsSlot
   S.leaders.forEach(l=>{ if(!l.bsSlot) l.bsSlot={slotType:'pool',slotId:null}; });
+  bsAutoNameTeams();
 
   // ── ALLIANCE NAMES (from Team Setup) ──
   const gNameInput=document.getElementById('garrisonAllianceName');
@@ -2357,7 +2408,7 @@ const turretGrid=document.getElementById('bsTurretGrid');
         <div class="bs-slot-label">🗼 \${t.name}</div>
         <div class="bs-slot" style="display:flex;flex-direction:column;gap:8px">
           \${occupants.length?occupants.map(o=>bsLeaderCardHTML(o)).join(''):'<div style="color:var(--text3);font-size:11px;text-align:center;padding:6px 0">No leaders yet.</div>'}
-          <button class="btn btn-ghost btn-sm" style="width:100%;font-size:11px" onclick="bsOpenAddModal('+"'"+'turret'+"'"+','+i+')">+ Add leader</button>
+          <button class="btn btn-ghost btn-sm" style="width:100%;font-size:11px" onclick="bsOpenAddModal('turret',\${i})">+ Add leader</button>
         </div>
       </div>\`;
     }).join('');
@@ -2463,7 +2514,7 @@ el.innerHTML=S.teams.map(t=>{
     const dot='<span class="team-dot '+(rallying?'rallying':'free')+'"></span>';
     let meta='<span style="opacity:.6;font-size:11px">('+leaderCount+')</span>';
     if(rallying){ const rem=(bsTeamRally[t.id].landEnd-Date.now())/1000; meta='<span class="mono" style="color:#ff7070;font-size:12px;margin-left:2px">lands '+bsFmtLand(rem)+'</span>'; }
-    return \`<button class="btn \${allianceColor}" style="\${selected}" onclick="bsSelectTeam('\${t.id}')">\${bsTeamColorDot(t.id)}\${dot}\${t.name} \${meta}</button>\`;
+    return \`<button class="btn \${allianceColor}" style="\${selected}" onclick="bsSelectTeam('\${t.id}')">\${dot}\${t.name} \${meta}</button>\`;
   }).join('');
 }
 function bsSelectTeam(teamId){
@@ -2500,7 +2551,7 @@ function bsCalcTeam(teamId, offsetSec, logToast){
   const header=\`\${t.name}\`;
   const resultEl=document.getElementById('bsFinalResult');
   resultEl.innerHTML=\`<div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:14px 16px">
-    <div style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;color:var(--text);margin-bottom:10px">\${bsTeamColorDot(t.id)}\${header}</div>
+    <div style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;color:var(--text);margin-bottom:10px">\${header}</div>
     \${results.map((r,i)=>\`
       <div class="copy-line" style="margin-bottom:5px" onclick="copyText('\${r.name} | Time: \${s2hms(r.launchSec)}')">
         <span>
@@ -2576,11 +2627,10 @@ function bsRenderFrozen(){
       '<span style="color:var(--text3);font-size:11px;margin-left:8px">(march '+r.march+'s)</span></span>'+st+'</div>';
   }).join('');
   el.innerHTML='<div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:14px 16px">'+
-    '<div style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;color:var(--text);margin-bottom:10px">'+bsTeamColorDot(f.teamId)+(t?t.name:'')+
+    '<div style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;color:var(--text);margin-bottom:10px">'+(t?t.name:'')+
     '<span style="color:var(--gold);font-size:11px;font-weight:600">● LOCKED — copied schedule</span></div>'+rows+
     '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
     '<button class="btn btn-gold btn-sm" onclick="bsCopyTeamResult(&quot;'+f.teamId+'&quot;)">📋 Copy again</button>'+
-    '<button class="btn btn-ghost btn-sm" onclick="bsUnfreezeSchedule()">↺ Recalculate live</button>'+
     '<span id="bsCopyMsg" style="font-size:12px;font-weight:600"></span></div></div>';
 }
 function bsUnfreezeSchedule(){
@@ -3253,7 +3303,7 @@ var _b=(MS.draft&&MS.draft.boards)?MS.draft.boards:[];
   if(_b.indexOf('buildings')>=0) _extra+='<div class="ms-slider-row" style="display:flex;align-items:center;gap:12px;justify-content:space-between"><strong style="font-size:14px">🟨 TrueGold to use</strong><input type="number" min="0" value="'+(MS.draft.truegold||0)+'" style="width:100px" oninput="msUpdateTG(this.value)"></div>';
   if(_b.indexOf('research')>=0) _extra+='<div class="ms-slider-row" style="display:flex;align-items:center;gap:12px;justify-content:space-between"><strong style="font-size:14px">🔺 TrueGold Dust to use</strong><input type="number" min="0" value="'+(MS.draft.dust||0)+'" style="width:100px" oninput="msUpdateDust(this.value)"></div>';
   if(_extra) grid.innerHTML += _extra;
-  grid.innerHTML += '<div id="msGeneralSplitWrap" style="display:none;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-top:10px"></div>';
+  grid.innerHTML += '<div id="msGeneralSplitWrap" class="ms-slider-row" style="display:none;border-top:1px solid var(--border);padding-top:14px;margin-top:4px"></div>';
   if(typeof msRenderGeneralSplit==='function') msRenderGeneralSplit();
 }
 // ── General Speedup split (fixes double-counting when 2+ applied boards share "General Speedup") ──
@@ -3265,30 +3315,86 @@ function msGeneralCommittedHours(){
   var pct = (MS.draft.commit && MS.draft.commit.general!==undefined) ? MS.draft.commit.general : 50;
   return hours*pct/100;
 }
+// Normalize the split so it ALWAYS sums exactly to the committed General hours — the same
+// hour can never be counted toward two boards. Pass a boards array to normalize over a
+// specific set (msSubmitEntry uses the open/frozen board list), otherwise the draft's.
+function msNormalizeGeneralSplit(boardsOpt){
+  var genBoards = boardsOpt || msGeneralSplitBoards();
+  var committedH = msGeneralCommittedHours();
+  MS.draft.generalSplit = MS.draft.generalSplit || {};
+  var gs = {}, sum = 0;
+  genBoards.forEach(function(b){ var v=parseFloat(MS.draft.generalSplit[b]); if(isNaN(v)||v<0)v=0; gs[b]=v; sum+=v; });
+  if(genBoards.length){
+    if(sum<=0){ var each=committedH/genBoards.length; genBoards.forEach(function(b){ gs[b]=each; }); }
+    else if(Math.abs(sum-committedH)>0.001){ var f=committedH/sum; genBoards.forEach(function(b){ gs[b]=gs[b]*f; }); }
+  }
+  // Round to 0.1h and push the rounding remainder onto the largest share so the total stays exact.
+  var rounded={}, rSum=0, maxB=null;
+  genBoards.forEach(function(b){ rounded[b]=Math.round(gs[b]*10)/10; rSum+=rounded[b]; if(maxB===null||gs[b]>gs[maxB]) maxB=b; });
+  if(maxB!==null){ rounded[maxB]=Math.round((rounded[maxB]+(committedH-rSum))*10)/10; if(rounded[maxB]<0) rounded[maxB]=0; }
+  MS.draft.generalSplit = rounded;
+  return rounded;
+}
 function msRenderGeneralSplit(){
   var host = document.getElementById('msGeneralSplitWrap'); if(!host) return;
   var genBoards = msGeneralSplitBoards();
-  if(genBoards.length<2){ host.style.display='none'; host.innerHTML=''; return; }
   var committedH = msGeneralCommittedHours();
-  MS.draft.generalSplit = MS.draft.generalSplit || {};
-  var keysMatch = genBoards.every(function(b){ return MS.draft.generalSplit[b]!==undefined; }) && Object.keys(MS.draft.generalSplit).length===genBoards.length;
-  if(!keysMatch){
-    var each = genBoards.length ? committedH/genBoards.length : 0;
-    MS.draft.generalSplit = {};
-    genBoards.forEach(function(b){ MS.draft.generalSplit[b]=Math.round(each*10)/10; });
-  }
+  if(genBoards.length<2 || committedH<=0){ host.style.display='none'; host.innerHTML=''; return; }
+  msNormalizeGeneralSplit();
   host.style.display='block';
+  var max = Math.round(committedH*10);
   var rows = genBoards.map(function(b){
     var m=MS_BOARD_META[b];
-    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="width:120px;font-size:12px;color:'+m.color+'">'+m.icon+' '+m.label+'</span><input type="number" min="0" step="0.1" value="'+(MS.draft.generalSplit[b]||0)+'" style="width:90px" oninput="msUpdateGeneralSplit(\\''+b+'\\',this.value)"><span style="font-size:11px;color:var(--text3)">hours</span></div>';
+    return '<div style="margin-bottom:2px;display:flex;justify-content:space-between;font-size:12px"><span style="color:'+m.color+';font-weight:600">'+m.icon+' '+m.label+'</span><span class="mono" style="color:var(--gold)" id="msGenSplitVal-'+b+'"></span></div>'+
+      '<input type="range" min="0" max="'+max+'" step="1" value="'+Math.round((MS.draft.generalSplit[b]||0)*10)+'" id="msGenSplitSlider-'+b+'" oninput="msSetGeneralSplit('+"'"+b+"'"+',this.value/10)" style="margin-bottom:10px">';
   }).join('');
   host.innerHTML =
-    '<div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">⚖️ Split your General Speedup between boards</div>'+
-    '<div style="font-size:11.5px;color:var(--text3);margin-bottom:8px">You picked more than one board that uses General Speedup. Tell us how many of your '+committedH.toFixed(1)+'h committed hours go to each — otherwise the same hours get counted toward both boards\\' KvK points.</div>'+
+    '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><strong style="font-size:14px">⏱️ Where does your General Speedup go?</strong><span class="mono" style="font-size:12px;color:var(--gold)" id="msGenSplitTotal"></span></div>'+
+    '<div style="font-size:11.5px;color:var(--text3);margin-bottom:10px">You applied for '+genBoards.length+' boards that can use General Speedup. Slide to divide your committed hours between them — the split always adds up automatically, so the same hours are never counted toward two boards.</div>'+
     rows+
-    '<div id="msGeneralSplitSummary" style="font-size:12px;margin-top:4px"></div>'+
-    '<button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="msSplitGeneralEvenly()">Split evenly</button>';
-  msRenderGeneralSplitSummary();
+    '<button class="btn btn-ghost btn-sm" onclick="msSplitGeneralEvenly()">⚖️ Split evenly</button>';
+  msUpdateGeneralSplitLabels();
+}
+function msUpdateGeneralSplitLabels(){
+  var genBoards = msGeneralSplitBoards();
+  var committedH = msGeneralCommittedHours();
+  genBoards.forEach(function(b){
+    var h=(MS.draft.generalSplit||{})[b]||0;
+    var pct=committedH>0?Math.round(h/committedH*100):0;
+    var vEl=document.getElementById('msGenSplitVal-'+b); if(vEl) vEl.textContent=h.toFixed(1)+'h ('+pct+'%)';
+    var sEl=document.getElementById('msGenSplitSlider-'+b); if(sEl && document.activeElement!==sEl) sEl.value=Math.round(h*10);
+  });
+  var tEl=document.getElementById('msGenSplitTotal'); if(tEl) tEl.textContent=committedH.toFixed(1)+'h committed';
+}
+// Move one board's share; the other boards automatically absorb the difference so the
+// total always equals the committed hours — over-budget or unassigned states cannot exist.
+function msSetGeneralSplit(board, val){
+  clearTimeout(window._msDraftT); window._msDraftT = setTimeout(msSaveDraft, 400);
+  var genBoards = msGeneralSplitBoards();
+  var committedH = msGeneralCommittedHours();
+  var v = Math.round((parseFloat(val)||0)*10)/10; if(v<0) v=0; if(v>committedH) v=Math.round(committedH*10)/10;
+  MS.draft.generalSplit = MS.draft.generalSplit || {};
+  MS.draft.generalSplit[board]=v;
+  var others = genBoards.filter(function(b){ return b!==board; });
+  var rest = Math.max(0, committedH - v);
+  var oSum = others.reduce(function(a,b){ return a+(parseFloat(MS.draft.generalSplit[b])||0); },0);
+  var acc = 0;
+  others.forEach(function(b, idx){
+    var share;
+    if(idx===others.length-1) share = rest-acc;
+    else if(oSum>0) share = Math.round((parseFloat(MS.draft.generalSplit[b])||0)/oSum*rest*10)/10;
+    else share = Math.round(rest/others.length*10)/10;
+    if(share<0) share=0;
+    MS.draft.generalSplit[b]=Math.round(share*10)/10;
+    acc+=MS.draft.generalSplit[b];
+  });
+  msUpdateGeneralSplitLabels();
+}
+function msSplitGeneralEvenly(){
+  clearTimeout(window._msDraftT); window._msDraftT = setTimeout(msSaveDraft, 400);
+  MS.draft.generalSplit = {};
+  msNormalizeGeneralSplit();
+  msRenderGeneralSplit();
 }
 function msRenderGeneralSplitSummary(){
   var el=document.getElementById('msGeneralSplitSummary'); if(!el) return;
@@ -3332,17 +3438,23 @@ function msAppliedBoardsList(){ var b=(MS.draft&&MS.draft.boards&&MS.draft.board
 function msActiveBoard(){ MS.draft=MS.draft||{}; var b=msAppliedBoardsList(); if(!MS.draft._activeBoard||b.indexOf(MS.draft._activeBoard)<0) MS.draft._activeBoard=b[0]; return MS.draft._activeBoard; }
 function msPicks(){ MS.draft.picksByBoard=MS.draft.picksByBoard||{}; var ab=msActiveBoard(); if(!MS.draft.picksByBoard[ab]) MS.draft.picksByBoard[ab]=[]; return MS.draft.picksByBoard[ab]; }
 function msFavs(){ MS.draft.favByBoard=MS.draft.favByBoard||{}; var ab=msActiveBoard(); if(!MS.draft.favByBoard[ab]) MS.draft.favByBoard[ab]=[]; return MS.draft.favByBoard[ab]; }
-function msApplyAllSync(){ if(!MS.draft.applyAll) return; var p=msPicks().slice(), f=msFavs().slice(); msAppliedBoardsList().forEach(function(b){ if(msBoardClosed(b)) return; MS.draft.picksByBoard[b]=p.slice(); MS.draft.favByBoard[b]=f.slice(); }); }
+// Every board has its own timeslot selection — "apply to all" was removed so slots are
+// always chosen per board. The empty sync keeps old call sites harmless and force-clears
+// the flag on drafts saved before this change.
+function msApplyAllSync(){ if(MS.draft) MS.draft.applyAll=false; }
 function msSwitchBoard(b){ MS.draft._activeBoard=b; msRenderSlotGrid(); }
-function msToggleApplyAll(){ MS.draft.applyAll=!MS.draft.applyAll; if(MS.draft.applyAll) msApplyAllSync(); msRenderSlotGrid(); }
+function msToggleApplyAll(){ msApplyAllSync(); msRenderSlotGrid(); }
 function msRenderBoardSwitcher(){
-  var chk=document.getElementById('msApplyAllChk'); if(chk) chk.checked=!!MS.draft.applyAll;
+  if(MS.draft) MS.draft.applyAll=false;
   var el=document.getElementById('msBoardSwitcher'); if(!el) return;
   var boards=msAppliedBoardsList(), ab=msActiveBoard();
-  if(MS.draft.applyAll || boards.length<2){ el.style.display='none'; return; }
+  var hint=document.getElementById('msPerBoardHint'); if(hint) hint.style.display=(boards.length<2?'none':'block');
+  if(boards.length<2){ el.style.display='none'; return; }
   el.style.display='flex';
   el.innerHTML=boards.map(function(b){ var m=MS_BOARD_META[b]; var on=b===ab;
-    return '<button class="btn btn-sm'+(on?'':' btn-ghost')+'" onclick="msSwitchBoard('+"'"+b+"'"+')" style="'+(on?'border-color:'+m.color+';color:'+m.color:'')+'">'+m.icon+' '+m.label+(msBoardClosed(b)?' 🔒':'')+'</button>';
+    var picked=((MS.draft.picksByBoard||{})[b]||[]).length;
+    var badge=msBoardClosed(b)?' 🔒':(picked>=MS_MIN_SLOTS_PICKED?' ✓':(' ('+picked+'/'+MS_MIN_SLOTS_PICKED+')'));
+    return '<button class="btn btn-sm'+(on?'':' btn-ghost')+'" onclick="msSwitchBoard('+"'"+b+"'"+')" style="'+(on?'border-color:'+m.color+';color:'+m.color:'')+'">'+m.icon+' '+m.label+badge+'</button>';
   }).join('');
 }
 function msRenderSignupSummary(){
@@ -3637,19 +3749,10 @@ for(var _bi=0;_bi<_openForCheck.length;_bi++){
       return;
     }
   }
-  // If 2+ applied boards share "General Speedup", the split must be filled in and add up —
-  // otherwise the same hours would silently get double-counted toward both boards' KvK points.
+// Automatic double-count prevention: normalize the split so it sums EXACTLY to the
+  // committed General hours — the same hour can never score points on two boards.
   var _genBoards = _boards.filter(function(b){ var m=MS_BOARD_META[b]; return m && m.cats && m.cats.indexOf('general')>=0; });
-  if(_genBoards.length>=2){
-    var _gCommitted = msGeneralCommittedHours();
-    var _gSplit = MS.draft.generalSplit||{};
-    var _gUsed = _genBoards.reduce(function(a,b){ return a+(parseFloat(_gSplit[b])||0); },0);
-    if(Math.abs(_gCommitted-_gUsed) > 0.05){
-      toast('General Speedup split must add up to '+_gCommitted.toFixed(1)+'h — fix it in Step 3.');
-      msGoStep(3);
-      return;
-    }
-  }
+  if(_genBoards.length>=2 && typeof msNormalizeGeneralSplit==='function') msNormalizeGeneralSplit(_genBoards);
 
   const committedHours={};
   MS_CATEGORIES.forEach(cat=>{
@@ -3850,10 +3953,10 @@ function msEditSubmission() {
       picksByBoard: JSON.parse(JSON.stringify(cur.picksByBoard||{})),
       favByBoard: JSON.parse(JSON.stringify(cur.favByBoard||{})),
       generalSplit: JSON.parse(JSON.stringify(cur.generalSplit||{})),
-      applyAll: (cur.applyAll!==undefined?cur.applyAll:true)
+      applyAll: false
     };
   } else {
-    MS.draft = {alliance:'', ign:'', verify:{}, commit:{}, picks:[], boards:[], truegold:0, dust:0, picksByBoard:{}, favByBoard:{}, applyAll:true};
+    MS.draft = {alliance:'', ign:'', verify:{}, commit:{}, picks:[], boards:[], truegold:0, dust:0, picksByBoard:{}, favByBoard:{}, applyAll:false};
   }
   MS._unlockedStep = 4; // all steps unlocked since they already completed them
   // Keep the overview tab visible so they can still see their current submission
