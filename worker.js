@@ -971,7 +971,7 @@ document.addEventListener('touchend',function(e){
   </div>
 
   <!-- BOARD PICK GATE -->  <div id="msBoardPick" class="card" style="display:none;margin-bottom:18px">
-    <div class="card-title">👑 Which minister spots are you applying for?</div>
+    <div class="card-title">👑 Step 1 — Apply: which minister spots are you applying for?</div>
     <p style="color:var(--text2);font-size:12px;margin-bottom:14px">Pick one or more. The rest of the signup only asks for what each one needs.</p>
     <div id="msBoardPickGrid" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px"></div>
     <button class="btn btn-primary" onclick="msBoardPickContinue()">Continue →</button>
@@ -980,12 +980,12 @@ document.addEventListener('touchend',function(e){
   <!-- STEP TABS -->
   <div class="phase-tabs" style="margin-bottom:18px;align-items:center">
     <button class="tab ms-step-tab" id="msStepTab0" onclick="msGoStep(0)" style="display:none">📋 My Submission</button>
-    <button class="tab ms-step-tab active" id="msStepTab1" onclick="msGoStep(1)">1. Upload</button>
-    <button class="tab ms-step-tab" id="msStepTab2" onclick="msGoStep(2)">2. Verify</button>
-    <button class="tab ms-step-tab" id="msStepTab3" onclick="msGoStep(3)">3. Commitment</button>
-    <button class="tab ms-step-tab" id="msStepTab4" onclick="msGoStep(4)">4. Timeslots &amp; Submit</button>
-    <button id="msChangeSpotsHeaderBtn" onclick="msChangeBoards()" style="margin-left:auto;background:rgba(197,92,255,.12);border:1.5px solid #c55cff;color:#c55cff;font-weight:700;font-size:13px;padding:8px 16px;border-radius:8px;cursor:pointer">👑 Change Minister Spots</button>
-    <button class="tab ms-step-tab" id="msStepTab5" onclick="msGoStep(5)" style="display:none;color:var(--gold);border-color:var(--gold)">👑 Manage Spots <span title="Leader controls for Minister Spots. Lock players into specific slots, manually assign or move anyone (even non-submitters), and review who wasn't selected and why." style="cursor:help;opacity:.7;font-size:11px">ⓘ</span></button>
+    <button class="tab ms-step-tab" id="msStepTabA" onclick="msGoApply()">1. Apply</button>
+    <button class="tab ms-step-tab active" id="msStepTab1" onclick="msGoStep(1)">2. Upload</button>
+    <button class="tab ms-step-tab" id="msStepTab2" onclick="msGoStep(2)">3. Verify</button>
+    <button class="tab ms-step-tab" id="msStepTab3" onclick="msGoStep(3)">4. Commitment</button>
+    <button class="tab ms-step-tab" id="msStepTab4" onclick="msGoStep(4)">5. Timeslots &amp; Submit</button>
+    <button class="tab ms-step-tab" id="msStepTab5" onclick="msGoStep(5)" style="display:none;color:var(--gold);border-color:var(--gold);margin-left:auto">👑 Manage Spots <span title="Leader controls for Minister Spots. Lock players into specific slots, manually assign or move anyone (even non-submitters), and review who wasn't selected and why." style="cursor:help;opacity:.7;font-size:11px">ⓘ</span></button>
   </div>
 
   <!-- STEP 0: MY SUBMISSION OVERVIEW -->
@@ -1008,7 +1008,7 @@ document.addEventListener('touchend',function(e){
   <!-- STEP 1: UPLOAD -->
   <div id="msStep1" class="ms-step">
     <div class="card">
-    <div class="card-title" style="display:flex;align-items:center;gap:10px">📸 Step 1 — Identify &amp; Upload <button onclick="msChangeBoards()" style="margin-left:auto;background:rgba(197,92,255,.12);border:1.5px solid #c55cff;color:#c55cff;font-weight:700;font-size:13px;padding:7px 14px;border-radius:8px;cursor:pointer;letter-spacing:0;text-transform:none">👑 Change Minister Spots</button></div>
+    <div class="card-title" style="display:flex;align-items:center;gap:10px">📸 Step 2 — Identify &amp; Upload <span onclick="msChangeBoards()" style="margin-left:auto;font-size:11px;font-weight:400;color:var(--accent2);cursor:pointer;letter-spacing:0;text-transform:none">← Back to Apply</span></div>
       <div class="row">
         <div id="msIdentityDisplay" style="background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:10px 14px;display:flex;align-items:center;gap:12px">
           <img id="msIdentityAvatar" src="" style="width:36px;height:36px;border-radius:50%;border:2px solid var(--border2);display:none">
@@ -1067,7 +1067,7 @@ document.addEventListener('touchend',function(e){
   <!-- STEP 2: VERIFY -->
   <div id="msStep2" class="ms-step" style="display:none">
     <div class="card">
-      <div class="card-title" style="display:flex;align-items:center;gap:10px">✅ Step 2 — Verify &amp; Correct <span onclick="msGoStep(1)" style="margin-left:auto;font-size:11px;font-weight:400;color:var(--accent2);cursor:pointer;letter-spacing:0;text-transform:none">← Back</span></div>
+      <div class="card-title" style="display:flex;align-items:center;gap:10px">✅ Step 3 — Verify &amp; Correct <span onclick="msGoStep(1)" style="margin-left:auto;font-size:11px;font-weight:400;color:var(--accent2);cursor:pointer;letter-spacing:0;text-transform:none">← Back</span></div>
       <p style="color:var(--text2);font-size:12px;margin-bottom:14px">Confirm the detected speedup amounts below. If a number looks wrong, correct it manually — OCR isn't perfect. Enter the raw amount and pick its unit; it converts to hours automatically.</p>
       <div id="msVerifyGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px"></div>
       <button class="btn btn-primary" style="margin-top:16px" onclick="msMarkStepComplete(2);msGoStep(3)">Continue to Commitment →</button>
@@ -1077,7 +1077,7 @@ document.addEventListener('touchend',function(e){
   <!-- STEP 3: COMMITMENT SLIDERS -->
   <div id="msStep3" class="ms-step" style="display:none">
     <div class="card">
-      <div class="card-title" style="display:flex;align-items:center;gap:10px">🎯 Step 3 — Expected Usage This KvK <span onclick="msGoStep(2)" style="margin-left:auto;font-size:11px;font-weight:400;color:var(--accent2);cursor:pointer;letter-spacing:0;text-transform:none">← Back</span></div>
+      <div class="card-title" style="display:flex;align-items:center;gap:10px">🎯 Step 4 — Expected Usage This KvK <span onclick="msGoStep(2)" style="margin-left:auto;font-size:11px;font-weight:400;color:var(--accent2);cursor:pointer;letter-spacing:0;text-transform:none">← Back</span></div>
       <p style="color:var(--text2);font-size:12px;margin-bottom:14px">For each category, set how much of your speedups you plan to commit this KvK. This determines your ranking priority for minister spots.</p>
       <div id="msSliderGrid"></div>
       <button class="btn btn-primary" style="margin-top:10px" onclick="msMarkStepComplete(3);msGoStep(4)">Continue to Timeslots →</button>
@@ -1087,7 +1087,7 @@ document.addEventListener('touchend',function(e){
 <!-- STEP 4: TIMESLOT PICKS -->
   <div id="msStep4" class="ms-step" style="display:none">
     <div class="card">
-      <div class="card-title" style="display:flex;align-items:center;gap:10px">🕐 Step 4 — Signup <span onclick="msGoStep(3)" style="margin-left:auto;font-size:11px;font-weight:400;color:var(--accent2);cursor:pointer;letter-spacing:0;text-transform:none">← Back</span></div>
+      <div class="card-title" style="display:flex;align-items:center;gap:10px">🕐 Step 5 — Signup <span onclick="msGoStep(3)" style="margin-left:auto;font-size:11px;font-weight:400;color:var(--accent2);cursor:pointer;letter-spacing:0;text-transform:none">← Back</span></div>
       <div id="msSignupSummary" style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px"></div>
       <div id="msBoardSwitcher" style="display:none;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>
       <p id="msPerBoardHint" style="display:none;color:var(--text2);font-size:12px;margin-bottom:10px">Each minister spot has its <strong style="color:var(--text)">own timeslot board</strong> — use the tabs above to fill in every board you applied for.</p>
@@ -2892,7 +2892,16 @@ function msMarkStepComplete(n){
 function msRenderStepTabs(){
   const isR4 = msCanAccessResults();
   const hasSubmission = !!MS._submittedEntry;
-  const unlocked = hasSubmission ? 0 : (MS._unlockedStep||1);
+  const hasBoards = !!(MS.draft && MS.draft.boards && MS.draft.boards.length);
+  // Until minister spots are picked (Step 1), the later steps stay locked.
+  const unlocked = hasSubmission ? 0 : (hasBoards ? (MS._unlockedStep||1) : 0);
+  const tabA = document.getElementById('msStepTabA');
+  if(tabA){
+    const doneA = hasBoards || hasSubmission;
+    tabA.textContent = (doneA?'✓ ':'')+'1. Apply';
+    if(doneA && !tabA.classList.contains('active')) tabA.style.color='var(--green)';
+    else tabA.style.color='';
+  }
 
   // Step 0 (overview) - shown whenever the person has submitted, same for everyone
   const tab0 = document.getElementById('msStepTab0');
@@ -2902,7 +2911,7 @@ function msRenderStepTabs(){
   const tab5 = document.getElementById('msStepTab5');
   if(tab5) tab5.style.display = isR4 ? '' : 'none';
 
-  const baseLabels={1:'1. Upload',2:'2. Verify',3:'3. Commitment',4:'4. Timeslots & Submit'};
+  const baseLabels={1:'2. Upload',2:'3. Verify',3:'4. Commitment',4:'5. Timeslots & Submit'};
   for(let i=1;i<=4;i++){
     const tab=document.getElementById('msStepTab'+i);
     if(!tab) continue;
@@ -2927,10 +2936,18 @@ const unlocked = (hasSubmission && !MS._editing) ? 0 : (MS._unlockedStep||1);
   if(n===5 && !isR4){ toast('Results are only visible to R4/R5.'); return; }
   // If they've submitted, steps 1-4 are locked (must click Edit) — same for everyone
 if(hasSubmission && !MS._editing && n>=1 && n<=4){ toast('Click "Edit my submission" to make changes.'); n=0; }
+  // Step 1 (Apply) comes first: no wizard steps until minister spots are picked
+  if(n>=1 && n<=4 && !hasSubmission && !(MS.draft && MS.draft.boards && MS.draft.boards.length)){
+    toast('Step 1 first — pick which minister spots you are applying for.');
+    msShowBoardPick();
+    return;
+  }
   // Normal step lock — same for everyone
   if(n>1 && n>unlocked && !hasSubmission){ toast('Please complete the previous step first.'); n=unlocked; }
 
   MS._currentStep=n;
+  var _bpEl=document.getElementById('msBoardPick'); if(_bpEl) _bpEl.style.display='none';
+  var _taEl=document.getElementById('msStepTabA'); if(_taEl) _taEl.classList.remove('active');
   // Show/hide step panels (0-5)
   for(let i=0;i<=5;i++){
     const el=document.getElementById('msStep'+i);
@@ -3227,10 +3244,15 @@ function msActiveCats(){
 function msShowBoardPick(){
   MS.draft = MS.draft || {alliance:'',ign:'',verify:{},commit:{},picks:[],boards:[]};
   MS.draft.boards = MS.draft.boards || [];
-  var pt=document.querySelector('#page-minister .phase-tabs'); if(pt) pt.style.display='none';
+  // The Apply step lives INSIDE the wizard now — keep the step tabs visible so
+  // R4/R5/Admin can always reach 👑 Manage Spots without filling out the form.
+  var pt=document.querySelector('#page-minister .phase-tabs'); if(pt) pt.style.display='';
   document.querySelectorAll('#page-minister .ms-step').forEach(function(el){ el.style.display='none'; });
   var bp=document.getElementById('msBoardPick'); if(bp) bp.style.display='block';
+  document.querySelectorAll('#page-minister .ms-step-tab').forEach(function(t){ t.classList.remove('active'); });
+  var ta=document.getElementById('msStepTabA'); if(ta) ta.classList.add('active');
   msRenderBoardPick();
+  if(typeof msRenderStepTabs==='function') msRenderStepTabs();
 }
 function msRenderBoardPick(){
   var el=document.getElementById('msBoardPickGrid'); if(!el) return;
@@ -3269,7 +3291,11 @@ function msBoardPickContinue(){
   var pt=document.querySelector('#page-minister .phase-tabs'); if(pt) pt.style.display='';
   msGoStep(1);
 }
-function msChangeBoards(){ msShowBoardPick(); }
+function msGoApply(){
+  if(MS._submittedEntry && !MS._editing){ toast('Click "Edit my submission" to make changes.'); msGoStep(0); return; }
+  msShowBoardPick();
+}
+function msChangeBoards(){ msGoApply(); }
 function msRenderVerifyGrid(){
   const grid=document.getElementById('msVerifyGrid'); if(!grid) return;
   const CATS=msActiveCats();
@@ -3351,7 +3377,7 @@ var _b=(MS.draft&&MS.draft.boards)?MS.draft.boards:[];
         '<div style="display:flex;justify-content:space-between;font-size:12px"><span class="mono" style="color:var(--accent2)" id="msSliderPct-dust">'+_dPct+'%</span><span class="mono" style="color:var(--gold)" id="msSliderCnt-dust">'+MS.draft.dust+' pieces ('+(MS.draft.dust*1000).toLocaleString()+' pts)</span></div>'+
       '</div>';
     } else {
-      _extra+='<div class="ms-slider-row" style="display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap"><strong style="font-size:14px">🔺 TrueGold Dust to use</strong><span style="display:flex;align-items:center;gap:8px"><input type="number" min="0" value="'+(MS.draft.dust||0)+'" style="width:100px" oninput="msUpdateDust(this.value)"><span style="font-size:11px;color:var(--text3)">tip: enter what you own in Step 2 to get a slider</span></span></div>';
+      _extra+='<div class="ms-slider-row" style="display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap"><strong style="font-size:14px">🔺 TrueGold Dust to use</strong><span style="display:flex;align-items:center;gap:8px"><input type="number" min="0" value="'+(MS.draft.dust||0)+'" style="width:100px" oninput="msUpdateDust(this.value)"><span style="font-size:11px;color:var(--text3)">tip: enter what you own in Step 3 (Verify) to get a slider</span></span></div>';
     }
   }
   if(_extra) grid.innerHTML += _extra;
