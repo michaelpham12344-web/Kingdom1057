@@ -1336,10 +1336,10 @@ let syncApplyRemote = function(data) {
 }
 
 async function syncPull() {
-  if (!syncEnabled()) return;
+if (!syncEnabled()) return false;
   try {
     const res = await fetch(SYNC_API_URL.replace(/\\/$/, '') + '/state', { cache: 'no-store', headers: stateHeaders() });
-    if (!res.ok) { updateSyncStatus('error'); return; }
+  if (!res.ok) { updateSyncStatus('error'); return false; }
     const data = await res.json();
     const json = JSON.stringify(data);
     // A successful response means we ARE connected and synced, even if the
@@ -1347,13 +1347,45 @@ async function syncPull() {
     // anything yet). Only the "apply remote data" step should be skipped
     // when there's nothing to apply.
     updateSyncStatus('synced');
-    if (json !== syncLastPushedJSON && Object.keys(data).length) {
+if (json !== syncLastPushedJSON && Object.keys(data).length) {
       syncApplyRemote(data);
       syncLastPushedJSON = json;
     }
+    return true;
   } catch (e) {
     updateSyncStatus('offline');
+    return false;
   }
+}
+
+// ── First-sync loading state: shown right after login until the shared state has been
+// pulled successfully (retries a few times — covers KV edge-propagation delays on relog).
+let _syncFirstDone=false;
+function syncShowLoading(show){
+  let ov=document.getElementById('syncLoadingOverlay');
+  if(!show){ if(ov) ov.style.display='none'; return; }
+  if(!ov){
+    ov=document.createElement('div'); ov.id='syncLoadingOverlay';
+    ov.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,12,8,.82);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9998;gap:14px';
+    ov.innerHTML='<div style="width:34px;height:34px;border:3px solid var(--border);border-top-color:var(--accent2);border-radius:50%;animation:syncspin 0.9s linear infinite"></div>'+
+      '<div style="font-family:var(--head);letter-spacing:.05em;color:var(--accent2);font-size:14px;font-weight:600">Synchronizing data…</div>'+
+      '<div style="font-size:11px;color:var(--text3)">Pulling the latest shared state for Kingdom 1057</div>';
+    var st=document.createElement('style'); st.textContent='@keyframes syncspin{to{transform:rotate(360deg)}}'; document.head.appendChild(st);
+    document.body.appendChild(ov);
+  }
+  ov.style.display='flex';
+}
+async function syncFirstPull(){
+  if(!syncEnabled() || _syncFirstDone) return;
+  syncShowLoading(true);
+  var ok=false;
+  for(var i=0;i<4 && !ok;i++){
+    ok = await syncPull();
+    if(!ok) await new Promise(function(r){ setTimeout(r,1200); });
+  }
+  _syncFirstDone=true;
+  syncShowLoading(false);
+  if(!ok) toast('Could not reach the sync server — showing local data. It keeps retrying in the background.');
 }
 
 async function syncPushNow() {
@@ -3259,9 +3291,19 @@ function msRenderVerifyGrid(){
         </select>
       </div>
       <div style="margin-top:6px;font-size:12px;color:var(--text2)">= <span class="mono" id="msVerifyHours-\${cat}" style="color:var(--gold)">\${v.hours.toFixed(1)}</span> hours</div>
-      \${flagged?'<div style="color:#ff9d4d;font-size:11px;margin-top:4px">⚠ Differs from OCR by more than 20% — please double-check</div>':''}
+      \${flagged?'<div style="color:#ff9d4d;font-size:11px;margin-top:4px">⚠ \${flagged?'<div style="color:#ff9d4d;font-size:11px;margin-top:4px">⚠ Differs from OCR by more than 20% — please double-check</div>':''}
     </div>\`;
   }).join('');
+  // ── TrueGold / TrueGold Dust inventory (only for boards that use them) ──
+  var _vb=(MS.draft&&MS.draft.boards)?MS.draft.boards:[];
+  var _vx='';
+  if(_vb.indexOf('buildings')>=0) _vx+='<div class="ms-verify-field"><label>🟨 TrueGold (you own)</label>'+
+    '<div style="display:flex;gap:6px;align-items:center"><input type="number" min="0" value="'+(MS.draft.tgOwned||0)+'" style="width:90px" id="msVerifyTG" oninput="msUpdateTGOwned(this.value)"><span style="font-size:12px;color:var(--text3)">pieces</span></div>'+
+    '<div style="margin-top:6px;font-size:11px;color:var(--text3)">Worth <span class="mono" style="color:var(--gold)">2,000 pts</span> each on the Construction board.</div></div>';
+  if(_vb.indexOf('research')>=0) _vx+='<div class="ms-verify-field"><label>🔺 TrueGold Dust (you own)</label>'+
+    '<div style="display:flex;gap:6px;align-items:center"><input type="number" min="0" value="'+(MS.draft.dustOwned||0)+'" style="width:90px" id="msVerifyDust" oninput="msUpdateDustOwned(this.value)"><span style="font-size:12px;color:var(--text3)">pieces</span></div>'+
+    '<div style="margin-top:6px;font-size:11px;color:var(--text3)">Worth <span class="mono" style="color:var(--gold)">1,000 pts</span> each on the Research board.</div></div>';
+  if(_vx) grid.innerHTML += _vx;
 }
 function msUpdateVerify(cat){
   clearTimeout(window._msDraftT); window._msDraftT = setTimeout(msSaveDraft, 400);
@@ -3295,8 +3337,24 @@ function msRenderSliderGrid(){
   }).join('');
 var _b=(MS.draft&&MS.draft.boards)?MS.draft.boards:[];
   var _extra='';
-  if(_b.indexOf('buildings')>=0) _extra+='<div class="ms-slider-row" style="display:flex;align-items:center;gap:12px;justify-content:space-between"><strong style="font-size:14px">🟨 TrueGold to use</strong><input type="number" min="0" value="'+(MS.draft.truegold||0)+'" style="width:100px" oninput="msUpdateTG(this.value)"></div>';
-  if(_b.indexOf('research')>=0) _extra+='<div class="ms-slider-row" style="display:flex;align-items:center;gap:12px;justify-content:space-between"><strong style="font-size:14px">🔺 TrueGold Dust to use</strong><input type="number" min="0" value="'+(MS.draft.dust||0)+'" style="width:100px" oninput="msUpdateDust(this.value)"></div>';
+  if(_b.indexOf('buildings')>=0){
+    var _tgMax=(MS.draft.tgOwned||0);
+    _extra+='<div class="ms-slider-row" style="display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap"><strong style="font-size:14px">🟨 TrueGold to use</strong><span style="display:flex;align-items:center;gap:8px"><input type="number" min="0" '+(_tgMax>0?'max="'+_tgMax+'" ':'')+'value="'+(MS.draft.truegold||0)+'" style="width:100px" oninput="msUpdateTG(this.value)">'+(_tgMax>0?'<span style="font-size:11px;color:var(--text3)">of '+_tgMax+' verified</span>':'')+'</span></div>';
+  }
+  if(_b.indexOf('research')>=0){
+    var _dOwn=(MS.draft.dustOwned||0);
+    if(_dOwn>0){
+      var _dPct=(MS.draft.dustPct!==undefined?MS.draft.dustPct:50);
+      MS.draft.dust=Math.round(_dOwn*_dPct/100);
+      _extra+='<div class="ms-slider-row">'+
+        '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><strong style="font-size:14px">🔺 TrueGold Dust</strong><span style="font-size:12px;color:var(--text3)">'+_dOwn+' available</span></div>'+
+        '<input type="range" min="0" max="100" value="'+_dPct+'" id="msSlider-dust" oninput="msUpdateDustPct(this.value)">'+
+        '<div style="display:flex;justify-content:space-between;font-size:12px"><span class="mono" style="color:var(--accent2)" id="msSliderPct-dust">'+_dPct+'%</span><span class="mono" style="color:var(--gold)" id="msSliderCnt-dust">'+MS.draft.dust+' pieces ('+(MS.draft.dust*1000).toLocaleString()+' pts)</span></div>'+
+      '</div>';
+    } else {
+      _extra+='<div class="ms-slider-row" style="display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap"><strong style="font-size:14px">🔺 TrueGold Dust to use</strong><span style="display:flex;align-items:center;gap:8px"><input type="number" min="0" value="'+(MS.draft.dust||0)+'" style="width:100px" oninput="msUpdateDust(this.value)"><span style="font-size:11px;color:var(--text3)">tip: enter what you own in Step 2 to get a slider</span></span></div>';
+    }
+  }
   if(_extra) grid.innerHTML += _extra;
   grid.innerHTML += '<div id="msGeneralSplitWrap" class="ms-slider-row" style="display:none;border-top:1px solid var(--border);padding-top:14px;margin-top:4px"></div>';
   if(typeof msRenderGeneralSplit==='function') msRenderGeneralSplit();
@@ -3415,8 +3473,18 @@ function msSplitGeneralEvenly(){
   genBoards.forEach(function(b){ MS.draft.generalSplit[b]=Math.round(each*10)/10; });
   msRenderGeneralSplit();
 }
-function msUpdateTG(v){ MS.draft=MS.draft||{}; var n=parseInt(v,10); MS.draft.truegold=(isNaN(n)||n<0)?0:n; }
-function msUpdateDust(v){ MS.draft=MS.draft||{}; var n=parseInt(v,10); MS.draft.dust=(isNaN(n)||n<0)?0:n; }
+function msUpdateTG(v){ clearTimeout(window._msDraftT); window._msDraftT=setTimeout(msSaveDraft,400); MS.draft=MS.draft||{}; var n=parseInt(v,10); if(isNaN(n)||n<0)n=0; var mx=MS.draft.tgOwned||0; if(mx>0&&n>mx)n=mx; MS.draft.truegold=n; }
+function msUpdateDust(v){ clearTimeout(window._msDraftT); window._msDraftT=setTimeout(msSaveDraft,400); MS.draft=MS.draft||{}; var n=parseInt(v,10); MS.draft.dust=(isNaN(n)||n<0)?0:n; }
+function msUpdateDustPct(v){
+  clearTimeout(window._msDraftT); window._msDraftT=setTimeout(msSaveDraft,400);
+  MS.draft=MS.draft||{}; var p=parseInt(v,10); if(isNaN(p)||p<0)p=0; if(p>100)p=100;
+  MS.draft.dustPct=p;
+  MS.draft.dust=Math.round((MS.draft.dustOwned||0)*p/100);
+  var a=document.getElementById('msSliderPct-dust'); if(a)a.textContent=p+'%';
+  var b=document.getElementById('msSliderCnt-dust'); if(b)b.textContent=MS.draft.dust+' pieces ('+(MS.draft.dust*1000).toLocaleString()+' pts)';
+}
+function msUpdateTGOwned(v){ clearTimeout(window._msDraftT); window._msDraftT=setTimeout(msSaveDraft,400); MS.draft=MS.draft||{}; var n=parseInt(v,10); MS.draft.tgOwned=(isNaN(n)||n<0)?0:n; if(MS.draft.tgOwned>0&&(MS.draft.truegold||0)>MS.draft.tgOwned) MS.draft.truegold=MS.draft.tgOwned; }
+function msUpdateDustOwned(v){ clearTimeout(window._msDraftT); window._msDraftT=setTimeout(msSaveDraft,400); MS.draft=MS.draft||{}; var n=parseInt(v,10); MS.draft.dustOwned=(isNaN(n)||n<0)?0:n; if(MS.draft.dustOwned>0) MS.draft.dust=Math.round(MS.draft.dustOwned*((MS.draft.dustPct!==undefined?MS.draft.dustPct:50))/100); }
 function msUpdateSlider(cat){
   clearTimeout(window._msDraftT); window._msDraftT = setTimeout(msSaveDraft, 400);
   const pct=parseInt(document.getElementById('msSlider-'+cat).value);
@@ -3772,6 +3840,9 @@ for(var _bi=0;_bi<_openForCheck.length;_bi++){
     boards: _boards.slice(),
     truegold: MS.draft.truegold||0,
     dust: MS.draft.dust||0,
+    tgOwned: MS.draft.tgOwned||0,
+    dustOwned: MS.draft.dustOwned||0,
+    dustPct: (MS.draft.dustPct!==undefined?MS.draft.dustPct:50),
     generalSplit: (_genBoards.length>=2) ? JSON.parse(JSON.stringify(MS.draft.generalSplit||{})) : null,
     scores: (function(){
       var splitMode = _genBoards.length>=2;
@@ -3945,6 +4016,7 @@ function msEditSubmission() {
       picks: (cur.picks||[]).slice(),
       boards: (cur.boards||[]).slice(),
       truegold: cur.truegold||0, dust: cur.dust||0,
+      tgOwned: cur.tgOwned||0, dustOwned: cur.dustOwned||0, dustPct: (cur.dustPct!==undefined?cur.dustPct:50),
       picksByBoard: JSON.parse(JSON.stringify(cur.picksByBoard||{})),
       favByBoard: JSON.parse(JSON.stringify(cur.favByBoard||{})),
       generalSplit: JSON.parse(JSON.stringify(cur.generalSplit||{})),
@@ -4988,6 +5060,7 @@ function enterApp(role) {
   AUTH.role = role;
   document.getElementById('page-landing').style.display = 'none';
   document.getElementById('mainNav').style.display = '';
+  if(typeof syncFirstPull==='function') syncFirstPull();
 
   // Tab visibility by role
   const isMemberOnly = role === 'member';
