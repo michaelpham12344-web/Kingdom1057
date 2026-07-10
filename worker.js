@@ -368,6 +368,8 @@ async function runMsAutomation(env){
     if(now >= sched.boards[b].allocAt && !auto.allocDone[b]){
       const prev = state.msAllocByBoard[b] || null;
       state.msAllocByBoard[b] = msRunAllocationForBoardSrv(b, submissions, prev);
+      state.msAllocByBoard[b].runAt = now;
+      state.msAllocByBoard[b].day1 = sched.day1;
       auto.allocDone[b] = true;
       lastRunBoard = b;
       msAuditPushSrv(state, 'system(cron)', 'Auto-ran allocation: '+(MS_BOARD_LABEL_SRV[b]||b)+' ('+state.msAllocByBoard[b].winners.length+'/'+MS_TOTAL_SLOTS_SRV+' placed).');
@@ -2751,28 +2753,21 @@ function msSchedChip(icon, label, val, tone){
     '<span class="mono" style="font-size:12px;font-weight:600;color:'+col+'">'+val+'</span>'+
   '</div>';
 }
-// Read-only KvK schedule strip on the Minister page. All times UTC. Purely informational.
+// Read-only KvK schedule on the Minister page — same per-board design as Manage Spots,
+// embedded subtly in the intro card. All times UTC.
 function msRenderScheduleStrip(){
   var el = document.getElementById('msScheduleStrip'); if(!el) return;
-  var now, s;
-  try { now = Date.now(); s = msSchedule(now); } catch(e){ el.style.display='none'; return; }
-  var rows = '';
-  rows += msSchedChip('📂','Old submissions cleared / signups open', fmtUTCDate(s.openAt), now>=s.openAt?'done':'open');
-  MS_BOARDS.forEach(function(b){
-    var m = MS_BOARD_META[b]; var bs = s.boards[b]; if(!bs) return;
-    rows += msSchedChip(m.icon, m.label+' — submissions close', fmtUTCDateTime(bs.deadline), now>=bs.deadline?'closed':'open');
-    rows += msSchedChip(m.icon, m.label+' — allocation runs', fmtUTCDateTime(bs.allocAt), now>=bs.allocAt?'done':'open');
-  });
-  var openMsg = '';
-  if(now >= s.openAt && now < s.boards.buildings.deadline){
-    openMsg = '<div style="background:rgba(46,204,113,.1);border:1px solid rgba(46,204,113,.4);border-radius:7px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:var(--green)">✅ <strong>Submissions are open</strong> for Minister Spots.</div>';
-  }
+  var blocks = (typeof msBoardTimerBlocksHTML==='function') ? msBoardTimerBlocksHTML() : '';
+  if(!blocks){ el.style.display='none'; return; }
+  var now = Date.now(), openMsg = '';
+  try{
+    var s = msSchedule(now);
+    if(now >= s.openAt && now < s.boards.buildings.deadline) openMsg = '<span style="color:var(--green);font-weight:600">✅ Submissions are open</span> · ';
+  }catch(e){}
   el.style.display = 'block';
   el.innerHTML =
-    '<div class="card-title" style="margin-bottom:10px">🗓️ KvK Schedule <span style="font-weight:400;font-size:11px;color:var(--text3)">— all times UTC</span></div>'+
-    openMsg +
-    '<div style="display:flex;flex-direction:column;gap:6px">'+ rows +'</div>'+
-    '<div style="font-size:10.5px;color:var(--text3);margin-top:10px;line-height:1.5">Days feed: 🏛️ Day 1 ('+fmtUTCDate(s.boards.buildings.dayStart)+') · 🔬 Day 2 ('+fmtUTCDate(s.boards.research.dayStart)+') · ⚔️ Day 4 ('+fmtUTCDate(s.boards.troops.dayStart)+')</div>';
+    '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">'+openMsg+'🗓️ KvK Schedule — all times UTC</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+blocks+'</div>';
 }
 
 function msInit(){
@@ -3973,23 +3968,37 @@ function msFmtCountdown(ms){
   var hours = Math.floor((totalMin%1440)/60);
   return days+'d '+hours+'h';
 }
-function msRenderBoardTimers(){
-  var host = document.getElementById('msBoardTimersPanel'); if(!host) return;
+// A board's allocation only counts as "Already run" if the stored result belongs to the
+// CURRENT KvK cycle. Stamped results (runAt) are checked against the cycle window; legacy
+// results without a stamp are only trusted once the scheduled allocation time has passed.
+// This fixes "Already run" showing while the allocation date is still in the future.
+function msAllocIsCurrent(b, sched){
+  var a = MS._allocByBoard && MS._allocByBoard[b];
+  if(!a) return false;
+  try{ sched = sched || msSchedule(Date.now()); }catch(e){ return true; }
+  if(a.runAt !== undefined) return a.runAt >= sched.clearAt;
+  return Date.now() >= (sched.boards[b] ? sched.boards[b].allocAt : 0);
+}
+function msBoardTimerBlocksHTML(){
   var now = Date.now();
   var sched;
-  try { sched = msSchedule(now); } catch(e){ host.innerHTML=''; return; }
-  host.innerHTML = MS_BOARDS.map(function(b){
+  try { sched = msSchedule(now); } catch(e){ return ''; }
+  return MS_BOARDS.map(function(b){
     var m = MS_BOARD_META[b]; var bs = sched.boards[b];
     var allocMs = bs.allocAt - now, dlMs = bs.deadline - now;
-    var allocDone = !!(MS._allocByBoard && MS._allocByBoard[b]);
+    var allocDone = msAllocIsCurrent(b, sched);
     var allocStr = allocDone ? 'Already run' : (allocMs>0 ? 'Happens in '+msFmtCountdown(allocMs) : 'Overdue — pending next check');
     var dlStr = dlMs>0 ? 'Closes in '+msFmtCountdown(dlMs) : 'Closed';
-    return '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px 12px">'+
+    return '<div style="flex:1;min-width:220px;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px 12px">'+
       '<div style="font-weight:700;color:'+m.color+';font-size:13px;margin-bottom:4px">'+m.icon+' '+m.label+' Minister Spot</div>'+
       '<div style="font-size:12px;color:var(--text2)">⚙️ Automatic assignment: <strong style="color:'+(allocDone?'var(--green)':(allocMs>0?'#ff9d4d':'#ff7070'))+'">'+allocStr+'</strong></div>'+
       '<div style="font-size:12px;color:var(--text2)">⏰ Submission deadline: <strong style="color:'+(dlMs>0?'#ff9d4d':'#ff7070')+'">'+dlStr+'</strong></div>'+
     '</div>';
   }).join('');
+}
+function msRenderBoardTimers(){
+  var host = document.getElementById('msBoardTimersPanel'); if(!host) return;
+  host.innerHTML = msBoardTimerBlocksHTML();
 }
 function msRenderResultsSummary(){
   document.getElementById('msTotalSubs').textContent=MS.submissions.length;
@@ -4073,7 +4082,8 @@ function msRunAllocation(){
   if(!confirm(warnMsg)) return;
   MS._allocByBoard = MS._allocByBoard || {};
   var boards = msBoardsInPlay();
-  boards.forEach(function(b){ MS._allocByBoard[b] = msRunAllocationForBoard(b, MS._allocByBoard[b]); });
+  var _runNow = Date.now(), _d1 = null; try{ _d1 = msSchedule(_runNow).day1; }catch(e){}
+  boards.forEach(function(b){ var _r = msRunAllocationForBoard(b, MS._allocByBoard[b]); _r.runAt = _runNow; if(_d1) _r.day1 = _d1; MS._allocByBoard[b] = _r; });
   if(boards.indexOf(MS._manageBoard)<0) MS._manageBoard = boards[0];
   msSetManageBoard(MS._manageBoard);
   // Flag this push as a bulk reallocation (server requires Admin for this specific
