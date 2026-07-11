@@ -1,4 +1,3 @@
-mkdir -p ~/kingdom1057-redeemer && cat > ~/kingdom1057-redeemer/redeem.py << 'PYEOF'
 #!/usr/bin/env python3
 import hashlib, json, os, sys, time, urllib.parse, urllib.request
 
@@ -80,7 +79,7 @@ def main():
     players = info.get("players", [])
     redeemed = set(info.get("redeemed", []))
     codes = fetch_codes()
-    print(f"{len(players)} players in kingdom 1057 · {len(codes)} active codes")
+    print(f"{len(players)} players in kingdom 1057 - {len(codes)} active codes")
     if not players or not codes:
         print("nothing to do"); return 0
     results = []
@@ -89,7 +88,7 @@ def main():
             if f"{p['id']}:{c}" in redeemed: continue
             r = redeem(p["id"], c)
             results.append({"id": p["id"], "name": p.get("name", p["id"]), "code": c, "ok": r["ok"], "err": r.get("err")})
-            print(f"  {p.get('name', p['id'])} · {c} -> {'OK' if r['ok'] else r.get('err')}")
+            print(f"  {p.get('name', p['id'])} - {c} -> {'OK' if r['ok'] else r.get('err')}")
             time.sleep(3)
     if not results:
         print("everyone already has every active code"); return 0
@@ -101,6 +100,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-PYEOF
-echo "--- script written ---"
-python3 -m py_compile ~/kingdom1057-redeemer/redeem.py && echo "SYNTAX OK"
