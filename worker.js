@@ -10,7 +10,7 @@
  *   GET  /gift-log            → return redemption log from KV
  *   GET  /gift-players        → [runner] player list for the external redeemer (shared secret)
  *   POST /gift-report         → [runner] external redeemer reports results back (shared secret)
- *   Cron every 30 min         → batched auto-redeem (5 players per run)
+ *   Cron every 30 min         → batched auto-redeem (5 players per run) 
  */
 
 const KINGSHOT_API  = "https://kingshot.net/api";
