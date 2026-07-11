@@ -76,7 +76,7 @@ def fetch_codes():
 def main():
     if not SECRET:
         print("::error::GIFT_SECRET not set"); return 1
-    hdr = {"X-Gift-Secret": SECRET}
+    hdr = {"X-Gift-Secret": SECRET, "User-Agent": API_HEADERS["User-Agent"]}
     try:
         info = json.load(urllib.request.urlopen(
             urllib.request.Request(f"{WORKER}/gift-players", headers=hdr), timeout=30))
@@ -120,4 +120,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-      
