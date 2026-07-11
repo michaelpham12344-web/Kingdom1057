@@ -8,6 +8,8 @@
  *   POST /register-player     → store a verified player ID in KV
  *   POST /admin-redeem        → manually trigger gift code redemption (admin)
  *   GET  /gift-log            → return redemption log from KV
+ *   GET  /gift-players        → [runner] player list for the external redeemer (shared secret)
+ *   POST /gift-report         → [runner] external redeemer reports results back (shared secret)
  *   Cron every 30 min         → batched auto-redeem (5 players per run)
  */
 
@@ -6350,6 +6352,58 @@ export default {
       } catch(e) { return json({ok:false,message:e.message},500); }
     }
     
+    // ── EXTERNAL REDEEMER (GitHub Actions) ──────────────────────────────────
+    // Cloudflare Worker IPs are blocked by Century's gift-code API (every fetch
+    // throws → "network error"), so the actual redeeming runs off-platform on a
+    // runner with a non-datacenter IP. The Worker stays the source of truth for
+    // the player list and the redeemed/log ledgers.
+    if (url.pathname==='/gift-players' && request.method==='GET') {
+      const secret = request.headers.get('X-Gift-Secret');
+      if (!env.GIFT_SECRET || secret !== env.GIFT_SECRET) return json({ok:false,error:'unauthorized'},401);
+      const raw = await env.SVS_KV.get(PLAYERS_KEY);
+      const all = raw ? Object.values(JSON.parse(raw)) : [];
+      const players = all.filter(p => p && p.id && Number(p.kingdom) === 1057);
+      const redRaw = await env.SVS_KV.get(REDEEMED_KEY);
+      const redeemed = redRaw ? JSON.parse(redRaw) : [];
+      return json({ ok:true, players: players.map(p => ({ id:String(p.id), name:p.name||String(p.id) })), redeemed });
+    }
+
+    if (url.pathname==='/gift-report' && request.method==='POST') {
+      const secret = request.headers.get('X-Gift-Secret');
+      if (!env.GIFT_SECRET || secret !== env.GIFT_SECRET) return json({ok:false,error:'unauthorized'},401);
+      try {
+        const body = await request.json();
+        const results = Array.isArray(body.results) ? body.results : [];
+        const codes = Array.isArray(body.codes) ? body.codes : [];
+
+        // Merge newly-settled pairs into the redeemed ledger
+        const redRaw = await env.SVS_KV.get(REDEEMED_KEY);
+        const redeemed = new Set(redRaw ? JSON.parse(redRaw) : []);
+        let ok=0, skip=0, fail=0;
+        for (const r of results) {
+          if (!r || !r.id || !r.code) continue;
+          if (r.ok) { redeemed.add(r.id + ':' + r.code); ok++; }
+          else if (r.err === 'already used') { redeemed.add(r.id + ':' + r.code); skip++; }
+          else fail++;
+        }
+        await env.SVS_KV.put(REDEEMED_KEY, JSON.stringify([...redeemed]));
+
+        // Append to the same gift log the admin page already reads
+        const logRaw = await env.SVS_KV.get(GIFT_LOG_KEY);
+        const log = logRaw ? JSON.parse(logRaw) : [];
+        log.unshift({
+          time: new Date().toISOString(),
+          codes,
+          ok, skip, fail,
+          source: 'runner',
+          results: results.slice(0, 40).map(r => ({ name:r.name||r.id, id:r.id, code:r.code, ok:!!r.ok, err:r.err||null }))
+        });
+        await env.SVS_KV.put(GIFT_LOG_KEY, JSON.stringify(log.slice(0, 30)));
+
+        return json({ ok:true, message:'Recorded '+ok+' redeemed, '+skip+' already used, '+fail+' failed.' });
+      } catch(e) { return json({ok:false,error:e.message},400); }
+    }
+
     // Gift redemption log
     if (url.pathname==='/gift-log' && request.method==='GET') {
       const _role = await verifyToken(env, bearer(request));
@@ -6559,7 +6613,10 @@ Reply with ONLY one line of raw JSON, no explanation, no markdown. Use 0 for any
 
 // Cron: every 30 min — process next batch of 5 players, and check Minister Spots automation
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(runBatch(env));
+    // NOTE: gift-code redemption no longer runs here. Century's API refuses
+    // connections from Cloudflare Worker IPs (fetch throws before any HTTP
+    // response), so redeeming is done by the GitHub Actions runner, which calls
+    // /gift-players and /gift-report. Minister automation still runs here.
     ctx.waitUntil(runMsAutomation(env).catch(function(e){ console.error('runMsAutomation failed:', e && e.message); }));
   }
 };
