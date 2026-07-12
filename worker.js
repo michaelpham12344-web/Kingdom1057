@@ -10,7 +10,7 @@
  *   GET  /gift-log            → return redemption log from KV
  *   GET  /gift-players        → [runner] player list for the external redeemer (shared secret)
  *   POST /gift-report         → [runner] external redeemer reports results back (shared secret)
- *   Cron every 30 min         → batched auto-redeem (5 players per run) 
+ *   Cron every 30 min         → batched auto-redeem (5 players per run)
  */
 
 const KINGSHOT_API  = "https://kingshot.net/api";
@@ -5330,16 +5330,28 @@ async function adminLoadGiftLog() {
       return;
     }
     logEl.innerHTML = data.log.slice().reverse().map(entry => {
-      const _ok = (entry.results||[]).filter(r => r.ok).length;
-      const _bad = (entry.results||[]).length - _ok;
-      return '<div style="border-bottom:1px solid var(--border);padding:6px 0;font-size:12px">' +
-      '<span style="color:var(--text3)">' + entry.time + '</span> ' +
-      '<strong>' + (entry.code || '—') + '</strong> ' +
-      '<span style="color:var(--green)">' + _ok + '✓</span>' + (_bad ? ' <span style="color:var(--enemy)">' + _bad + '✗</span>' : '') + ' — ' +
-      (entry.results || []).map(r =>
-        '<span style="color:' + (r.ok ? 'var(--green)' : 'var(--enemy)') + '">' +
-        r.name + ' (' + (r.ok ? '✓' : r.err || 'fail') + ')</span>'
-      ).join(', ') +
+      const results = entry.results || [];
+      const okN   = (entry.ok  != null) ? entry.ok  : results.filter(r => r.ok).length;
+      const skipN = (entry.skip!= null) ? entry.skip: results.filter(r => !r.ok && (r.err||'').includes("already")).length;
+      const failN = (entry.fail!= null) ? entry.fail: results.filter(r => !r.ok && !(r.err||'').includes("already")).length;
+      const codes = entry.codes ? entry.codes.join(", ") : (entry.code || "—");
+      const when = new Date(entry.time).toLocaleString(undefined,{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});
+      const src = entry.source === "runner" ? '<span style="color:var(--accent2);font-size:10px">⚙ auto</span> ' : "";
+      const detail = results.length
+        ? '<div style="margin-top:4px;padding-left:8px;color:var(--text2);font-size:11px">' +
+            results.map(r => (r.name||r.id) + " · " + (r.code||"") + " → " +
+              (r.ok ? '<span style="color:var(--green)">✓</span>'
+                    : '<span style="color:'+(((r.err||'').includes("already"))?'var(--text3)':'var(--enemy)')+'">'+(r.err||"fail")+'</span>')
+            ).join("<br>") + '</div>'
+        : "";
+      return '<div style="border-bottom:1px solid var(--border);padding:8px 0">' +
+        '<div style="font-size:12px">' + src +
+          '<span style="color:var(--text3)">' + when + '</span> · ' +
+          '<strong>' + codes + '</strong> · ' +
+          '<span style="color:var(--green)">' + okN + ' ✓</span>' +
+          (skipN ? ' <span style="color:var(--text3)">' + skipN + ' already</span>' : '') +
+          (failN ? ' <span style="color:var(--enemy)">' + failN + ' ✗</span>' : '') +
+        '</div>' + detail +
       '</div>';
     }).join('');
   } catch(e) {
