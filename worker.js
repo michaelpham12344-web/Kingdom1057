@@ -419,6 +419,67 @@ button:focus-visible,.tab:focus-visible,input:focus-visible,select:focus-visible
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;}}
 select{cursor:pointer;}select option{background:var(--bg4);}
 label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px;}
+/* ══ LANDING (Entry design 1B) ══ */
+.lgWrap{max-width:520px;width:100%;background:linear-gradient(180deg,var(--bg3),var(--bg2));border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}
+.lgBanner{text-align:center;padding:34px 26px 24px;background:linear-gradient(180deg,rgba(168,50,44,.22),transparent);border-bottom:1px solid var(--border);}
+.lgCrest{position:relative;width:56px;height:64px;margin:0 auto 12px;}
+.lgCrest .lgNum{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--head);font-weight:700;font-size:14px;color:var(--gold);padding-top:4px;}
+.lgKicker{font-family:var(--head);font-size:11px;font-weight:500;letter-spacing:.22em;color:var(--text2);margin-bottom:4px;}
+.lgWord{font-family:var(--head);font-size:27px;font-weight:700;color:var(--text);letter-spacing:.03em;}
+.lgWord span{color:var(--gold);}
+.lgTag{font-family:var(--head);font-size:9.5px;letter-spacing:.24em;color:var(--text3);text-transform:uppercase;margin-top:8px;}
+.lgBody{padding:20px 24px 30px;}
+.lgChips{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.lgChip{background:var(--bg2);border:1px solid var(--border);border-radius:11px;padding:12px 6px;text-align:center;}
+.lgChip .lgIco{font-size:19px;margin-bottom:5px;}
+.lgChip .lgCap{font-size:11px;color:var(--text2);line-height:1.35;}
+.lgMore{display:block;width:100%;text-align:center;background:none;border:none;color:var(--accent2);font-family:var(--body);font-size:12.5px;cursor:pointer;padding:8px 0 0;}
+.lgMore:hover{color:#f0a978;}
+.lgStory{background:rgba(201,165,92,.04);border:1px solid var(--border);border-radius:11px;padding:14px 15px;font-size:12.5px;line-height:1.85;color:var(--text2);margin-top:10px;}
+.lgRail{display:flex;align-items:center;gap:8px;margin:20px 0;}
+.lgNode{display:flex;align-items:center;gap:7px;}
+.lgDot{width:24px;height:24px;border-radius:50%;font-family:var(--head);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--border2);background:transparent;color:var(--text3);transition:.2s;}
+.lgNode.lgOn .lgDot{background:var(--gold);color:#100c0a;border-color:var(--gold);}
+.lgNode.lgDone .lgDot{background:var(--green);color:#100c0a;border-color:var(--green);}
+.lgNode .lgT{font-size:12px;font-weight:600;color:var(--text3);}
+.lgNode.lgOn .lgT,.lgNode.lgDone .lgT{color:var(--text);}
+.lgBar{flex:1;height:1.5px;background:rgba(201,165,92,.24);}
+.lgQ{font-family:var(--head);font-size:15px;font-weight:600;color:var(--gold);margin-bottom:6px;}
+.lgHelp{font-size:13px;color:var(--text2);line-height:1.55;margin-bottom:14px;}
+.lgHelp b,.lgHelp strong{color:var(--text);}
+.lgInput{width:100%;background:var(--bg4);border:1.5px solid var(--border2);border-radius:11px;color:var(--text);font-family:var(--body);font-size:17px;padding:15px 16px;outline:none;}
+.lgInput:focus{border-color:var(--gold);}
+select.lgInput{cursor:pointer;font-size:15px;}
+.lgPri{width:100%;background:linear-gradient(180deg,#b8423a,#962b25);color:#fff;border:none;border-radius:11px;padding:15px;font-family:var(--body);font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 3px 14px rgba(150,43,37,.4);margin-top:12px;}
+.lgPri:disabled{opacity:.6;cursor:default;}
+.lgLnk{color:var(--accent2);font-size:13px;cursor:pointer;background:none;border:none;font-family:var(--body);padding:0;}
+.lgLnk:hover{color:#f0a978;}
+.lgBack{display:inline-flex;align-items:center;gap:6px;color:var(--text2);font-size:13.5px;cursor:pointer;background:none;border:none;font-family:var(--body);margin-bottom:14px;padding:0;}
+.lgBack:hover{color:var(--text);}
+.lgGuide{margin-top:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px;}
+.lgTile{width:100%;text-align:left;cursor:pointer;background:var(--bg2);border:1.5px solid var(--border2);border-radius:13px;padding:15px 16px;display:flex;gap:13px;align-items:flex-start;transition:.15s;font-family:var(--body);}
+.lgTile:hover{border-color:var(--gold);background:var(--bg3);}
+.lgTile.lgTileGold{border-color:rgba(217,166,72,.3);}
+.lgTile .lgTi{font-size:22px;line-height:1;}
+.lgTile .lgTh{font-family:var(--head);font-size:15px;color:var(--text);margin-bottom:3px;}
+.lgTile.lgTileGold .lgTh{color:var(--gold);}
+.lgTile .lgTs{font-size:12.5px;color:var(--text2);line-height:1.45;}
+.lgFound{display:flex;align-items:center;gap:12px;background:var(--bg2);border:1px solid rgba(46,204,113,.3);border-radius:12px;padding:12px 14px;}
+.lgFound.lgFoundBad{border-color:rgba(224,69,69,.4);}
+.lgAv{width:40px;height:40px;border-radius:11px;flex-shrink:0;background:linear-gradient(135deg,#3a2c1e,#2a2016);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-family:var(--head);font-weight:700;color:var(--gold);font-size:16px;object-fit:cover;}
+.lgFoundName{font-family:var(--head);font-size:14.5px;color:var(--text);}
+.lgFoundId{font-size:11.5px;color:var(--text2);font-family:var(--mono);}
+.lgOk{color:var(--green);font-size:12px;font-weight:700;white-space:nowrap;}
+.lgNo{color:var(--enemy);font-size:12px;font-weight:700;white-space:nowrap;}
+.lgErr{background:rgba(224,69,69,.09);border:1px solid rgba(224,69,69,.35);border-radius:11px;padding:12px 14px;font-size:13px;color:#ffb0b0;line-height:1.5;}
+.lgHint{font-size:11.5px;color:var(--text3);margin-top:10px;line-height:1.5;}
+.lgOutage{background:rgba(255,157,77,.08);border:1px solid rgba(255,157,77,.4);border-radius:12px;padding:15px 16px;margin-bottom:16px;}
+.lgOutageH{font-family:var(--head);font-size:14px;font-weight:600;color:#ff9d4d;margin-bottom:5px;}
+.lgRow{display:flex;gap:8px;margin-top:12px;}
+.lgRow .lgInput{font-size:15px;padding:13px 14px;}
+.lgPwErr{color:#ff7070;font-size:12.5px;margin-top:8px;}
+.lgFoot{text-align:center;font-family:var(--head);font-size:9.5px;letter-spacing:.26em;color:#3e352a;text-transform:uppercase;margin-top:26px;}
+@media (max-width:520px){.lgBody{padding:18px 18px 26px;}.lgWord{font-size:23px;}}
 .field{display:flex;flex-direction:column;}
 .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;}
 .btn{font-family:var(--body);font-size:13px;font-weight:600;letter-spacing:.03em;padding:7px 16px;border-radius:6px;border:none;cursor:pointer;transition:all .15s;white-space:nowrap;}
@@ -657,112 +718,136 @@ document.addEventListener('touchend',function(e){
 </script>
 </head>
 <body>
-<!-- LANDING PAGE -->
-<div id="page-landing" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:24px 16px">
-  <div style="max-width:520px;width:100%">
+<!-- LANDING PAGE — Entry design 1B -->
+<div id="page-landing" style="min-height:100vh;display:flex;align-items:flex-start;justify-content:center;background:var(--bg);padding:28px 16px 60px">
+  <div class="lgWrap">
 
-    <!-- Hero header -->
-    <div style="text-align:center;margin-bottom:32px">
-      <svg width="84" height="96" viewBox="0 0 60 68" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:14px;filter:drop-shadow(0 4px 14px rgba(217,166,72,.25))" aria-hidden="true"><path d="M14 12 L20 4 L30 10 L40 4 L46 12 Z" fill="#d9a648"/><path d="M8 16 H52 V38 C52 52 42 60 30 66 C18 60 8 52 8 38 Z" fill="#7e1f26" stroke="#d9a648" stroke-width="2.5"/><path d="M14 32 L30 22 L46 32 V39 L30 29 L14 39 Z" fill="#d9a648" opacity="0.92"/><text x="30" y="56" text-anchor="middle" font-family="Cinzel,serif" font-size="13" font-weight="700" fill="#d9a648">1057</text></svg>
-      <div style="font-family:var(--head);font-size:11px;font-weight:600;letter-spacing:.3em;color:var(--text2);margin-bottom:10px;text-transform:uppercase">KvK Alliance Command</div>
-      <div style="font-family:var(--head);font-size:15px;font-weight:500;color:var(--text3);letter-spacing:.2em;margin-bottom:6px">WELCOME TO</div>
-      <div style="font-family:var(--head);font-size:clamp(32px,8.5vw,50px);font-weight:700;color:var(--text);letter-spacing:.04em;line-height:1.05;margin-bottom:10px;text-shadow:0 2px 18px rgba(217,166,72,.18)">KINGDOM <span style="color:var(--gold)">1057</span></div>
-      <div style="font-family:var(--head);font-size:11.5px;color:var(--text2);letter-spacing:.18em">✦ &nbsp; THE GREATEST KINGDOM OF ALL TIME &nbsp; ✦</div>
-      <div style="width:180px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:18px auto 26px"></div>
-      <!-- Story card -->
-      <div class="card" style="text-align:left;border:1px solid rgba(201,165,92,.25);background:rgba(201,165,92,.04);margin-bottom:0">
-        <div style="font-size:13px;color:var(--text);line-height:1.9;font-family:var(--body)">
-          This site is your <strong style="color:var(--accent2)">KvK coordination hub</strong> — built to give Kingdom 1057 the edge it deserves.<br><br>
-          Minister Spots are <strong style="color:var(--gold)">scarce and powerful</strong>. Submit your speedup inventory and pick timeslots to compete for a position.<br><br>
-          <strong style="color:var(--gold)">Bonus perk:</strong> Register your Player ID and get <strong style="color:var(--accent2)">automatic gift code redemption</strong> throughout the KvK — free rewards, zero effort. 🎁<br><br>
-          <span style="color:var(--text3);font-size:12px">Let's go. Kingdom 1057 doesn't lose.</span>
-        </div>
+    <!-- Banner -->
+    <div class="lgBanner">
+      <div class="lgCrest">
+        <svg width="56" height="64" viewBox="0 0 60 68" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M30 2 L56 11 V35 C56 51 44 61 30 66 C16 61 4 51 4 35 V11 Z" fill="rgba(217,166,72,.1)" stroke="#d9a648" stroke-width="2.4"/></svg>
+        <div class="lgNum">1057</div>
       </div>
+      <div class="lgKicker">WELCOME TO</div>
+      <div class="lgWord">KINGDOM <span>1057</span></div>
+      <div class="lgTag">&#10022; The greatest kingdom of all time &#10022;</div>
     </div>
 
-    <!-- Login card — single column, step-based -->
-    <div class="card" style="border:1px solid rgba(46,204,113,.2)">
-      <div style="font-family:var(--head);font-size:16px;font-weight:700;color:var(--green);margin-bottom:4px">🎮 Enter Kingdom 1057</div>
-      <p style="color:var(--text2);font-size:12px;margin-bottom:16px;line-height:1.6">Verify your Player ID to enter. Members, R4/R5 and Rally Leaders all enter here.</p>
+    <div class="lgBody">
+
+      <!-- Value chips -->
+      <div class="lgChips">
+        <div class="lgChip"><div class="lgIco">&#127873;</div><div class="lgCap">Auto gift codes</div></div>
+        <div class="lgChip"><div class="lgIco">&#128081;</div><div class="lgCap">Minister spots</div></div>
+        <div class="lgChip"><div class="lgIco">&#9876;&#65039;</div><div class="lgCap">Battle plans</div></div>
+      </div>
+      <button class="lgMore" id="lgMoreBtn" onclick="lgToggleStory()">Why register? &#9662;</button>
+      <div class="lgStory" id="lgStory" style="display:none">
+        This site is your <strong style="color:var(--accent2)">KvK coordination hub</strong> — built to give Kingdom 1057 the edge it deserves.<br><br>
+        Minister Spots are <strong style="color:var(--gold)">scarce and powerful</strong>. Submit your speedup inventory and pick timeslots to compete for a position.<br><br>
+        <strong style="color:var(--gold)">Bonus perk:</strong> Register your Player ID and get <strong style="color:var(--accent2)">automatic gift code redemption</strong> throughout the KvK — free rewards, zero effort. &#127873;<br><br>
+        <span style="color:var(--text3);font-size:12px">Let's go. Kingdom 1057 doesn't lose.</span>
+      </div>
+
+      <!-- Progress rail -->
+      <div class="lgRail" id="lgRail">
+        <div class="lgNode lgOn" id="lgN1"><div class="lgDot">1</div><span class="lgT">Verify ID</span></div>
+        <div class="lgBar"></div>
+        <div class="lgNode" id="lgN2"><div class="lgDot">2</div><span class="lgT">Choose role</span></div>
+      </div>
 
       <!-- Step 1: Player ID -->
       <div id="landingStepEntry">
-        <div style="display:flex;gap:8px;margin-bottom:10px">
-          <input type="text" id="landingPlayerId" placeholder="Your Player ID — e.g. 8767319" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')lookupPlayer()">
-          <button class="btn btn-primary" id="lookupBtn" onclick="lookupPlayer()">🔍 Lookup</button>
+        <div id="lgEntryFields">
+          <div class="lgQ">Enter your Player ID</div>
+          <p class="lgHelp">Tap your profile picture in-game and copy the number next to <strong>ID:</strong> — members, R4/R5 and Rally Leaders all start here.</p>
+          <input type="text" id="landingPlayerId" class="lgInput" inputmode="numeric" placeholder="e.g.  8767319" onkeydown="if(event.key==='Enter')lookupPlayer()">
+          <button class="lgPri" id="lookupBtn" onclick="lookupPlayer()">Verify my ID  &#8594;</button>
         </div>
-        <div id="playerLookupResult" style="display:none;margin-bottom:12px"></div>
-        <div id="landingRoleButtons" style="display:none;flex-direction:column;gap:8px">
-          <button class="btn btn-primary" onclick="landingEnterMember()">✅ Enter as Member of 1057</button>
-          <button class="btn btn-ghost" onclick="landingStartWithPassword()">🛡 R4/R5</button>
+
+        <div id="playerLookupResult" style="display:none;margin-top:14px"></div>
+
+        <!-- Step 2: role tiles (revealed by lookupPlayer once Kingdom 1057 is confirmed) -->
+        <div id="landingRoleButtons" style="display:none;flex-direction:column;gap:10px;margin-top:16px">
+          <p class="lgHelp" style="margin-bottom:0">How are you entering?</p>
+          <button class="lgTile" onclick="landingEnterMember()">
+            <div class="lgTi">&#127918;</div>
+            <div><div class="lgTh">Member</div><div class="lgTs">Submit speedups, pick timeslots, get gift codes</div></div>
+          </button>
+          <button class="lgTile lgTileGold" onclick="landingStartWithPassword()">
+            <div class="lgTi">&#128737;</div>
+            <div><div class="lgTh">R4 / R5 &#183; Rally Leader</div><div class="lgTs">Manage spots &amp; strategy — password needed</div></div>
+          </button>
+          <div style="text-align:center;margin-top:4px"><button class="lgLnk" style="color:var(--text3)" onclick="lgStartOver()">Not you? Start over</button></div>
         </div>
       </div>
 
-      <!-- Step 2: Alliance picker -->
+      <!-- Step 2a: Alliance picker -->
       <div id="landingStepAlliance" style="display:none">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-          <button class="btn btn-ghost btn-sm" onclick="landingBack('entry')">← Back</button>
-          <div style="font-weight:600;font-size:14px">🏰 Select your Alliance</div>
-        </div>
-        <p style="color:var(--text2);font-size:12px;margin-bottom:12px">Your alliance is permanent — only an admin can change it later.</p>
-        <select id="alliancePicker" style="width:100%;margin-bottom:12px">
+        <button class="lgBack" onclick="landingBack('entry')">&#8592; Back</button>
+        <div class="lgQ">&#127984; Pick your alliance</div>
+        <p class="lgHelp">This is permanent — only an admin can change it later. Choose carefully.</p>
+        <select id="alliancePicker" class="lgInput">
           <option value="">Select your alliance…</option>
           <option>FIR</option><option>LOC</option><option>LYL</option>
           <option>KNG</option><option>KOV</option><option>TLA</option>
         </select>
-        <button id="allianceNextStep" class="btn btn-primary" style="width:100%" data-next="" onclick="landingConfirmAlliance()">Continue →</button>
+        <button id="allianceNextStep" class="lgPri" data-next="" onclick="landingConfirmAlliance()">Continue  &#8594;</button>
       </div>
 
-      <!-- Step 3: Password -->
+      <!-- Step 2b: Password -->
       <div id="landingStepPassword" style="display:none">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-          <button class="btn btn-ghost btn-sm" onclick="landingBack('alliance')">← Back</button>
-          <div style="font-weight:600;font-size:14px" id="landingPwLabel">Enter your password</div>
-        </div>
-        <input type="password" id="landingPwInput" placeholder="Password" style="width:100%;margin-bottom:10px;box-sizing:border-box" onkeydown="if(event.key==='Enter')landingCheckPassword()">
-        <div id="landingPwError" style="display:none;color:#ff7070;font-size:12px;margin-bottom:8px">Incorrect password.</div>
-        <button class="btn btn-primary" style="width:100%" onclick="landingCheckPassword()">Enter →</button>
+        <button class="lgBack" onclick="landingBack('alliance')">&#8592; Back</button>
+        <div class="lgQ" id="landingPwLabel">&#128737; Leader password</div>
+        <p class="lgHelp">Unlocks spot management, allocation and battle strategy.</p>
+        <input type="password" id="landingPwInput" class="lgInput" placeholder="Password" onkeydown="if(event.key==='Enter')landingCheckPassword()">
+        <div id="landingPwError" class="lgPwErr" style="display:none">Incorrect password.</div>
+        <button class="lgPri" onclick="landingCheckPassword()">Enter  &#8594;</button>
       </div>
 
       <!-- Player ID guide -->
-      <div id="landingGuide" style="margin-top:16px;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px 14px">
-        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">📍 Where to find your Player ID</div>
-        <div style="font-size:12px;color:var(--text2);line-height:1.7;margin-bottom:10px">
-          Tap your <strong>profile picture</strong> in the top-left corner of the game.<br>
-          Your Player ID is the number shown next to <strong style="color:var(--gold)">ID:</strong> — as highlighted below.
-        </div>
+      <div id="landingGuide" style="margin-top:16px">
+        <button class="lgLnk" onclick="lgToggleGuide()" id="lgGuideBtn">&#128248; Where do I find my Player ID?</button>
+        <div class="lgGuide" id="lgGuideBody" style="display:none">
+          <p class="lgHelp" style="margin-bottom:10px">
+            Tap your <strong>profile picture</strong> in the top-left corner of the game.<br>
+            Your Player ID is the number shown next to <strong style="color:var(--gold)">ID:</strong> — as highlighted below.
+          </p>
         <img src="data:image/jpeg;base64,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" alt="Player ID location" style="width:100%;border-radius:6px;border:1px solid var(--border)">
-      </div>
-      <!-- OUTAGE BYPASS — hidden unless kingshot.net is down -->
-        <div id="bypassBox" style="display:none;margin-top:16px;background:rgba(255,157,77,.08);border:1px solid rgba(255,157,77,.4);border-radius:8px;padding:14px">
-          <div style="font-weight:600;color:#ff9d4d;margin-bottom:4px">⚠ Player ID verification is temporarily unavailable</div>
-          <p style="color:var(--text2);font-size:12px;margin-bottom:12px">Please use our backup method to enter the site.</p>
-          <div style="margin-bottom:14px">
-            <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px">👤 Members — enter manually</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-              <input type="text" id="bypassPlayerId" placeholder="Your Player ID" inputmode="numeric" style="flex:1;min-width:120px">
-            </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
-              <input type="text" id="bypassName" placeholder="Your in-game name" style="flex:1;min-width:120px">
-              <select id="bypassAlliance" style="width:110px">
-                <option value="">Alliance…</option>
-                <option>FIR</option><option>LOC</option><option>LYL</option>
-                <option>KNG</option><option>KOV</option><option>TLA</option>
-              </select>
-              <button class="btn btn-primary btn-sm" onclick="bypassEnterMember()">Enter</button>
-            </div>
-          </div>
-          <div>
-            <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px">🛡 R4/R5 — enter your name, alliance & password</div>
-            <div style="display:flex;gap:6px">
-              <input type="password" id="bypassPwInput" placeholder="Password" style="flex:1" onkeydown="if(event.key==='Enter')bypassCheckPassword()">
-              <button class="btn btn-primary btn-sm" onclick="bypassCheckPassword()">Enter</button>
-            </div>
-            <div id="bypassPwError" style="display:none;color:#ff7070;font-size:12px;margin-top:6px">Incorrect password.</div>
-          </div>
         </div>
-    </div>
+      </div>
 
+      <!-- OUTAGE BYPASS — hidden unless kingshot.net is down -->
+      <div id="bypassBox" style="display:none;margin-top:18px">
+        <div class="lgOutage">
+          <div class="lgOutageH">&#9888; Player ID check is offline</div>
+          <div style="font-size:12.5px;color:var(--text2);line-height:1.55">kingshot.net isn't responding, so we can't verify IDs right now. Enter your details manually to get in.</div>
+        </div>
+
+        <div class="lgQ">&#128100; Your details</div>
+        <input type="text" id="bypassPlayerId" class="lgInput" placeholder="Player ID — e.g. 8767319" inputmode="numeric">
+        <div class="lgRow">
+          <input type="text" id="bypassName" class="lgInput" placeholder="In-game name">
+          <select id="bypassAlliance" class="lgInput" style="width:132px;flex:0 0 132px">
+            <option value="">Alliance…</option>
+            <option>FIR</option><option>LOC</option><option>LYL</option>
+            <option>KNG</option><option>KOV</option><option>TLA</option>
+          </select>
+        </div>
+        <button class="lgPri" onclick="bypassEnterMember()">Enter as member  &#8594;</button>
+
+        <div style="margin-top:20px">
+          <div class="lgQ">&#128737; Leader? Add your password</div>
+          <input type="password" id="bypassPwInput" class="lgInput" placeholder="Password" onkeydown="if(event.key==='Enter')bypassCheckPassword()">
+          <div id="bypassPwError" class="lgPwErr" style="display:none">Incorrect password.</div>
+          <button class="lgPri" onclick="bypassCheckPassword()">Enter as leader  &#8594;</button>
+        </div>
+        <div class="lgHint">Manual entries are flagged for review — an admin can correct them later.</div>
+      </div>
+
+      <div class="lgFoot">&#10022; Kingdom 1057 doesn't lose &#10022;</div>
+
+    </div>
   </div>
 </div>
 
@@ -5217,6 +5302,59 @@ let _landingPwType = null;  // 'rallyleader' | 'r4r5'
 
 function toggleLandingPassword() {}  // no longer needed, kept for compat
 
+// ── Entry design 1B — presentation helpers. Purely cosmetic: they read the
+//    display state the existing flow already sets, and repaint the rail.
+//    Wrapped in try/catch so a UI slip can never block a login.
+function _landingRailSync() {
+  try {
+    const entry  = document.getElementById('landingStepEntry');
+    const roles  = document.getElementById('landingRoleButtons');
+    const fields = document.getElementById('lgEntryFields');
+    const guide  = document.getElementById('landingGuide');
+    const n1     = document.getElementById('lgN1');
+    const n2     = document.getElementById('lgN2');
+    if (!n1 || !n2) return;
+
+    const onEntry   = entry && entry.style.display !== 'none';
+    const rolesOpen = roles && roles.style.display !== 'none';
+    const onStep2   = !onEntry || rolesOpen;   // role tiles, alliance or password
+
+    // Once the ID is verified, the input collapses and the found-card takes over.
+    if (fields) fields.style.display = rolesOpen ? 'none' : 'block';
+    if (guide && onEntry) guide.style.display = rolesOpen ? 'none' : 'block';
+
+    n1.className = 'lgNode ' + (onStep2 ? 'lgDone' : 'lgOn');
+    n2.className = 'lgNode ' + (onStep2 ? 'lgOn' : '');
+  } catch (e) {}
+}
+
+function lgToggleStory() {
+  const s = document.getElementById('lgStory');
+  const b = document.getElementById('lgMoreBtn');
+  if (!s || !b) return;
+  const open = s.style.display === 'none';
+  s.style.display = open ? 'block' : 'none';
+  b.innerHTML = open ? 'Why register? \u25B4' : 'Why register? \u25BE';
+}
+
+function lgToggleGuide() {
+  const g = document.getElementById('lgGuideBody');
+  if (g) g.style.display = (g.style.display === 'none') ? 'block' : 'none';
+}
+
+// "Not you? Start over" — clears the lookup, returns to step 1. No auth state touched.
+function lgStartOver() {
+  verifiedPlayer = null;
+  const idEl = document.getElementById('landingPlayerId');
+  if (idEl) { idEl.value = ''; }
+  const resultEl = document.getElementById('playerLookupResult');
+  if (resultEl) { resultEl.style.display = 'none'; resultEl.innerHTML = ''; }
+  const roleButtons = document.getElementById('landingRoleButtons');
+  if (roleButtons) roleButtons.style.display = 'none';
+  _landingRailSync();
+  if (idEl) idEl.focus();
+}
+
 // Member: Player ID verified → show alliance picker → enter
 
 
@@ -5240,6 +5378,7 @@ function _showAlliancePicker(nextStep) {
   document.getElementById('allianceNextStep').dataset.next = nextStep;
   const guide = document.getElementById('landingGuide');
   if (guide) guide.style.display = 'none';
+  _landingRailSync();
 }
 
 function _showPasswordField() {
@@ -5250,6 +5389,7 @@ function _showPasswordField() {
   const guide = document.getElementById('landingGuide');
   if (guide) guide.style.display = 'none';
   setTimeout(() => { const i = document.getElementById('landingPwInput'); if(i) i.focus(); }, 100);
+  _landingRailSync();
 }
 
 // ── Button 1: Enter as Member ──
@@ -5377,26 +5517,31 @@ async function lookupPlayer() {
   const btn = document.getElementById('lookupBtn');
   if (!idEl) return;
   const id = idEl.value.trim();
-  if (!id) { if (resultEl) { resultEl.style.display = 'block'; resultEl.innerHTML = '<div style="color:var(--enemy);font-size:13px">Enter your Player ID first.</div>'; } return; }
+  if (!id) { if (resultEl) { resultEl.style.display = 'block'; resultEl.innerHTML = '<div class="lgErr">Enter your Player ID to continue.</div>'; } return; }
 
-  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
   if (resultEl) resultEl.style.display = 'none';
   if (roleButtons) roleButtons.style.display = 'none';
 
   const p = await doPlayerLookup(id);
 
-  if (btn) { btn.disabled = false; btn.textContent = '🔍 Lookup'; }
+  if (btn) { btn.disabled = false; btn.innerHTML = 'Verify my ID  &#8594;'; }
 
   if (p) {
     const inKingdom = p.kingdom === 1057;
-    const col = inKingdom ? 'var(--green)' : 'var(--enemy)';
-    const msg = inKingdom ? '✅ Kingdom 1057 — verified' : '❌ Kingdom ' + p.kingdom + ' — not Kingdom 1057';
+    const initial = (p.name || '?').charAt(0).toUpperCase();
     if (resultEl) {
-      resultEl.innerHTML = '<div style="display:flex;align-items:center;gap:10px;background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:10px 12px">' +
-        (p.profilePhoto ? '<img src="' + p.profilePhoto + '" style="width:40px;height:40px;border-radius:50%;border:2px solid var(--border2);flex-shrink:0">' : '') +
-        '<div><div style="font-weight:700">' + p.name + '</div>' +
-        '<div style="font-size:11px;color:var(--text3)">Level ' + p.level + ' · ID: ' + p.playerId + '</div>' +
-        '<div style="font-size:12px;font-weight:600;color:' + col + ';margin-top:2px">' + msg + '</div></div></div>';
+      resultEl.innerHTML = '<div class="lgFound' + (inKingdom ? '' : ' lgFoundBad') + '">' +
+        (p.profilePhoto
+          ? '<img class="lgAv" src="' + p.profilePhoto + '">'
+          : '<div class="lgAv">' + initial + '</div>') +
+        '<div style="flex:1;min-width:0">' +
+          '<div class="lgFoundName">' + p.name + '</div>' +
+          '<div class="lgFoundId">Kingdom ' + p.kingdom + ' · Lv ' + p.level + ' · ID ' + p.playerId + '</div>' +
+        '</div>' +
+        '<div class="' + (inKingdom ? 'lgOk' : 'lgNo') + '">' + (inKingdom ? '✓ Verified' : 'Not 1057') + '</div>' +
+      '</div>' +
+      (inKingdom ? '' : '<div class="lgHint">This site is for Kingdom 1057 only.</div>');
       resultEl.style.display = 'block';
     }
     if (inKingdom) {
@@ -5405,10 +5550,11 @@ async function lookupPlayer() {
     }
   } else {
     if (resultEl) {
-      resultEl.innerHTML = '<div style="color:var(--enemy);font-size:13px;padding:8px 0">⚠ Player not found. Check your ID and try again.</div>';
+      resultEl.innerHTML = '<div class="lgErr">No player with that ID. Check the number in your in-game profile and try again.</div>';
       resultEl.style.display = 'block';
     }
   }
+  _landingRailSync();
 }
 
 // ── Navigation between landing steps ──
@@ -5424,6 +5570,7 @@ function landingBack(to) {
   // Show guide only on entry step
   const guide = document.getElementById('landingGuide');
   if (guide) guide.style.display = to === 'entry' ? 'block' : 'none';
+  _landingRailSync();
 }
 
 // ── Password check — role from which password matches ──
@@ -5602,6 +5749,9 @@ function logOut() {
   if(resultEl) resultEl.style.display = 'none';
   const pidInput = document.getElementById('landingPlayerId');
   if(pidInput) pidInput.value = '';
+  const gb = document.getElementById('lgGuideBody');
+  if(gb) gb.style.display = 'none';
+  _landingRailSync();
 }
 async function initApp() {
   authLoadToken();
