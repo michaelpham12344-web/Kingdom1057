@@ -845,7 +845,7 @@ document.addEventListener('touchend',function(e){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;flex-wrap:wrap">
       <div>
         <label>Rally Arrival Time</label>
-        <select id="bsDur" style="width:160px;margin-bottom:4px" onchange="bsRenderResults()">
+        <select id="bsDur" style="width:160px;margin-bottom:4px" onchange="bsDurChanged()">
           <option value="300">5 min</option>
           <option value="600">10 min</option>
         </select>
@@ -1337,6 +1337,28 @@ let syncSerialize = function() {
       var d = document.getElementById('landDate'), t = document.getElementById('landTime');
       return { landDate: d ? d.value : '', landTime: t ? t.value : '' };
     })(),
+    // The "Shared Setup" card — rally duration, marker offset, selected team.
+    // It was named shared but nothing in it ever left the browser.
+    bsSetup: (function(){
+      var d = document.getElementById('bsDur');
+      return {
+        dur: d ? (parseInt(d.value, 10) || 300) : 300,
+        offsetSec: (typeof BS_CALC !== 'undefined') ? BS_CALC.offsetSec : null,
+        selectedTeamId: (typeof BS_CALC !== 'undefined') ? BS_CALC.selectedTeamId : null
+      };
+    })(),
+    // The schedule frozen by the Final Calculation "Copy" button. launchSec values are
+    // absolute epoch seconds, so every device counts down to the same instant.
+    // _fired is local (it drives the vibrate), so it is deliberately not sent.
+    bsFrozen: (function(){
+      if (typeof BS_CALC === 'undefined' || !BS_CALC.frozen) return null;
+      return {
+        teamId: BS_CALC.frozen.teamId,
+        results: (BS_CALC.frozen.results || []).map(function(r){
+          return { name: r.name, march: r.march, launchSec: r.launchSec };
+        })
+      };
+    })(),
     _replace: (typeof MS!=='undefined') ? (MS._pendingReplace||null) : null
   });
 }
@@ -1346,9 +1368,11 @@ let syncApplyRemote = function(data) {
   try {
     // Rally state now travels with the state instead of being reset on every pull.
     const _rally = data.rally || {};
+    const _oldLeaders = {};
+    S.leaders.forEach(function(l){ _oldLeaders[l.id] = l; });
     S.leaders = (data.leaders || []).map(function(l){
       const r = _rally[l.id] || {};
-      return Object.assign({}, l, {
+      return Object.assign({}, _oldLeaders[l.id] || {}, l, {
         status: r.status || 'free',
         timerEnd: (typeof r.timerEnd === 'number') ? r.timerEnd : null,
         cooldownEnd: (typeof r.cooldownEnd === 'number') ? r.cooldownEnd : null,
@@ -1357,7 +1381,11 @@ let syncApplyRemote = function(data) {
     });
     if (data.teamRally && typeof bsTeamRally !== 'undefined') bsTeamRally = data.teamRally;
     if (Array.isArray(data.petPlans) && typeof bsPetPlans !== 'undefined') bsPetPlans = data.petPlans;
-    S.teams = data.teams || [];
+    // Merge incoming teams over the existing objects instead of replacing them, so
+    // local-only fields (notably t._bsLastCalc, which Copy needs) survive a patch.
+    const _oldTeams = {};
+    S.teams.forEach(function(t){ _oldTeams[t.id] = t; });
+    S.teams = (data.teams || []).map(function(t){ return Object.assign({}, _oldTeams[t.id] || {}, t); });
     S.alliances = (data.alliances && data.alliances.length) ? data.alliances : (S.alliances || []);
     bsEnsureAlliances();
     const gEl = document.getElementById('garrisonAllianceName');
@@ -1373,7 +1401,35 @@ let syncApplyRemote = function(data) {
       if (_ft && _ft.value && typeof calcLaunchTimes === 'function') { try { calcLaunchTimes(); } catch(e){} }
     }
     if (typeof renderPetPlans === 'function') renderPetPlans();
+    // Shared Setup: rally duration, marker offset, selected team.
+    if (data.bsSetup && typeof BS_CALC !== 'undefined') {
+      const _bd = document.getElementById('bsDur');
+      if (_bd && data.bsSetup.dur) _bd.value = String(data.bsSetup.dur);
+      BS_CALC.offsetSec = (typeof data.bsSetup.offsetSec === 'number') ? data.bsSetup.offsetSec : null;
+      if (data.bsSetup.selectedTeamId !== undefined) BS_CALC.selectedTeamId = data.bsSetup.selectedTeamId;
+    }
+    // Frozen (copied) schedule. Rebuilt only when it actually changes, so an unrelated
+    // patch doesn't re-arm the "GO!" vibrate on everyone's phone.
+    if (data.bsFrozen !== undefined && typeof BS_CALC !== 'undefined') {
+      const _f = data.bsFrozen;
+      const _sig = _f ? JSON.stringify([_f.teamId, (_f.results||[]).map(function(r){ return [r.name, r.march, r.launchSec]; })]) : 'null';
+      if (_sig !== _bsFrozenSig) {
+        _bsFrozenSig = _sig;
+        BS_CALC.frozen = _f ? {
+          teamId: _f.teamId,
+          results: (_f.results || []).map(function(r){
+            return { name: r.name, march: r.march, launchSec: r.launchSec, _fired: false };
+          })
+        } : null;
+      }
+    }
     if (typeof bsRenderTeamButtons === 'function') bsRenderTeamButtons();
+    if (typeof BS_CALC !== 'undefined') {
+      if (BS_CALC.frozen && typeof bsRenderFrozen === 'function') bsRenderFrozen();
+      else if (BS_CALC.selectedTeamId !== null && BS_CALC.offsetSec !== null && typeof bsCalcTeam === 'function') {
+        try { bsCalcTeam(BS_CALC.selectedTeamId, BS_CALC.offsetSec, false); } catch(e){}
+      }
+    }
     if (typeof renderLeaderTable === 'function') renderLeaderTable();
     if (typeof renderSetup === 'function') renderSetup();
     if (typeof renderBattleStrategy === 'function') renderBattleStrategy();
@@ -2696,11 +2752,12 @@ renderBattleStrategy();
 
 // ════════════ BATTLE STRATEGY — SHARED SETUP & FINAL CALCULATION ════════════
 const BS_CALC = { offsetSec: null, selectedTeamId: null, frozen: null };
+let _bsFrozenSig = null; // guards against rebuilding the frozen panel on every patch
 
 function bsTickClock(){
   const hh=document.getElementById('bsClockHH');
   if(!hh) return;
-  const n=new Date();
+  const n=new Date(nowSync());
   document.getElementById('bsClockHH').textContent=String(n.getUTCHours()).padStart(2,'0');
   document.getElementById('bsClockMM').textContent=String(n.getUTCMinutes()).padStart(2,'0');
   document.getElementById('bsClockSS').textContent=String(n.getUTCSeconds()).padStart(2,'0');
@@ -2722,7 +2779,7 @@ function bsTickClock(){
 setInterval(bsTickClock,1000); bsTickClock();
 
 function nowUTCSec(){
-  return Math.floor(Date.now()/1000);
+  return Math.floor(nowSync()/1000);
 }
 function s2hms(totalSec){
   // Convert absolute UTC seconds to HH:MM:SS string
@@ -2738,11 +2795,19 @@ function bsClearOffsetHighlight(){
   var wrap=document.getElementById('bsCustomOffsetWrap');
   if(wrap){ wrap.style.borderColor='var(--border2)'; wrap.style.background='var(--bg3)'; }
 }
+function bsDurChanged(){
+  if(typeof bsRenderResults==='function') bsRenderResults();
+  BS_CALC.frozen=null; _bsFrozenSig=null;
+  if(BS_CALC.selectedTeamId!==null && BS_CALC.offsetSec!==null) bsCalcTeam(BS_CALC.selectedTeamId, BS_CALC.offsetSec, false);
+  syncQueuePush();
+}
 function bsSetOffsetManual(){
   const el=document.getElementById('bsOffsetManual'); if(!el) return;
   const v=parseInt(el.value,10);
   if(isNaN(v)||v<0){ toast('Enter seconds (0 or more)'); return; }
   BS_CALC.offsetSec=v;
+  BS_CALC.frozen=null; _bsFrozenSig=null;
+  syncQueuePush();
   bsClearOffsetHighlight();
   var wrap=document.getElementById('bsCustomOffsetWrap');
   if(wrap){ wrap.style.borderColor='var(--gold)'; wrap.style.background='rgba(217,166,72,.15)'; }
@@ -2751,7 +2816,8 @@ function bsSetOffsetManual(){
 }
 function bsSetOffset(sec){
   BS_CALC.offsetSec=sec;
-  BS_CALC.frozen=null;
+  BS_CALC.frozen=null; _bsFrozenSig=null;
+  syncQueuePush();
   bsClearOffsetHighlight();
   var btn=document.getElementById('bsOffsetBtn-'+sec);
   if(btn){ btn.style.background='var(--gold)'; btn.style.color='#1a1206'; btn.style.boxShadow='0 0 0 3px rgba(217,166,72,.35)'; }
@@ -2780,8 +2846,9 @@ el.innerHTML=S.teams.map(t=>{
   }).join('');
 }
 function bsSelectTeam(teamId){
-  if(BS_CALC.frozen && BS_CALC.frozen.teamId!==teamId) BS_CALC.frozen=null;
+  if(BS_CALC.frozen && BS_CALC.frozen.teamId!==teamId){ BS_CALC.frozen=null; _bsFrozenSig=null; }
   BS_CALC.selectedTeamId=teamId;
+  syncQueuePush();
   bsRenderTeamButtons();
   if(BS_CALC.offsetSec!==null) bsCalcTeam(teamId, BS_CALC.offsetSec, true);
   else {
@@ -2857,6 +2924,8 @@ function bsCopyTeamResult(teamId){
   // Freeze the copied schedule so the screen matches what was pasted in chat,
   // and switch the result panel to live per-leader launch countdowns.
   BS_CALC.frozen={teamId:teamId, results:results.map(function(r){ return {name:r.name, march:r.march, launchSec:r.launchSec, _fired:false}; })};
+  _bsFrozenSig=null; // ours is authoritative — let the next inbound patch re-evaluate
+  syncQueuePush();   // share the copied schedule with everyone
   bsRenderFrozen();
   if(typeof bsRenderTeamButtons==='function') bsRenderTeamButtons();
 }
