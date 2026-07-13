@@ -1285,7 +1285,7 @@ let syncSerialize = function() {
       teamId: l.teamId, pet: l.pet ? { active: !!l.pet.active, startMs: l.pet.startMs || null } : { active: false, startMs: null },
       bsSlot: l.bsSlot || { slotType: 'pool', slotId: null }
     })),
-    teams: S.teams.map(t => ({ id: t.id, name: t.name, alliance: t.alliance, color: t.color })),
+    teams: S.teams.map(t => ({ id: t.id, name: t.name, alliance: t.alliance, color: t.color, customName: !!t.customName })),
     alliances: S.alliances || [],
     garrisonAllianceName: document.getElementById('garrisonAllianceName') ? document.getElementById('garrisonAllianceName').value : '',
     attackAllianceName: document.getElementById('attackAllianceName') ? document.getElementById('attackAllianceName').value : '',
