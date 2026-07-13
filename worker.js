@@ -1269,6 +1269,27 @@ let syncApplyingRemote = false; // guards against re-triggering a push while app
 let syncRev = null;   // server revision this client last saw
 let syncBase = {};    // last known shared state — we diff against this to build a patch
 let syncPollTimer = null;
+let syncSafetyTimer = null;
+let syncWs = null;
+let syncWsRetry = 0;
+let syncWsTimer = null;
+
+// Must match MERGE_KEYS on the server: id-keyed maps where we send only the changed
+// entries, so two people editing different leaders/players never collide.
+const CLIENT_MERGE_KEYS = ['rally', 'teamRally', 'msSubmissionsByPlayer'];
+
+// ── Server-authoritative clock ──────────────────────────────────────────────────
+// Device clocks drift (a desktop being 10s off is completely normal). Every timer
+// in this app compares an absolute timestamp set by ONE device against Date.now()
+// on ANOTHER, so drift shows up directly as countdowns disagreeing. We take the
+// DO's clock as truth and offset every time-critical read by the measured skew.
+let syncSkew = 0;
+function syncSetSkew(serverNow){
+  if (typeof serverNow !== 'number') return;
+  const s = serverNow - Date.now();
+  if (Math.abs(s) < 3600000) syncSkew = s; // ignore absurd values
+}
+function nowSync(){ return Date.now() + syncSkew; }
 
 function syncEnabled() {
   // Empty string is a valid, intentional value meaning "same origin as this page"
@@ -1296,17 +1317,46 @@ let syncSerialize = function() {
     kvkDay1Override: (typeof MS!=='undefined') ? (MS.kvkDay1Override||null) : null,
     msActionHint: (typeof MS!=='undefined') ? (MS._pendingAction||null) : null,
     msSubmissionsByPlayer: (typeof MS!=='undefined') ? (MS.submissionsByPlayer||{}) : {},
-    msAuditLog: (typeof MS!=='undefined') ? (MS.auditLog||[]) : []
+    msAuditLog: (typeof MS!=='undefined') ? (MS.auditLog||[]) : [],
+    // Rally state, per leader. Kept in its own key (not folded into leaders) so a
+    // rally start never collides with a team edit or a slot move.
+    rally: (function(){
+      var r = {};
+      S.leaders.forEach(function(l){
+        r[l.id] = { status: l.status || 'free', timerEnd: l.timerEnd || null, cooldownEnd: l.cooldownEnd || null };
+      });
+      return r;
+    })(),
+    // Team land timers, set by the Final Calculation "Copy" button.
+    teamRally: (typeof bsTeamRally !== 'undefined') ? bsTeamRally : {},
+    // Pet activation plans — previously local-only, so they never reached anyone else.
+    petPlans: (typeof bsPetPlans !== 'undefined') ? bsPetPlans : [],
+    // Launch times are fully derivable from the land time + each leader's march,
+    // so we sync the inputs and let every client compute the same answer.
+    finalCalc: (function(){
+      var d = document.getElementById('landDate'), t = document.getElementById('landTime');
+      return { landDate: d ? d.value : '', landTime: t ? t.value : '' };
+    })(),
+    _replace: (typeof MS!=='undefined') ? (MS._pendingReplace||null) : null
   });
 }
 
 let syncApplyRemote = function(data) {
   syncApplyingRemote = true;
   try {
-    S.leaders = (data.leaders || []).map(l => ({
-      ...l,
-      status: 'free', timerEnd: null, cooldownEnd: null, launchTimeStr: null, landTimeStr: null
-    }));
+    // Rally state now travels with the state instead of being reset on every pull.
+    const _rally = data.rally || {};
+    S.leaders = (data.leaders || []).map(function(l){
+      const r = _rally[l.id] || {};
+      return Object.assign({}, l, {
+        status: r.status || 'free',
+        timerEnd: (typeof r.timerEnd === 'number') ? r.timerEnd : null,
+        cooldownEnd: (typeof r.cooldownEnd === 'number') ? r.cooldownEnd : null,
+        launchTimeStr: null, landTimeStr: null
+      });
+    });
+    if (data.teamRally && typeof bsTeamRally !== 'undefined') bsTeamRally = data.teamRally;
+    if (Array.isArray(data.petPlans) && typeof bsPetPlans !== 'undefined') bsPetPlans = data.petPlans;
     S.teams = data.teams || [];
     S.alliances = (data.alliances && data.alliances.length) ? data.alliances : (S.alliances || []);
     bsEnsureAlliances();
@@ -1315,6 +1365,15 @@ let syncApplyRemote = function(data) {
     if (gEl && data.garrisonAllianceName !== undefined) gEl.value = data.garrisonAllianceName;
     if (aEl && data.attackAllianceName !== undefined) aEl.value = data.attackAllianceName;
     if (typeof updateAllianceNames === 'function') updateAllianceNames();
+    // Final Calculation: restore the land time, then recompute launch times locally.
+    if (data.finalCalc) {
+      const _fd = document.getElementById('landDate'), _ft = document.getElementById('landTime');
+      if (_fd && data.finalCalc.landDate !== undefined) _fd.value = data.finalCalc.landDate || '';
+      if (_ft && data.finalCalc.landTime !== undefined) _ft.value = data.finalCalc.landTime || '';
+      if (_ft && _ft.value && typeof calcLaunchTimes === 'function') { try { calcLaunchTimes(); } catch(e){} }
+    }
+    if (typeof renderPetPlans === 'function') renderPetPlans();
+    if (typeof bsRenderTeamButtons === 'function') bsRenderTeamButtons();
     if (typeof renderLeaderTable === 'function') renderLeaderTable();
     if (typeof renderSetup === 'function') renderSetup();
     if (typeof renderBattleStrategy === 'function') renderBattleStrategy();
@@ -1343,7 +1402,8 @@ if (!syncEnabled()) return false;
     const data = await res.json();
     // _rev is transport metadata, not shared state — pull it out before comparing.
     const rev = (typeof data._rev === 'number') ? data._rev : null;
-    delete data._rev;
+    syncSetSkew(data._now);
+    delete data._rev; delete data._now;
     const json = JSON.stringify(data);
     // A successful response means we ARE connected and synced, even if the
     // shared state is still empty (e.g. first-ever load, nobody has saved
@@ -1382,6 +1442,7 @@ function syncShowLoading(show){
 }
 async function syncFirstPull(){
   if(!syncEnabled() || _syncFirstDone) return;
+  syncWsConnect();
   syncShowLoading(true);
   var ok=false;
   for(var i=0;i<4 && !ok;i++){
@@ -1403,9 +1464,24 @@ async function syncPushNow() {
   // so renaming a team can no longer wipe a Minister Spots submission that
   // arrived in the meantime.
   const patch = {};
+  const replaceKeys = Array.isArray(cur._replace) ? cur._replace : [];
   Object.keys(cur).forEach(function(k){
-    if (k === 'msActionHint') return; // one-shot signal, handled below
-    if (JSON.stringify(cur[k]) !== JSON.stringify(syncBase[k])) patch[k] = cur[k];
+    if (k === 'msActionHint' || k === '_replace') return; // one-shot signals
+    if (CLIENT_MERGE_KEYS.indexOf(k) >= 0 && replaceKeys.indexOf(k) < 0
+        && cur[k] && typeof cur[k] === 'object' && !Array.isArray(cur[k])) {
+      // Send ONLY the entries that changed, plus tombstones for removed ones.
+      const base = (syncBase[k] && typeof syncBase[k] === 'object') ? syncBase[k] : {};
+      const sub = {};
+      Object.keys(cur[k]).forEach(function(id){
+        if (JSON.stringify(cur[k][id]) !== JSON.stringify(base[id])) sub[id] = cur[k][id];
+      });
+      Object.keys(base).forEach(function(id){
+        if (!(id in cur[k])) sub[id] = null; // tombstone = delete
+      });
+      if (Object.keys(sub).length) patch[k] = sub;
+    } else if (JSON.stringify(cur[k]) !== JSON.stringify(syncBase[k])) {
+      patch[k] = cur[k];
+    }
   });
   if (cur.msActionHint) patch.msActionHint = cur.msActionHint;
   if (!Object.keys(patch).length) return; // nothing changed
@@ -1414,23 +1490,25 @@ async function syncPushNow() {
     const res = await fetch(SYNC_API_URL.replace(/\\/$/, '') + '/state', {
       method: 'PUT',
       headers: stateHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ _baseRev: syncRev, patch: patch })
+      body: JSON.stringify({ _baseRev: syncRev, patch: patch, _replace: replaceKeys })
     });
     if (!res.ok) { updateSyncStatus('error'); return; }
     const out = await res.json();
     if (out && out.ok === false) { updateSyncStatus('error'); return; }
 
     if (typeof out.rev === 'number') syncRev = out.rev;
+    syncSetSkew(out.now);
+    if (typeof MS !== 'undefined') MS._pendingReplace = null; // one-shot
     delete patch.msActionHint;
-    Object.keys(patch).forEach(function(k){ syncBase[k] = JSON.parse(JSON.stringify(patch[k])); });
-    syncLastPushedJSON = JSON.stringify(syncBase);
+    syncMergeIntoBase(patch, replaceKeys);
 
     // Someone else wrote while we were editing. The server merged both, and handed
     // back the result — apply it now rather than waiting for the next poll.
     if (out.conflict && out.state) {
       const s = out.state;
       if (typeof s._rev === 'number') syncRev = s._rev;
-      delete s._rev;
+      syncSetSkew(s._now);
+      delete s._rev; delete s._now;
       syncApplyRemote(s);
       syncBase = JSON.parse(JSON.stringify(s));
       syncLastPushedJSON = JSON.stringify(syncBase);
@@ -1439,6 +1517,32 @@ async function syncPushNow() {
   } catch (e) {
     updateSyncStatus('offline');
   }
+}
+
+// Fold a patch into our local base copy, using the same merge rule as the server.
+function syncMergeIntoBase(patch, replaceKeys) {
+  const replace = replaceKeys || [];
+  Object.keys(patch).forEach(function(k){
+    if (k === 'msActionHint' || k === '_replace') return;
+    const v = patch[k];
+    if (CLIENT_MERGE_KEYS.indexOf(k) >= 0 && replace.indexOf(k) < 0
+        && v && typeof v === 'object' && !Array.isArray(v)) {
+      const cur = (syncBase[k] && typeof syncBase[k] === 'object') ? syncBase[k] : {};
+      Object.keys(v).forEach(function(id){
+        if (v[id] === null) delete cur[id]; else cur[id] = JSON.parse(JSON.stringify(v[id]));
+      });
+      syncBase[k] = cur;
+    } else {
+      syncBase[k] = JSON.parse(JSON.stringify(v));
+    }
+  });
+  syncLastPushedJSON = JSON.stringify(syncBase);
+}
+
+// A change was pushed to us over the socket — merge and re-render. Sub-second.
+function syncApplyPatchFromServer(patch, replaceKeys) {
+  syncMergeIntoBase(patch || {}, replaceKeys || []);
+  syncApplyRemote(JSON.parse(JSON.stringify(syncBase)));
 }
 
 function syncQueuePush() {
@@ -1463,8 +1567,8 @@ function updateSyncStatus(state) {
   });
 }
 
-// Poll only while the tab is actually visible. Most of the 50 tabs open during a
-// battle are backgrounded — this roughly halves our daily request usage for free.
+// Poll only while the tab is actually visible. Used as the FALLBACK path when the
+// socket can't be established — and as a slow safety net even when it can.
 function syncStartPolling(){
   if (syncPollTimer) return;
   syncPollTimer = setInterval(syncPull, SYNC_POLL_MS);
@@ -1474,12 +1578,79 @@ function syncStopPolling(){
   clearInterval(syncPollTimer);
   syncPollTimer = null;
 }
+// Belt and braces: even with a healthy socket, re-pull every 5 minutes in case a
+// broadcast was ever missed. Cheap (~12 requests/hour/user).
+function syncStartSafetyPoll(){
+  if (syncSafetyTimer) return;
+  syncSafetyTimer = setInterval(syncPull, 300000);
+}
+
+// ── WebSocket: the server pushes changes instead of us asking for them ─────────
+// Outgoing messages are free, so a change fanning out to 50 spectators costs nothing.
+// Writes still go over PUT /state — the socket is receive-only.
+function syncWsUrl(){
+  const proto = (location.protocol === 'https:') ? 'wss:' : 'ws:';
+  return proto + '//' + location.host + '/ws?token=' + encodeURIComponent((typeof AUTH!=='undefined' && AUTH.token) ? AUTH.token : '');
+}
+function syncWsConnect(){
+  if (!syncEnabled()) return;
+  if (typeof AUTH === 'undefined' || !AUTH.token) return;
+  if (syncWs && (syncWs.readyState === 0 || syncWs.readyState === 1)) return;
+  let ws;
+  try { ws = new WebSocket(syncWsUrl()); } catch(e){ syncWsRetryLater(); return; }
+  syncWs = ws;
+  ws.onopen = function(){
+    syncWsRetry = 0;
+    syncStopPolling();      // live push — no need to ask any more
+    syncStartSafetyPoll();
+    updateSyncStatus('synced');
+  };
+  ws.onmessage = function(ev){
+    let m; try { m = JSON.parse(ev.data); } catch(e){ return; }
+    if (m.type === 'hello') {
+      syncSetSkew(m.now);
+      if (typeof m.rev === 'number') syncRev = m.rev;
+      if (m.state) {
+        const s = m.state;
+        delete s._rev; delete s._now;
+        if (Object.keys(s).length) {
+          syncApplyRemote(s);
+          syncBase = JSON.parse(JSON.stringify(s));
+          syncLastPushedJSON = JSON.stringify(syncBase);
+        }
+      }
+      _syncFirstDone = true; syncShowLoading(false);
+      updateSyncStatus('synced');
+    } else if (m.type === 'patch') {
+      syncSetSkew(m.now);
+      if (typeof m.rev === 'number') syncRev = m.rev;
+      syncApplyPatchFromServer(m.patch, m.replace);
+      updateSyncStatus('synced');
+    }
+  };
+  ws.onclose = function(){ if (syncWs === ws) syncWs = null; syncWsRetryLater(); };
+  ws.onerror = function(){ try { ws.close(); } catch(e){} };
+}
+function syncWsRetryLater(){
+  syncWsRetry++;
+  // Socket won't come up (blocked proxy, flaky mobile network) — fall back to the
+  // 20s poll so the app keeps working exactly as it did before. Keep retrying quietly.
+  if (syncWsRetry >= 3) syncStartPolling();
+  const delay = Math.min(30000, 1000 * Math.pow(2, Math.min(syncWsRetry, 5)));
+  clearTimeout(syncWsTimer);
+  syncWsTimer = setTimeout(syncWsConnect, delay);
+}
+
 if (syncEnabled()) {
   syncPull();
-  syncStartPolling();
+  syncStartPolling();   // dropped as soon as the socket opens
+  syncWsConnect();
   document.addEventListener('visibilitychange', function(){
     if (document.hidden) { syncStopPolling(); }
-    else { syncPull(); syncStartPolling(); }
+    else {
+      syncPull();                                  // catch up on anything missed
+      if (!syncWs || syncWs.readyState > 1) { syncWsConnect(); syncStartPolling(); }
+    }
   });
 } else {
   setTimeout(() => updateSyncStatus('off'), 0);
@@ -1499,7 +1670,7 @@ function showPage(p) {
 
 // UTC clock
 function updateClock(){
-  const n=new Date();
+  const n=new Date(nowSync());
   document.getElementById('utcClock').textContent=
     String(n.getUTCHours()).padStart(2,'0')+':'+String(n.getUTCMinutes()).padStart(2,'0')+':'+String(n.getUTCSeconds()).padStart(2,'0')+' UTC';
   updateKvK();
@@ -1654,6 +1825,7 @@ function calcLaunchTimes(){
   });
   document.getElementById('launchOutput').style.display='block';
   renderLeaderTable();
+  syncQueuePush();
 }
 function copyAllLaunch(){
   const tv=document.getElementById('landTime').value; if(!tv||!S.leaders.length) return;
@@ -1686,15 +1858,16 @@ function updateLeaderMarch(id, value){
 }
 function startRallyTimer(id){
   const l=S.leaders.find(x=>x.id===id); if(!l) return;
+  const t=nowSync();
   l.status='locked';
-  l.timerEnd=Date.now()+l.dur*1000;
+  l.timerEnd=t+l.dur*1000;
   // cooldown = rally dur + 2x march
-  l.cooldownEnd=Date.now()+l.dur*1000+l.march*2*1000;
-  renderLeaderTable();
+  l.cooldownEnd=t+l.dur*1000+l.march*2*1000;
+  renderLeaderTable(); syncQueuePush();
 }
 function stopTimer(id){
   const l=S.leaders.find(x=>x.id===id); if(!l) return;
-  l.status='free'; l.timerEnd=null; l.cooldownEnd=null; renderLeaderTable();
+  l.status='free'; l.timerEnd=null; l.cooldownEnd=null; renderLeaderTable(); syncQueuePush();
 }
 function renderLeaderTable(){
   // update team dropdown
@@ -1958,13 +2131,13 @@ function petToggle(leaderId){
   const l=S.leaders.find(x=>x.id===leaderId); if(!l) return;
   if(!l.pet) l.pet={active:false,startMs:null};
   if(l.pet.active){ l.pet.active=false; l.pet.startMs=null; }
-  else { l.pet.active=true; l.pet.startMs=Date.now(); }
+  else { l.pet.active=true; l.pet.startMs=nowSync(); }
   renderPetGrid();
   syncQueuePush();
 }
 
 function petActivateAll(){
-  S.leaders.forEach(l=>{ if(!l.pet) l.pet={active:false,startMs:null}; l.pet.active=true; l.pet.startMs=Date.now(); });
+  S.leaders.forEach(l=>{ if(!l.pet) l.pet={active:false,startMs:null}; l.pet.active=true; l.pet.startMs=nowSync(); });
   renderPetGrid();
   syncQueuePush();
 }
@@ -1976,7 +2149,7 @@ function petResetAll(){
 
 function tickPets(){
   if(!S.leaders.length) return;
-  const now=Date.now();
+  const now=nowSync();
   let healed=false;
   S.leaders.forEach(function(l){ if(l.pet&&l.pet.active&&!l.pet.startMs){ l.pet.active=false; healed=true; } });
   if(healed){ if(typeof renderBattleStrategy==='function') renderBattleStrategy(); if(typeof syncQueuePush==='function') syncQueuePush(); }
@@ -2016,14 +2189,14 @@ function bsAddPetPlan(){
   const parts=v.split(':'); const hh=parseInt(parts[0],10), mm=parseInt(parts[1],10);
   const now=new Date();
   let t=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate(),hh,mm,0);
-  if(t<=Date.now()) t+=86400000;
+  if(t<=nowSync()) t+=86400000;
   bsPetPlans.push({id:'pp'+Date.now(),targetMs:t,hh:hh,mm:mm,leaderIds:bsPetSel.slice(),fired:false});
-  bsPetSel=[]; renderPetPlans(); toast('Plan added');
+  bsPetSel=[]; renderPetPlans(); toast('Plan added'); syncQueuePush();
 }
-function bsRemovePetPlan(id){ bsPetPlans=bsPetPlans.filter(p=>p.id!==id); renderPetPlans(); }
+function bsRemovePetPlan(id){ bsPetPlans=bsPetPlans.filter(p=>p.id!==id); renderPetPlans(); syncQueuePush(); }
 
 function bsFirePetPlans(){
-  const now=Date.now(); let changed=false;
+  const now=nowSync(); let changed=false;
   bsPetPlans.forEach(function(p){
     if(p.fired||now<p.targetMs) return;
     p.leaderIds.forEach(function(id){ const l=S.leaders.find(function(x){return x.id===id;}); if(l){ if(!l.pet)l.pet={active:false,startMs:null}; l.pet.active=true; l.pet.startMs=now; } });
@@ -2213,7 +2386,9 @@ function bsRenameTeam(teamId){
   var t=S.teams.find(function(x){return x.id===teamId;}); if(!t) return;
   var n=prompt('Rename team', t.name); if(n===null) return;
   n=n.trim(); if(!n) return;
-  t.name=n; t.customName=true; renderBattleStrategy(); if(typeof renderSetup==='function') renderSetup(); syncQueuePush();
+  if(!n){ t.customName=false; if(typeof bsAutoNameTeams==='function') bsAutoNameTeams(); }
+  else { t.name=n; t.customName=true; }
+  renderBattleStrategy(); if(typeof renderSetup==='function') renderSetup(); syncQueuePush();
 }
 function bsDeleteTeam(teamId){
   var t=S.teams.find(function(x){return x.id===teamId;}); if(!t) return;
@@ -2402,7 +2577,9 @@ function renderBsTeamList(){
 function bsRenameTeamInput(teamId, val){
   var t=S.teams.find(function(x){return x.id===teamId;}); if(!t) return;
   var name=(val||'').trim(); if(!name) return;
-  t.name=name; t.customName=true; renderBattleStrategy(); if(typeof renderSetup==='function') renderSetup(); syncQueuePush();
+  if(!name){ t.customName=false; if(typeof bsAutoNameTeams==='function') bsAutoNameTeams(); }
+  else { t.name=name; t.customName=true; }
+  renderBattleStrategy(); if(typeof renderSetup==='function') renderSetup(); syncQueuePush();
   toast('Team renamed');
 }
 function bsOnDrop(e,slotType,slotId){
@@ -2584,7 +2761,7 @@ function bsSetOffset(sec){
 
 // Per-team rally state (transient, not synced — driven by the land timer in the rally flow)
 let bsTeamRally = {};
-function bsTeamRallying(id){ return !!(bsTeamRally[id] && bsTeamRally[id].landEnd && bsTeamRally[id].landEnd>Date.now()); }
+function bsTeamRallying(id){ return !!(bsTeamRally[id] && bsTeamRally[id].landEnd && bsTeamRally[id].landEnd>nowSync()); }
 function bsRenderTeamButtons(){
   const el=document.getElementById('bsTeamButtons'); if(!el) return;
   if(!S.teams.length){
@@ -2598,7 +2775,7 @@ el.innerHTML=S.teams.map(t=>{
     const rallying=bsTeamRallying(t.id);
     const dot='<span class="team-dot '+(rallying?'rallying':'free')+'"></span>';
     let meta='<span style="opacity:.6;font-size:11px">('+leaderCount+')</span>';
-    if(rallying){ const rem=(bsTeamRally[t.id].landEnd-Date.now())/1000; meta='<span class="mono" style="color:#ff7070;font-size:12px;margin-left:2px">lands '+bsFmtLand(rem)+'</span>'; }
+    if(rallying){ const rem=(bsTeamRally[t.id].landEnd-nowSync())/1000; meta='<span class="mono" style="color:#ff7070;font-size:12px;margin-left:2px">lands '+bsFmtLand(rem)+'</span>'; }
     return \`<button class="btn \${allianceColor}" style="\${selected}" onclick="bsSelectTeam('\${t.id}')">\${dot}\${t.name} \${meta}</button>\`;
   }).join('');
 }
@@ -2675,7 +2852,8 @@ function bsCopyTeamResult(teamId){
   
   // Start (or reset) this team's land timer: rally duration + longest march + marker (= selected offset)
   const dur=t._bsLastCalc.dur||300, mm=t._bsLastCalc.maxMarch||0, mk=(BS_CALC.offsetSec!=null?BS_CALC.offsetSec:0);
-  bsTeamRally[teamId]={landEnd:Date.now()+(dur+mm+mk)*1000};
+  bsTeamRally[teamId]={landEnd:nowSync()+(dur+mm+mk)*1000};
+  syncQueuePush();
   // Freeze the copied schedule so the screen matches what was pasted in chat,
   // and switch the result panel to live per-leader launch countdowns.
   BS_CALC.frozen={teamId:teamId, results:results.map(function(r){ return {name:r.name, march:r.march, launchSec:r.launchSec, _fired:false}; })};
@@ -2771,7 +2949,7 @@ function bsCopyFeedback(ok){
 }
 function bsFmtLand(sec){ sec=Math.max(0,Math.ceil(sec)); if(sec>=60){ const m=Math.floor(sec/60), s=sec%60; return m+':'+String(s).padStart(2,'0'); } return sec+'s'; }
 function bsTickRally(){
-  const now=Date.now(); let changed=false;
+  const now=nowSync(); let changed=false;
   Object.keys(bsTeamRally).forEach(function(id){ if(bsTeamRally[id]&&bsTeamRally[id].landEnd&&bsTeamRally[id].landEnd<=now){ delete bsTeamRally[id]; changed=true; } });
   if(changed || Object.keys(bsTeamRally).length){ if(typeof bsRenderTeamButtons==='function') bsRenderTeamButtons(); }
 }
@@ -4716,6 +4894,7 @@ function msClearAllSubs(){
   if(!confirm('⚠️ Admin action: clear ALL Minister Spots submissions for every board? This cannot be undone.')) return;
   MS.submissions=[];
   MS.submissionsByPlayer={};
+  MS._pendingReplace=['msSubmissionsByPlayer']; // wipe, don't merge (one-shot)
   MS._lastAllocation=null;
   MS._submittedEntry=null;
   MS._allocByBoard={};   // clear every board's ranked winners too — otherwise stale
@@ -6306,6 +6485,12 @@ function bearer(request){ return (request.headers.get('Authorization')||'').repl
 // A Durable Object handles one request at a time and its storage is strongly
 // consistent, so read-modify-write is atomic and there are no stale edge reads.
 // State is cached in memory between requests, so reads cost zero storage rows.
+// Top-level keys that are id-keyed maps. The DO merges these entry-by-entry, so two
+// people touching different entries (different leaders, different players) can never
+// overwrite each other. A null entry is a tombstone = delete. Wholesale replacement
+// requires an explicit _replace directive (used by admin "clear all submissions").
+const MERGE_KEYS = ['rally', 'teamRally', 'msSubmissionsByPlayer'];
+
 function kingdomStub(env){
   return env.KINGDOM.get(env.KINGDOM.idFromName('1057'));
 }
@@ -6317,7 +6502,59 @@ export class KingdomState {
     this.st = null;   // in-memory copy of the shared state
     this.rev = 0;     // bumped on every successful write
     this.ready = false;
+    // Handled by the runtime without waking the object: free, and it keeps the DO
+    // hibernating so we are not billed for duration while 50 sockets sit idle.
+    try {
+      this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
+    } catch(e){}
   }
+
+  // Applies a patch to in-memory state. MERGE_KEYS are merged entry-by-entry;
+  // everything else is replaced wholesale. Returns true if anything changed.
+  applyPatch(patch, replaceKeys){
+    const replace = Array.isArray(replaceKeys) ? replaceKeys : [];
+    let touched = false;
+    for (const k of Object.keys(patch)){
+      if (k === '_rev' || k === '_baseRev' || k === '_replace') continue;
+      const v = patch[k];
+      if (MERGE_KEYS.indexOf(k) >= 0 && replace.indexOf(k) < 0
+          && v && typeof v === 'object' && !Array.isArray(v)){
+        const cur = (this.st[k] && typeof this.st[k] === 'object') ? this.st[k] : {};
+        for (const id of Object.keys(v)){
+          if (v[id] === null) delete cur[id]; else cur[id] = v[id];
+        }
+        this.st[k] = cur;
+      } else {
+        this.st[k] = v;
+      }
+      touched = true;
+    }
+    return touched;
+  }
+
+  // Push a change to every connected client. Outgoing WebSocket messages are free,
+  // so fanning a single edit out to 50 spectators costs nothing.
+  broadcast(payload){
+    const msg = JSON.stringify(payload);
+    this.ctx.getWebSockets().forEach(function(ws){
+      try { ws.send(msg); } catch(e){}
+    });
+  }
+
+  snapshot(){
+    const s = stripPw(JSON.parse(JSON.stringify(this.st)));
+    s._rev = this.rev;
+    s._now = Date.now();
+    return s;
+  }
+
+  // Clients never write over the socket — writes go through PUT /state, which already
+  // carries auth. The socket is a one-way push channel.
+  async webSocketMessage(ws, message){
+    if (message === 'ping') { try { ws.send('pong'); } catch(e){} }
+  }
+  async webSocketClose(ws, code, reason, wasClean){ try { ws.close(code, 'closing'); } catch(e){} }
+  async webSocketError(ws, err){}
 
   // Loads state into memory once per wake. On the very first wake ever, seeds
   // itself from the legacy KV blob so no data is lost during the cutover.
@@ -6357,9 +6594,21 @@ export class KingdomState {
     }
 
     if (url.pathname === '/get'){
-      const out = stripPw(JSON.parse(JSON.stringify(this.st)));
-      out._rev = this.rev;
-      return json(out);
+      return json(this.snapshot());
+    }
+
+    // WebSocket upgrade. Hibernatable: the DO can be evicted while sockets stay open.
+    if (url.pathname === '/ws'){
+      if ((request.headers.get('Upgrade') || '').toLowerCase() !== 'websocket'){
+        return new Response('expected websocket', {status:426});
+      }
+      const pair = new WebSocketPair();
+      const client = pair[0], server = pair[1];
+      this.ctx.acceptWebSocket(server);
+      try {
+        server.send(JSON.stringify({ type:'hello', rev:this.rev, now:Date.now(), state:this.snapshot() }));
+      } catch(e){}
+      return new Response(null, { status:101, webSocket: client });
     }
 
     if (url.pathname === '/put'){
@@ -6387,6 +6636,7 @@ export class KingdomState {
 
       // The action hint is a one-shot signal for this write only — never persist it.
       delete patch.msActionHint;
+      const replaceKeys = Array.isArray(body.replace) ? body.replace : [];
       // Passwords are server-side only; a non-admin may never set them.
       if (role !== 'admin'){
         delete patch.pw_rallyleader; delete patch.pw_r4r5; delete patch.pw_admin;
@@ -6395,29 +6645,28 @@ export class KingdomState {
       // Merge only the keys the client actually changed. Keys it did not send are
       // left untouched — so a Battle Strategy edit can no longer erase a Minister
       // Spots submission that landed in the meantime.
-      let touched = false;
-      for (const k of Object.keys(patch)){
-        if (k === '_rev' || k === '_baseRev') continue;
-        this.st[k] = patch[k];
-        touched = true;
-      }
+      const touched = this.applyPatch(patch, replaceKeys);
       if (touched) await this.persist();
 
-      const conflict = (baseRev !== null && baseRev !== revBefore);
-      const out = { ok:true, rev:this.rev, conflict:conflict };
-      // Someone else wrote while this client was editing — hand back the merged
-      // truth so it re-syncs immediately instead of waiting for the next poll.
-      if (conflict){
-        const s = stripPw(JSON.parse(JSON.stringify(this.st)));
-        s._rev = this.rev;
-        out.state = s;
+      // Push the change to everyone else, right now. This is what replaces polling.
+      if (touched){
+        this.broadcast({ type:'patch', rev:this.rev, now:Date.now(), patch:patch, replace:replaceKeys });
       }
+
+      const conflict = (baseRev !== null && baseRev !== revBefore);
+      const out = { ok:true, rev:this.rev, now:Date.now(), conflict:conflict };
+      // Someone else wrote while this client was editing — hand back the merged
+      // truth so it re-syncs immediately rather than waiting for the next poll.
+      if (conflict) out.state = this.snapshot();
       return json(out);
     }
 
     if (url.pathname === '/automation'){
       const changed = msAutomationTick(this.st);
-      if (changed) await this.persist();
+      if (changed){
+        await this.persist();
+        this.broadcast({ type:'hello', rev:this.rev, now:Date.now(), state:this.snapshot() });
+      }
       // Mirror to KV (~48 writes/day, far under the 1,000/day free-tier cap).
       // Pure insurance: a <=30-min-old rollback target if we ever need to revert.
       try { await this.env.SVS_KV.put(STATE_KEY, JSON.stringify(this.st)); } catch(e){}
@@ -6762,6 +7011,14 @@ Reply with ONLY one line of raw JSON, no explanation, no markdown. Use 0 for any
       return new Response(await res.text(), {status:res.status, headers:{'Content-Type':'application/json',...cors()}});
     }
 
+    // WebSocket: browsers cannot set headers on a WS handshake, so the token rides
+    // in the query string. Verified here before the socket ever reaches the DO.
+    if (url.pathname==='/ws') {
+      const role = await verifyToken(env, url.searchParams.get('token') || bearer(request));
+      if (!role) return new Response('unauthorized', {status:401});
+      return kingdomStub(env).fetch(new Request('https://kingdom/ws', request));
+    }
+
     // Cheap revision probe — lets the client poll without shipping the whole state.
     if (url.pathname==='/rev' && request.method==='GET') {
       const role = await verifyToken(env, bearer(request));
@@ -6778,20 +7035,22 @@ Reply with ONLY one line of raw JSON, no explanation, no markdown. Use 0 for any
       // New clients send { _baseRev, patch:{...only changed keys} }.
       // Older clients (a tab still running pre-deploy JS) send the full blob —
       // treat that as a patch containing every key, which behaves exactly as before.
-      let patch, baseRev;
+      let patch, baseRev, replaceKeys;
       if (incoming && typeof incoming.patch === 'object' && incoming.patch !== null){
         patch = incoming.patch;
         baseRev = (typeof incoming._baseRev === 'number') ? incoming._baseRev : null;
+        replaceKeys = Array.isArray(incoming._replace) ? incoming._replace : [];
       } else {
         patch = incoming || {};
         baseRev = null;
-        delete patch._baseRev;
+        replaceKeys = Array.isArray(patch._replace) ? patch._replace : [];
+        delete patch._baseRev; delete patch._replace;
       }
 
       const res = await kingdomStub(env).fetch('https://kingdom/put', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ role: role, baseRev: baseRev, patch: patch })
+        body: JSON.stringify({ role: role, baseRev: baseRev, patch: patch, replace: replaceKeys })
       });
       return new Response(await res.text(), {status:res.status, headers:{'Content-Type':'application/json',...cors()}});
     }
