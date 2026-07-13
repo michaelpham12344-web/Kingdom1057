@@ -25,4 +25,4 @@ class_name = "KingdomState"
 
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["KingdomState"]
+new_sqlite_classes = ["KingdomState"] 
