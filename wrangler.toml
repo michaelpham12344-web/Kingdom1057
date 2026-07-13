@@ -15,3 +15,14 @@ bucket_name = "kingdom1057-img"
 
 [triggers]
 crons = ["*/30 * * * *"]
+
+# ── Durable Object: single source of truth for shared state ──
+# SQLite-backed is required on the Workers Free plan (and is the recommended
+# backend regardless). The migration below registers the class on first deploy.
+[[durable_objects.bindings]]
+name = "KINGDOM"
+class_name = "KingdomState"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["KingdomState"]
