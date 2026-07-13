@@ -1285,6 +1285,26 @@ let syncWsTimer = null;
 // entries, so two people editing different leaders/players never collide.
 const CLIENT_MERGE_KEYS = ['rally', 'teamRally', 'msSubmissionsByPlayer', 'msAllocByBoard'];
 
+// Mirrors the server's ACL. A member's browser still runs the display timers, which can
+// nudge local state (a pet expiring, a rally timer running out) — without this, those
+// nudges would be pushed up and dropped by the server, wasting a write every time.
+const CLIENT_ROLE_RANK = { member: 1, rallyleader: 2, r4r5: 3, admin: 4 };
+const CLIENT_KEY_MIN_ROLE = {
+  leaders: 'rallyleader', teams: 'rallyleader', alliances: 'rallyleader',
+  garrisonAllianceName: 'rallyleader', attackAllianceName: 'rallyleader',
+  rally: 'rallyleader', teamRally: 'rallyleader', petPlans: 'rallyleader',
+  bsSetup: 'rallyleader', bsFrozen: 'rallyleader', finalCalc: 'rallyleader',
+  msAllocByBoard: 'r4r5', msLastAllocation: 'r4r5', msAuditLog: 'r4r5',
+  msSubmissionsByPlayer: 'member',
+  msDeadline: 'admin', kvkDay1Override: 'admin'
+};
+function syncCanWrite(key){
+  const role = (typeof AUTH !== 'undefined' && AUTH.role) ? AUTH.role : null;
+  if (!role) return false;
+  const need = CLIENT_KEY_MIN_ROLE[key] || 'admin';
+  return (CLIENT_ROLE_RANK[role] || 0) >= CLIENT_ROLE_RANK[need];
+}
+
 // ── Server-authoritative clock ──────────────────────────────────────────────────
 // Device clocks drift (a desktop being 10s off is completely normal). Every timer
 // in this app compares an absolute timestamp set by ONE device against Date.now()
@@ -1531,6 +1551,8 @@ async function syncPushNow() {
   const replaceKeys = Array.isArray(cur._replace) ? cur._replace : [];
   Object.keys(cur).forEach(function(k){
     if (k === 'msActionHint' || k === '_replace') return; // one-shot signals
+    if (k === 'msSubmissions') return;                    // derived server-side from msSubmissionsByPlayer
+    if (!syncCanWrite(k)) return;                         // not ours to write
     if (CLIENT_MERGE_KEYS.indexOf(k) >= 0 && replaceKeys.indexOf(k) < 0
         && cur[k] && typeof cur[k] === 'object' && !Array.isArray(cur[k])) {
       // Send ONLY the entries that changed, plus tombstones for removed ones.
@@ -2290,15 +2312,12 @@ function bsAddPetPlan(){
 }
 function bsRemovePetPlan(id){ bsPetPlans=bsPetPlans.filter(p=>p.id!==id); renderPetPlans(); syncQueuePush(); }
 
-function bsFirePetPlans(){
-  const now=nowSync(); let changed=false;
-  bsPetPlans.forEach(function(p){
-    if(p.fired||now<p.targetMs) return;
-    p.leaderIds.forEach(function(id){ const l=S.leaders.find(function(x){return x.id===id;}); if(l){ if(!l.pet)l.pet={active:false,startMs:null}; l.pet.active=true; l.pet.startMs=now; } });
-    p.fired=true; changed=true;
-  });
-  if(changed){ if(typeof renderBattleStrategy==='function') renderBattleStrategy(); if(typeof syncQueuePush==='function') syncQueuePush(); toast('Pets activated by plan'); }
-}
+// Pet plans are fired by the server on a Durable Object alarm, so they go off at the
+// planned instant whether or not anyone has the app open. This is now display-only:
+// the client just re-renders whatever the server tells it.
+function bsFirePetPlans(){ /* server-driven — see KingdomState.alarm() */ }
+
+
 function renderPetPlanChips(){
   const el=document.getElementById('bsPetSelChips'); if(!el) return;
   const planned={};
@@ -6640,6 +6659,26 @@ function bearer(request){ return (request.headers.get('Authorization')||'').repl
 // requires an explicit _replace directive (used by admin "clear all submissions").
 const MERGE_KEYS = ['rally', 'teamRally', 'msSubmissionsByPlayer', 'msAllocByBoard'];
 
+// Minimum role required to write each top-level key. Anything not listed is admin-only:
+// deny by default, so a new key can't accidentally be world-writable.
+const ROLE_RANK = { member: 1, rallyleader: 2, r4r5: 3, admin: 4 };
+const KEY_MIN_ROLE = {
+  // Battle Strategy — rally leaders and up
+  leaders: 'rallyleader', teams: 'rallyleader', alliances: 'rallyleader',
+  garrisonAllianceName: 'rallyleader', attackAllianceName: 'rallyleader',
+  rally: 'rallyleader', teamRally: 'rallyleader', petPlans: 'rallyleader',
+  bsSetup: 'rallyleader', bsFrozen: 'rallyleader', finalCalc: 'rallyleader',
+  // Manage Spots — R4/R5 and up
+  msAllocByBoard: 'r4r5', msLastAllocation: 'r4r5', msAuditLog: 'r4r5',
+  // Submissions are owner-scoped; the per-entry rules in /put do the real work.
+  msSubmissionsByPlayer: 'member'
+  // msDeadline, kvkDay1Override, msAuto, pw_* : absent => admin only
+};
+function canWriteKey(role, key){
+  const need = KEY_MIN_ROLE[key] || 'admin';
+  return (ROLE_RANK[role] || 0) >= ROLE_RANK[need];
+}
+
 function kingdomStub(env){
   return env.KINGDOM.get(env.KINGDOM.idFromName('1057'));
 }
@@ -6660,11 +6699,17 @@ export class KingdomState {
 
   // Applies a patch to in-memory state. MERGE_KEYS are merged entry-by-entry;
   // everything else is replaced wholesale. Returns true if anything changed.
-  applyPatch(patch, replaceKeys){
+  applyPatch(patch, replaceKeys, role){
     const replace = Array.isArray(replaceKeys) ? replaceKeys : [];
     let touched = false;
     for (const k of Object.keys(patch)){
       if (k === '_rev' || k === '_baseRev' || k === '_replace') continue;
+      // msSubmissions is derived from msSubmissionsByPlayer — never trust the client's copy.
+      if (k === 'msSubmissions') continue;
+      // Not your key. Drop it rather than 403: a member's browser may still send an
+      // incidental battle key, and we don't want to spam them with errors for it. The
+      // deliberate actions (clear-all, deadline, someone else's submission) still 403.
+      if (role && !canWriteKey(role, k)) continue;
       const v = patch[k];
       if (MERGE_KEYS.indexOf(k) >= 0 && replace.indexOf(k) < 0
           && v && typeof v === 'object' && !Array.isArray(v)){
@@ -6678,7 +6723,69 @@ export class KingdomState {
       }
       touched = true;
     }
+    // Keep the derived list in step with the authoritative map.
+    if (touched && patch.msSubmissionsByPlayer) {
+      this.st.msSubmissions = Object.values(this.st.msSubmissionsByPlayer || {});
+    }
     return touched;
+  }
+
+  // ── Pet plans fire on the SERVER, on an alarm ────────────────────────────────
+  // Previously whichever browser happened to be awake at the plan's UTC time did the
+  // firing. If nobody had a visible tab, the plan didn't fire at all — and then fired
+  // LATE when someone next opened the app, burning the buff at the wrong moment.
+  // The object now wakes itself at the planned instant, whether or not anyone is looking.
+  async scheduleAlarm(){
+    const plans = Array.isArray(this.st.petPlans) ? this.st.petPlans : [];
+    let next = null;
+    plans.forEach(function(p){
+      if (!p || p.fired || typeof p.targetMs !== 'number') return;
+      if (next === null || p.targetMs < next) next = p.targetMs;
+    });
+    const cur = await this.ctx.storage.getAlarm();
+    if (next === null){ if (cur !== null) await this.ctx.storage.deleteAlarm(); return; }
+    if (cur !== next) await this.ctx.storage.setAlarm(next);
+  }
+
+  firePetPlans(){
+    const plans = Array.isArray(this.st.petPlans) ? this.st.petPlans : [];
+    if (!plans.length) return false;
+    const leaders = Array.isArray(this.st.leaders) ? this.st.leaders : [];
+    const now = Date.now();
+    let changed = false;
+    plans.forEach(function(p){
+      if (!p || p.fired || typeof p.targetMs !== 'number' || now < p.targetMs) return;
+      // Don't resurrect a plan we somehow slept through (deploy, long outage). Firing a
+      // pet buff 40 minutes late is worse than not firing it — just retire the plan.
+      const late = now - p.targetMs;
+      if (late <= 300000){
+        (p.leaderIds || []).forEach(function(id){
+          const l = leaders.find(function(x){ return x && x.id === id; });
+          if (!l) return;
+          if (!l.pet) l.pet = { active:false, startMs:null };
+          l.pet.active = true;
+          // Anchor to the PLANNED instant, not to whenever the alarm actually woke,
+          // so every client counts the same duration down.
+          l.pet.startMs = p.targetMs;
+        });
+      }
+      p.fired = true;
+      changed = true;
+    });
+    if (changed){ this.st.petPlans = plans; this.st.leaders = leaders; }
+    return changed;
+  }
+
+  async alarm(){
+    await this.init();
+    if (this.firePetPlans()){
+      await this.persist();
+      this.broadcast({
+        type: 'patch', rev: this.rev, now: Date.now(), replace: [], from: null,
+        patch: { leaders: this.st.leaders, petPlans: this.st.petPlans }
+      });
+    }
+    await this.scheduleAlarm();
   }
 
   // Push a change to every connected client. Outgoing WebSocket messages are free,
@@ -6726,6 +6833,7 @@ export class KingdomState {
       this.rev = rv || 1;
       this.ready = true;
     });
+    await this.scheduleAlarm();
   }
 
   async persist(){
@@ -6859,8 +6967,10 @@ export class KingdomState {
       // Merge only the keys the client actually changed. Keys it did not send are
       // left untouched — so a Battle Strategy edit can no longer erase a Minister
       // Spots submission that landed in the meantime.
-      const touched = this.applyPatch(patch, replaceKeys);
+      const touched = this.applyPatch(patch, replaceKeys, role);
       if (touched) await this.persist();
+      // A plan may have been added or removed — make sure the alarm matches.
+      if (patch.petPlans !== undefined) await this.scheduleAlarm();
 
       // Push the change to everyone else, right now. This is what replaces polling.
       if (touched){
