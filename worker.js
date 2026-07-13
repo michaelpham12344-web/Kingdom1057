@@ -739,6 +739,9 @@ document.addEventListener('touchend',function(e){
           <p style="color:var(--text2);font-size:12px;margin-bottom:12px">Please use our backup method to enter the site.</p>
           <div style="margin-bottom:14px">
             <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px">👤 Members — enter manually</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+              <input type="text" id="bypassPlayerId" placeholder="Your Player ID" inputmode="numeric" style="flex:1;min-width:120px">
+            </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap">
               <input type="text" id="bypassName" placeholder="Your in-game name" style="flex:1;min-width:120px">
               <select id="bypassAlliance" style="width:110px">
@@ -1458,6 +1461,7 @@ async function syncPull() {
 if (!syncEnabled()) return false;
   try {
     const res = await fetch(SYNC_API_URL.replace(/\\/$/, '') + '/state', { cache: 'no-store', headers: stateHeaders() });
+  if (res.status === 401) { syncSessionExpired(); return false; }
   if (!res.ok) { updateSyncStatus('error'); return false; }
     const data = await res.json();
     // _rev is transport metadata, not shared state — pull it out before comparing.
@@ -1552,6 +1556,14 @@ async function syncPushNow() {
       headers: stateHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ _baseRev: syncRev, patch: patch, _replace: replaceKeys, _client: SYNC_CLIENT_ID })
     });
+    if (res.status === 401) { syncSessionExpired(); return; }
+    if (res.status === 403) {
+      const e = await res.json().catch(function(){ return {}; });
+      updateSyncStatus('error');
+      if (typeof toast === 'function') toast(syncPermMessage(e && e.error));
+      await syncPull();   // pull the truth back so the screen stops showing a rejected edit
+      return;
+    }
     if (!res.ok) { updateSyncStatus('error'); return; }
     const out = await res.json();
     if (out && out.ok === false) { updateSyncStatus('error'); return; }
@@ -1603,6 +1615,26 @@ function syncMergeIntoBase(patch, replaceKeys) {
 function syncApplyPatchFromServer(patch, replaceKeys) {
   syncMergeIntoBase(patch || {}, replaceKeys || []);
   syncApplyRemote(JSON.parse(JSON.stringify(syncBase)));
+}
+
+// The token is dead (expired, or issued before the identity fix). Send them back to the
+// landing page rather than leaving a permanent "Sync error" on screen.
+function syncSessionExpired() {
+  updateSyncStatus('error');
+  try { sessionStorage.removeItem('auth_token'); } catch(e){}
+  if (typeof AUTH !== 'undefined') { AUTH.token = null; AUTH.role = null; }
+  if (typeof toast === 'function') toast('Your session has expired — please log in again.');
+  setTimeout(function(){ location.reload(); }, 1500);
+}
+
+function syncPermMessage(code) {
+  if (code === 'submission-not-yours')            return "That submission belongs to another player — you can't change it.";
+  if (code === 'cannot-author-submission')        return "You can put a player on the bench, but you can't fill in their hours or TrueGold.";
+  if (code === 'would-overwrite-real-submission') return 'That player already has a real submission — it was left untouched.';
+  if (code === 'submission-identity-mismatch')    return "That submission doesn't match your Player ID.";
+  if (code === 'verify-required')                 return 'Player ID verification is unavailable, so an existing submission cannot be changed right now.';
+  if (code === 'admin-required')                  return 'That action is admin-only.';
+  return 'That change was rejected by the server.';
 }
 
 function syncQueuePush() {
@@ -5000,6 +5032,8 @@ function msClearAllSubs(){
 // ════════════════════════════════════════════════════════
 
 const AUTH = {
+  pid: null,         // the player id the server issued this token for
+  verified: false,   // did the KingShot lookup actually confirm it?
   role: null,        // 'member' | 'rallyleader' | 'r4r5' | 'admin'
   alliance: null,    // 'FIR'|'LOC'|'LYL'|'KNG'|'KOV'|'TLA' | null
   playerVerified: false,
@@ -5026,7 +5060,12 @@ async function msAuthLogin(role, opts){
   try {
     const res = await fetch('/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ role: role, password: opts.password, playerId: opts.playerId }) });
     const d = await res.json();
-    if (res.ok && d.ok && d.token){ authSaveToken(d.token); return d.role; }
+    if (res.ok && d.ok && d.token){
+      authSaveToken(d.token);
+      AUTH.pid = d.pid || null;
+      AUTH.verified = !!d.verified;
+      return d.role;
+    }
   } catch(e) {}
   return null;
 }
@@ -5136,7 +5175,9 @@ async function msUnlockAdmin() {
   const input = document.getElementById('msAdminPwInput');
   const err = document.getElementById('msAdminPwErr');
   if (!input) return;
-  const role = await msAuthLogin('admin', { password: input.value });
+  const _apid = (typeof verifiedPlayer !== 'undefined' && verifiedPlayer) ? String(verifiedPlayer.id) : '';
+  if (!_apid) { if (err) { err.style.display='block'; err.textContent='Verify your Player ID first.'; } return; }
+  const role = await msAuthLogin('admin', { password: input.value, playerId: _apid });
   if (role === 'admin') {
     AUTH.role = 'admin';
     AUTH.adminUnlocked = true;
@@ -5268,12 +5309,18 @@ function showBypassUI() {
   if (box) box.style.display = 'block';
 }
 
-function bypassEnterMember() {
+async function bypassEnterMember() {
+  const pid = (document.getElementById('bypassPlayerId').value || '').trim();
   const name = (document.getElementById('bypassName').value || '').trim();
   const alliance = document.getElementById('bypassAlliance').value;
+  if (!pid) { toast('Enter your Player ID.'); return; }
   if (!name) { toast('Enter your in-game name.'); return; }
   if (!alliance) { toast('Select your alliance.'); return; }
-  verifiedPlayer = { id: 'manual_' + Date.now(), name, kingdom: 1057, level: null, avatar: null };
+  // Members have no password, so the lookup is their only proof of identity. If it is
+  // genuinely down, they cannot submit — otherwise anyone could claim anyone's ID.
+  const role = await msAuthLogin('member', { playerId: pid });
+  if (!role) { toast('Could not verify that Player ID right now. Please try again shortly.'); return; }
+  verifiedPlayer = { id: pid, name: name, kingdom: 1057, level: null, avatar: null };
   _registerAndEnter('member', alliance);
 }
 
@@ -5282,20 +5329,22 @@ async function bypassCheckPassword() {
   const errEl = document.getElementById('bypassPwError');
   if (!input) return;
 
-  // R4/R5, Rally Leaders and Admin must also give name + alliance
+  // R4/R5, Rally Leaders and Admin must also give Player ID + name + alliance
+  const pid = (document.getElementById('bypassPlayerId').value || '').trim();
   const name = (document.getElementById('bypassName').value || '').trim();
   const alliance = document.getElementById('bypassAlliance').value;
+  if (!pid) { toast('Enter your Player ID first.'); return; }
   if (!name) { toast('Enter your in-game name first.'); return; }
   if (!alliance) { toast('Select your alliance first.'); return; }
 
   const pw = input.value;
   let role = null;
-  if (await msAuthLogin('admin', {password: pw})) role = 'admin';
-  else if (await msAuthLogin('r4r5', {password: pw})) role = 'r4r5';
-  else if (await msAuthLogin('rallyleader', {password: pw})) role = 'rallyleader';
+  if (await msAuthLogin('admin', {password: pw, playerId: pid})) role = 'admin';
+  else if (await msAuthLogin('r4r5', {password: pw, playerId: pid})) role = 'r4r5';
+  else if (await msAuthLogin('rallyleader', {password: pw, playerId: pid})) role = 'rallyleader';
 
   if (role) {
-    verifiedPlayer = { id: 'bypass_' + role + '_' + Date.now(), name, kingdom: 1057, level: null, avatar: null };
+    verifiedPlayer = { id: pid, name: name, kingdom: 1057, level: null, avatar: null };
     await _registerAndEnter(role, alliance);
   } else {
     if (errEl) { errEl.style.display = 'block'; input.value = ''; input.focus(); setTimeout(() => errEl.style.display = 'none', 3000); }
@@ -5367,10 +5416,11 @@ async function landingCheckPassword() {
   const pw = input.value;
   const pid = verifiedPlayer ? String(verifiedPlayer.id) : '';
 
+  if (!pid) { toast('Verify your Player ID first.'); return; }
   let role = null;
-  if (pid === ADMIN_PLAYER_ID) { if (await msAuthLogin('admin', {password: pw})) role = 'admin'; }
-  if (!role && await msAuthLogin('r4r5', {password: pw})) role = 'r4r5';
-  if (!role && await msAuthLogin('rallyleader', {password: pw})) role = 'rallyleader';
+  if (pid === ADMIN_PLAYER_ID) { if (await msAuthLogin('admin', {password: pw, playerId: pid})) role = 'admin'; }
+  if (!role && await msAuthLogin('r4r5', {password: pw, playerId: pid})) role = 'r4r5';
+  if (!role && await msAuthLogin('rallyleader', {password: pw, playerId: pid})) role = 'rallyleader';
 
   if (role) {
     const alliance = (role === 'rallyleader' || role === 'admin') ? null : AUTH.alliance;
@@ -6539,19 +6589,42 @@ async function _hmac(secret, msg){
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg));
   return _b64url(new Uint8Array(sig));
 }
-async function makeToken(env, role){
-  const body = _b64url(new TextEncoder().encode(JSON.stringify({ role, exp: Date.now() + 43200000 }))); // 12h
+// v2 tokens carry the player's REAL id, plus whether the KingShot lookup actually
+// confirmed it (false only when the API was down and a correct password was given).
+// v1 tokens had no identity at all and are rejected outright — everyone re-logs in once.
+async function makeToken(env, role, pid, verified){
+  const body = _b64url(new TextEncoder().encode(JSON.stringify({
+    v: 2, role: role, pid: String(pid), ver: !!verified, exp: Date.now() + 43200000  // 12h
+  })));
   const sig = await _hmac(await getAuthSecret(env), body);
   return body + '.' + sig;
 }
-async function verifyToken(env, token){
+async function verifyTokenFull(env, token){
   if (!token || token.indexOf('.') < 0) return null;
   const parts = token.split('.');
   const expect = await _hmac(await getAuthSecret(env), parts[0]);
   if (parts[1] !== expect) return null;
   let p; try { p = JSON.parse(new TextDecoder().decode(_b64urlDecode(parts[0]))); } catch(e){ return null; }
   if (!p || !p.exp || Date.now() > p.exp) return null;
-  return p.role || null;
+  if (p.v !== 2 || !p.role || !p.pid) return null;   // no identity => not a usable token
+  return { role: p.role, pid: String(p.pid), verified: !!p.ver };
+}
+async function verifyToken(env, token){
+  const f = await verifyTokenFull(env, token);
+  return f ? f.role : null;
+}
+
+// Is this entry a bare "put them on the bench" stub? R4/R5 may create one of these for
+// another player so they become eligible for a spot — but must never be able to author
+// anyone's hours, TrueGold or commitments.
+function isBenchStub(e){
+  if (!e || typeof e !== 'object') return false;
+  const ch = e.committedHours || {};
+  for (const k of Object.keys(ch)) { if (Number(ch[k]) > 0) return false; }
+  const vf = e.verify || {};
+  for (const k of Object.keys(vf)) { if (Number((vf[k] || {}).hours) > 0) return false; }
+  if (Number(e.truegold || 0) > 0 || Number(e.dust || 0) > 0) return false;
+  return true;
 }
 function stripPw(s){ if (s && typeof s==='object'){ delete s.pw_rallyleader; delete s.pw_r4r5; delete s.pw_admin; } return s; }
 function bearer(request){ return (request.headers.get('Authorization')||'').replace(/^Bearer\s+/,''); }
@@ -6669,6 +6742,16 @@ export class KingdomState {
       return json({ ok:true, rev:this.rev });
     }
 
+    // Password check happens INSIDE the object so the secret never leaves it.
+    // (Phase 1 moved state into the DO but /auth was still reading passwords from the
+    // old KV blob, which the cron only refreshes every 30 min — so a password change
+    // took up to half an hour to take effect. Fixed here.)
+    if (url.pathname === '/check-pw'){
+      let b = {}; try { b = await request.json(); } catch(e){}
+      const expected = this.st['pw_' + b.role] || PW_DEFAULTS[b.role];
+      return json({ ok: !!b.password && b.password === expected });
+    }
+
     if (url.pathname === '/get'){
       return json(this.snapshot());
     }
@@ -6690,6 +6773,8 @@ export class KingdomState {
     if (url.pathname === '/put'){
       let body = {}; try { body = await request.json(); } catch(e){}
       const role  = body.role || null;
+      const pid   = body.pid ? String(body.pid) : null;
+      const tokenVerified = !!body.verified;
       const from  = body.client || null;   // who sent this — so we can skip echoing it back
       const patch = body.patch && typeof body.patch === 'object' ? body.patch : {};
       const baseRev = (typeof body.baseRev === 'number') ? body.baseRev : null;
@@ -6711,9 +6796,61 @@ export class KingdomState {
         return json({ ok:false, error:'admin-required' }, 403);
       }
 
+      const replaceKeys = Array.isArray(body.replace) ? body.replace : [];
+
+      // ── Minister Spots submissions belong to the player who made them ──────────
+      // A submission's CONTENT (hours, TrueGold, commitments) may only ever be written
+      // by its owner. Not by R4/R5, not by admin. What R4/R5 and admin *can* do is put
+      // someone on the bench (a zero-hours stub) so they become eligible for a spot,
+      // or take them off it. That is the whole of their power here.
+      const subs = patch.msSubmissionsByPlayer;
+      if (subs && typeof subs === 'object' && !Array.isArray(subs)) {
+        const isAdmin = (role === 'admin');
+        const isManager = isAdmin || (role === 'r4r5');
+        const current = this.st.msSubmissionsByPlayer || {};
+
+        // Wiping every submission is an admin action.
+        if (replaceKeys.indexOf('msSubmissionsByPlayer') >= 0 && !isAdmin) {
+          return json({ ok:false, error:'admin-required' }, 403);
+        }
+
+        for (const key of Object.keys(subs)) {
+          const v = subs[key];
+
+          if (pid && key === pid) {
+            // Your own submission.
+            if (v !== null) {
+              if (String(v.playerId || '') !== pid) {
+                return json({ ok:false, error:'submission-identity-mismatch' }, 403);
+              }
+              // Logged in during a KingShot outage: your id was typed, not proven. You
+              // may file a new submission, but you may NOT overwrite a verified one —
+              // otherwise an outage would be an open door to stealing someone's spot.
+              const existing = current[key];
+              if (!tokenVerified && existing && !existing._unverified) {
+                return json({ ok:false, error:'verify-required' }, 403);
+              }
+              // Stamp trust on the server. The client does not get to claim this.
+              if (tokenVerified) delete v._unverified; else v._unverified = true;
+            }
+            continue;
+          }
+
+          // Somebody else's submission.
+          if (!isManager) return json({ ok:false, error:'submission-not-yours' }, 403);
+          if (v === null) continue;                       // removing from the bench is fine
+          if (!v._addedManually || !isBenchStub(v)) {
+            return json({ ok:false, error:'cannot-author-submission' }, 403);
+          }
+          const existing = current[key];
+          if (existing && !existing._addedManually) {
+            return json({ ok:false, error:'would-overwrite-real-submission' }, 403);
+          }
+        }
+      }
+
       // The action hint is a one-shot signal for this write only — never persist it.
       delete patch.msActionHint;
-      const replaceKeys = Array.isArray(body.replace) ? body.replace : [];
       // Passwords are server-side only; a non-admin may never set them.
       if (role !== 'admin'){
         delete patch.pw_rallyleader; delete patch.pw_r4r5; delete patch.pw_admin;
@@ -7056,29 +7193,53 @@ Reply with ONLY one line of raw JSON, no explanation, no markdown. Use 0 for any
     if (url.pathname==='/auth' && request.method==='POST') {
       let b={}; try { b = await request.json(); } catch(e) {}
       const role = b.role, password = b.password, playerId = b.playerId;
-      const stateRaw = await env.SVS_KV.get(STATE_KEY);
-      let st={}; try { st = JSON.parse(stateRaw||'{}'); } catch(e){}
-      if (role === 'member') {
-        if (!playerId) return json({ok:false, error:'missing-id'}, 400);
-        try {
-          const r = await fetch(KINGSHOT_API+'/player-info?playerId='+encodeURIComponent(playerId), {headers:{Accept:'application/json'}});
+      if (role !== 'member' && role !== 'rallyleader' && role !== 'r4r5' && role !== 'admin') {
+        return json({ok:false, error:'bad-role'}, 400);
+      }
+      // EVERY role must now present a real Player ID — including admin. No more
+      // fabricated "bypass_admin_1736…" identities.
+      if (!playerId) return json({ok:false, error:'missing-id'}, 400);
+      const pid = String(playerId).trim();
+      if (!/^[0-9]{4,20}$/.test(pid)) return json({ok:false, error:'bad-id'}, 400);
+
+      // Try the lookup. Three outcomes:
+      //   answered + Kingdom 1057  -> verified
+      //   answered + not found / wrong kingdom -> REJECT (you can't fake your way in)
+      //   didn't answer (API down) -> outage; privileged roles may still get in on password
+      let verified = false, outage = false;
+      try {
+        const r = await fetch(KINGSHOT_API+'/player-info?playerId='+encodeURIComponent(pid), {headers:{Accept:'application/json'}});
+        if (!r.ok) { outage = true; }
+        else {
           const d = await r.json();
           const p = (d && d.data) ? d.data : (d && d.status==='success' ? d.data : null);
-          const kd = p ? (p.kingdom || p.kid || p.stove_lv || p.k) : null;
           if (!p) return json({ok:false, error:'not-found'}, 404);
-          // accept if lookup returned a real player; kingdom check best-effort
+          const kd = p.kingdom || p.kid || p.stove_lv || p.k;
           if (kd !== undefined && kd !== null && String(kd) !== '1057' && String(kd) !== '') {
             return json({ok:false, error:'not-1057'}, 403);
           }
-        } catch(e) { return json({ok:false, error:'lookup-failed'}, 502); }
-        return json({ok:true, role:'member', token: await makeToken(env, 'member')});
+          verified = true;
+        }
+      } catch(e) { outage = true; }
+
+      if (role === 'member') {
+        // Members have no password behind them — the lookup IS their credential.
+        // During an outage they cannot prove who they are, so they wait it out.
+        if (!verified) return json({ok:false, error:'lookup-failed'}, 502);
+        return json({ok:true, role:'member', pid: pid, verified: true, token: await makeToken(env, 'member', pid, true)});
       }
-      if (role === 'rallyleader' || role === 'r4r5' || role === 'admin') {
-        const expected = st['pw_'+role] || PW_DEFAULTS[role];
-        if (!password || password !== expected) return json({ok:false, error:'bad-password'}, 401);
-        return json({ok:true, role, token: await makeToken(env, role)});
-      }
-      return json({ok:false, error:'bad-role'}, 400);
+
+      // Privileged roles: password required, always.
+      const chkRes = await kingdomStub(env).fetch('https://kingdom/check-pw', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ role: role, password: password })
+      });
+      const chk = await chkRes.json();
+      if (!chk || !chk.ok) return json({ok:false, error:'bad-password'}, 401);
+      // Correct password + a real Player ID they typed. If the lookup was down we let
+      // them in unverified, so a KingShot outage can't stop an R4 running the battle.
+      if (!verified && !outage) return json({ok:false, error:'not-found'}, 404);
+      return json({ok:true, role: role, pid: pid, verified: verified, token: await makeToken(env, role, pid, verified)});
     }
 
     if (url.pathname==='/state' && request.method==='GET') {
@@ -7091,8 +7252,8 @@ Reply with ONLY one line of raw JSON, no explanation, no markdown. Use 0 for any
     // WebSocket: browsers cannot set headers on a WS handshake, so the token rides
     // in the query string. Verified here before the socket ever reaches the DO.
     if (url.pathname==='/ws') {
-      const role = await verifyToken(env, url.searchParams.get('token') || bearer(request));
-      if (!role) return new Response('unauthorized', {status:401});
+      const who = await verifyTokenFull(env, url.searchParams.get('token') || bearer(request));
+      if (!who) return new Response('unauthorized', {status:401});
       return kingdomStub(env).fetch(new Request('https://kingdom/ws', request));
     }
 
@@ -7104,8 +7265,9 @@ Reply with ONLY one line of raw JSON, no explanation, no markdown. Use 0 for any
       return new Response(await res.text(), {status:res.status, headers:{'Content-Type':'application/json',...cors()}});
     }
     if (url.pathname==='/state' && request.method==='PUT') {
-      const role = await verifyToken(env, bearer(request));
-      if (!role) return json({ok:false, error:'unauthorized'}, 401);
+      const who = await verifyTokenFull(env, bearer(request));
+      if (!who) return json({ok:false, error:'unauthorized'}, 401);
+      const role = who.role;
       const body = await request.text();
       let incoming; try { incoming = JSON.parse(body); } catch(e) { return json({error:'Invalid JSON'},400); }
 
@@ -7127,7 +7289,7 @@ Reply with ONLY one line of raw JSON, no explanation, no markdown. Use 0 for any
       const res = await kingdomStub(env).fetch('https://kingdom/put', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ role: role, baseRev: baseRev, patch: patch, replace: replaceKeys, client: (incoming && incoming._client) || null })
+        body: JSON.stringify({ role: role, pid: who.pid, verified: who.verified, baseRev: baseRev, patch: patch, replace: replaceKeys, client: (incoming && incoming._client) || null })
       });
       return new Response(await res.text(), {status:res.status, headers:{'Content-Type':'application/json',...cors()}});
     }
