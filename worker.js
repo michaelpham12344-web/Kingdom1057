@@ -321,10 +321,7 @@ function msAuditPushSrv(state, who, action){
 // and runs each board's allocation once at its own Day1-36h mark. Idempotent via
 // state.msAuto, keyed to the cycle's Day-1 timestamp so a 30-min tick cadence
 // can never double-fire either action.
-async function runMsAutomation(env){
-  const raw = await env.SVS_KV.get(STATE_KEY);
-  let state = {}; try { state = JSON.parse(raw||'{}'); } catch(e){ state = {}; }
-
+function msAutomationTick(state){
   const now = Date.now();
   const override = state.kvkDay1Override ? new Date(state.kvkDay1Override).getTime() : null;
   const sched = msScheduleSrv(now, (override && !isNaN(override)) ? override : null);
@@ -380,10 +377,8 @@ async function runMsAutomation(env){
   });
   if(lastRunBoard) state.msLastAllocation = state.msAllocByBoard[lastRunBoard];
 
-  if(changed){
-    state.msAuto = auto;
-    await env.SVS_KV.put(STATE_KEY, JSON.stringify(state));
-  }
+  if(changed) state.msAuto = auto;
+  return changed;
 }
 
 const SITE_HTML=`<!DOCTYPE html>
@@ -1271,6 +1266,9 @@ const SYNC_POLL_MS = 20000; // check for updates from others every 20s
 let syncPushTimer = null;
 let syncLastPushedJSON = null;
 let syncApplyingRemote = false; // guards against re-triggering a push while applying a pull
+let syncRev = null;   // server revision this client last saw
+let syncBase = {};    // last known shared state — we diff against this to build a patch
+let syncPollTimer = null;
 
 function syncEnabled() {
   // Empty string is a valid, intentional value meaning "same origin as this page"
@@ -1343,6 +1341,9 @@ if (!syncEnabled()) return false;
     const res = await fetch(SYNC_API_URL.replace(/\\/$/, '') + '/state', { cache: 'no-store', headers: stateHeaders() });
   if (!res.ok) { updateSyncStatus('error'); return false; }
     const data = await res.json();
+    // _rev is transport metadata, not shared state — pull it out before comparing.
+    const rev = (typeof data._rev === 'number') ? data._rev : null;
+    delete data._rev;
     const json = JSON.stringify(data);
     // A successful response means we ARE connected and synced, even if the
     // shared state is still empty (e.g. first-ever load, nobody has saved
@@ -1353,6 +1354,8 @@ if (json !== syncLastPushedJSON && Object.keys(data).length) {
       syncApplyRemote(data);
       syncLastPushedJSON = json;
     }
+    if (Object.keys(data).length) syncBase = JSON.parse(json);
+    if (rev !== null) syncRev = rev;
     return true;
   } catch (e) {
     updateSyncStatus('offline');
@@ -1393,15 +1396,46 @@ async function syncFirstPull(){
 async function syncPushNow() {
   if (!syncEnabled() || syncApplyingRemote) return;
   const json = syncSerialize();
-  if (json === syncLastPushedJSON) return; // nothing changed
+  const cur = JSON.parse(json);
+
+  // Build a patch of ONLY the top-level keys this client actually changed since
+  // it last saw the server. Keys we don't send are left untouched server-side —
+  // so renaming a team can no longer wipe a Minister Spots submission that
+  // arrived in the meantime.
+  const patch = {};
+  Object.keys(cur).forEach(function(k){
+    if (k === 'msActionHint') return; // one-shot signal, handled below
+    if (JSON.stringify(cur[k]) !== JSON.stringify(syncBase[k])) patch[k] = cur[k];
+  });
+  if (cur.msActionHint) patch.msActionHint = cur.msActionHint;
+  if (!Object.keys(patch).length) return; // nothing changed
+
   try {
     const res = await fetch(SYNC_API_URL.replace(/\\/$/, '') + '/state', {
       method: 'PUT',
       headers: stateHeaders({ 'Content-Type': 'application/json' }),
-      body: json
+      body: JSON.stringify({ _baseRev: syncRev, patch: patch })
     });
-    if (res.ok) { syncLastPushedJSON = json; updateSyncStatus('synced'); }
-    else updateSyncStatus('error');
+    if (!res.ok) { updateSyncStatus('error'); return; }
+    const out = await res.json();
+    if (out && out.ok === false) { updateSyncStatus('error'); return; }
+
+    if (typeof out.rev === 'number') syncRev = out.rev;
+    delete patch.msActionHint;
+    Object.keys(patch).forEach(function(k){ syncBase[k] = JSON.parse(JSON.stringify(patch[k])); });
+    syncLastPushedJSON = JSON.stringify(syncBase);
+
+    // Someone else wrote while we were editing. The server merged both, and handed
+    // back the result — apply it now rather than waiting for the next poll.
+    if (out.conflict && out.state) {
+      const s = out.state;
+      if (typeof s._rev === 'number') syncRev = s._rev;
+      delete s._rev;
+      syncApplyRemote(s);
+      syncBase = JSON.parse(JSON.stringify(s));
+      syncLastPushedJSON = JSON.stringify(syncBase);
+    }
+    updateSyncStatus('synced');
   } catch (e) {
     updateSyncStatus('offline');
   }
@@ -1429,9 +1463,24 @@ function updateSyncStatus(state) {
   });
 }
 
+// Poll only while the tab is actually visible. Most of the 50 tabs open during a
+// battle are backgrounded — this roughly halves our daily request usage for free.
+function syncStartPolling(){
+  if (syncPollTimer) return;
+  syncPollTimer = setInterval(syncPull, SYNC_POLL_MS);
+}
+function syncStopPolling(){
+  if (!syncPollTimer) return;
+  clearInterval(syncPollTimer);
+  syncPollTimer = null;
+}
 if (syncEnabled()) {
   syncPull();
-  setInterval(syncPull, SYNC_POLL_MS);
+  syncStartPolling();
+  document.addEventListener('visibilitychange', function(){
+    if (document.hidden) { syncStopPolling(); }
+    else { syncPull(); syncStartPolling(); }
+  });
 } else {
   setTimeout(() => updateSyncStatus('off'), 0);
 }
@@ -6251,6 +6300,133 @@ async function verifyToken(env, token){
 }
 function stripPw(s){ if (s && typeof s==='object'){ delete s.pw_rallyleader; delete s.pw_r4r5; delete s.pw_admin; } return s; }
 function bearer(request){ return (request.headers.get('Authorization')||'').replace(/^Bearer\s+/,''); }
+
+// ═══════════════ DURABLE OBJECT: single source of truth ═══════════════
+// All shared state (Battle Strategy + Minister Spots) lives here instead of KV.
+// A Durable Object handles one request at a time and its storage is strongly
+// consistent, so read-modify-write is atomic and there are no stale edge reads.
+// State is cached in memory between requests, so reads cost zero storage rows.
+function kingdomStub(env){
+  return env.KINGDOM.get(env.KINGDOM.idFromName('1057'));
+}
+
+export class KingdomState {
+  constructor(ctx, env){
+    this.ctx = ctx;
+    this.env = env;
+    this.st = null;   // in-memory copy of the shared state
+    this.rev = 0;     // bumped on every successful write
+    this.ready = false;
+  }
+
+  // Loads state into memory once per wake. On the very first wake ever, seeds
+  // itself from the legacy KV blob so no data is lost during the cutover.
+  async init(){
+    if (this.ready) return;
+    await this.ctx.blockConcurrencyWhile(async () => {
+      if (this.ready) return;
+      let st = await this.ctx.storage.get('state');
+      let rv = await this.ctx.storage.get('rev');
+      if (st === undefined || st === null){
+        let seed = {};
+        try {
+          const raw = await this.env.SVS_KV.get(STATE_KEY);
+          if (raw) seed = JSON.parse(raw) || {};
+        } catch(e){ seed = {}; }
+        st = seed; rv = 1;
+        await this.ctx.storage.put({ state: st, rev: rv, seededAt: Date.now() });
+      }
+      this.st = st || {};
+      this.rev = rv || 1;
+      this.ready = true;
+    });
+  }
+
+  async persist(){
+    this.rev++;
+    await this.ctx.storage.put({ state: this.st, rev: this.rev });
+    return this.rev;
+  }
+
+  async fetch(request){
+    await this.init();
+    const url = new URL(request.url);
+
+    if (url.pathname === '/rev'){
+      return json({ ok:true, rev:this.rev });
+    }
+
+    if (url.pathname === '/get'){
+      const out = stripPw(JSON.parse(JSON.stringify(this.st)));
+      out._rev = this.rev;
+      return json(out);
+    }
+
+    if (url.pathname === '/put'){
+      let body = {}; try { body = await request.json(); } catch(e){}
+      const role  = body.role || null;
+      const patch = body.patch && typeof body.patch === 'object' ? body.patch : {};
+      const baseRev = (typeof body.baseRev === 'number') ? body.baseRev : null;
+      const revBefore = this.rev;
+
+      // ── Admin-only guards (moved here from the Worker: they need current state) ──
+      // A bulk "Run Allocation" pass, clearing/reducing submissions, or changing the
+      // manual deadline / KvK Day-1 override are Admin-only. A single manage-board edit
+      // (assign/swap/pin/unpin/undo by R4/R5) is NOT flagged, so those still go through.
+      const bulkAllocation = patch.msActionHint === 'runAllocation';
+      const oldSubs = this.st.msSubmissionsByPlayer ? Object.keys(this.st.msSubmissionsByPlayer).length : 0;
+      const subsReduced = ('msSubmissionsByPlayer' in patch)
+        && (patch.msSubmissionsByPlayer ? Object.keys(patch.msSubmissionsByPlayer).length : 0) < oldSubs;
+      const deadlineChanged = ('msDeadline' in patch)
+        && (patch.msDeadline||null) !== (this.st.msDeadline||null);
+      const overrideChanged = ('kvkDay1Override' in patch)
+        && (patch.kvkDay1Override||null) !== (this.st.kvkDay1Override||null);
+      if ((bulkAllocation || subsReduced || deadlineChanged || overrideChanged) && role !== 'admin'){
+        return json({ ok:false, error:'admin-required' }, 403);
+      }
+
+      // The action hint is a one-shot signal for this write only — never persist it.
+      delete patch.msActionHint;
+      // Passwords are server-side only; a non-admin may never set them.
+      if (role !== 'admin'){
+        delete patch.pw_rallyleader; delete patch.pw_r4r5; delete patch.pw_admin;
+      }
+
+      // Merge only the keys the client actually changed. Keys it did not send are
+      // left untouched — so a Battle Strategy edit can no longer erase a Minister
+      // Spots submission that landed in the meantime.
+      let touched = false;
+      for (const k of Object.keys(patch)){
+        if (k === '_rev' || k === '_baseRev') continue;
+        this.st[k] = patch[k];
+        touched = true;
+      }
+      if (touched) await this.persist();
+
+      const conflict = (baseRev !== null && baseRev !== revBefore);
+      const out = { ok:true, rev:this.rev, conflict:conflict };
+      // Someone else wrote while this client was editing — hand back the merged
+      // truth so it re-syncs immediately instead of waiting for the next poll.
+      if (conflict){
+        const s = stripPw(JSON.parse(JSON.stringify(this.st)));
+        s._rev = this.rev;
+        out.state = s;
+      }
+      return json(out);
+    }
+
+    if (url.pathname === '/automation'){
+      const changed = msAutomationTick(this.st);
+      if (changed) await this.persist();
+      // Mirror to KV (~48 writes/day, far under the 1,000/day free-tier cap).
+      // Pure insurance: a <=30-min-old rollback target if we ever need to revert.
+      try { await this.env.SVS_KV.put(STATE_KEY, JSON.stringify(this.st)); } catch(e){}
+      return json({ ok:true, rev:this.rev, changed:changed });
+    }
+
+    return json({ ok:false, error:'not-found' }, 404);
+  }
+}
 // ═══════════════════════════════════════════════════════════════
 export default {
   async fetch(request, env) {
@@ -6582,41 +6758,42 @@ Reply with ONLY one line of raw JSON, no explanation, no markdown. Use 0 for any
     if (url.pathname==='/state' && request.method==='GET') {
       const role = await verifyToken(env, bearer(request));
       if (!role) return json({ok:false, error:'unauthorized'}, 401);
-      const raw = await env.SVS_KV.get(STATE_KEY);
-      let st={}; try { st = JSON.parse(raw||'{}'); } catch(e){}
-      return json(stripPw(st));
+      const res = await kingdomStub(env).fetch('https://kingdom/get');
+      return new Response(await res.text(), {status:res.status, headers:{'Content-Type':'application/json',...cors()}});
+    }
+
+    // Cheap revision probe — lets the client poll without shipping the whole state.
+    if (url.pathname==='/rev' && request.method==='GET') {
+      const role = await verifyToken(env, bearer(request));
+      if (!role) return json({ok:false, error:'unauthorized'}, 401);
+      const res = await kingdomStub(env).fetch('https://kingdom/rev');
+      return new Response(await res.text(), {status:res.status, headers:{'Content-Type':'application/json',...cors()}});
     }
     if (url.pathname==='/state' && request.method==='PUT') {
       const role = await verifyToken(env, bearer(request));
       if (!role) return json({ok:false, error:'unauthorized'}, 401);
       const body = await request.text();
       let incoming; try { incoming = JSON.parse(body); } catch(e) { return json({error:'Invalid JSON'},400); }
-      const oldRaw = await env.SVS_KV.get(STATE_KEY);
-      let old={}; try { old = JSON.parse(oldRaw||'{}'); } catch(e){}
-      
-// Admin-only: a bulk "Run Allocation" pass (flagged explicitly by the client via
-      // msActionHint, since it can reassign many unpinned players at once), clearing or
-      // reducing submissions, or changing the manual deadline / KvK Day-1 override.
-      // A single manage-board edit (assign/swap/pin/unpin/undo by R4/R5) also touches
-      // msAllocByBoard but is NOT flagged here, so those saves are allowed through —
-      // R4/R5 keep full Manage Spots editing rights; only the bulk/global actions are Admin-only.
-      const bulkAllocation = incoming.msActionHint === 'runAllocation';
-      const oldSubs = old.msSubmissionsByPlayer ? Object.keys(old.msSubmissionsByPlayer).length : 0;
-      const newSubs = incoming.msSubmissionsByPlayer ? Object.keys(incoming.msSubmissionsByPlayer).length : 0;
-      const subsReduced = newSubs < oldSubs;
-      const deadlineChanged = (incoming.msDeadline||null) !== (old.msDeadline||null);
-      const overrideChanged = (incoming.kvkDay1Override||null) !== (old.kvkDay1Override||null);
-      if ((bulkAllocation || subsReduced || deadlineChanged || overrideChanged) && role !== 'admin') {
-        return json({ok:false, error:'admin-required'}, 403);
+
+      // New clients send { _baseRev, patch:{...only changed keys} }.
+      // Older clients (a tab still running pre-deploy JS) send the full blob —
+      // treat that as a patch containing every key, which behaves exactly as before.
+      let patch, baseRev;
+      if (incoming && typeof incoming.patch === 'object' && incoming.patch !== null){
+        patch = incoming.patch;
+        baseRev = (typeof incoming._baseRev === 'number') ? incoming._baseRev : null;
+      } else {
+        patch = incoming || {};
+        baseRev = null;
+        delete patch._baseRev;
       }
-      // The action hint is a one-shot signal for this write only — never persist it.
-      delete incoming.msActionHint;
-      // Preserve server-only secrets; only an admin may change them explicitly
-      incoming.pw_rallyleader = (role==='admin' && incoming.pw_rallyleader!==undefined) ? incoming.pw_rallyleader : old.pw_rallyleader;
-      incoming.pw_r4r5 = (role==='admin' && incoming.pw_r4r5!==undefined) ? incoming.pw_r4r5 : old.pw_r4r5;
-      incoming.pw_admin = (role==='admin' && incoming.pw_admin!==undefined) ? incoming.pw_admin : old.pw_admin;
-      await env.SVS_KV.put(STATE_KEY, JSON.stringify(incoming));
-      return json({ok:true});
+
+      const res = await kingdomStub(env).fetch('https://kingdom/put', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ role: role, baseRev: baseRev, patch: patch })
+      });
+      return new Response(await res.text(), {status:res.status, headers:{'Content-Type':'application/json',...cors()}});
     }
 
     if (request.method==='GET') return new Response(SITE_HTML,{headers:{'Content-Type':'text/html;charset=UTF-8',...cors()}});
@@ -6629,6 +6806,7 @@ Reply with ONLY one line of raw JSON, no explanation, no markdown. Use 0 for any
     // connections from Cloudflare Worker IPs (fetch throws before any HTTP
     // response), so redeeming is done by the GitHub Actions runner, which calls
     // /gift-players and /gift-report. Minister automation still runs here.
-    ctx.waitUntil(runMsAutomation(env).catch(function(e){ console.error('runMsAutomation failed:', e && e.message); }));
+    ctx.waitUntil(kingdomStub(env).fetch('https://kingdom/automation', {method:'POST'})
+      .catch(function(e){ console.error('ms automation failed:', e && e.message); }));
   }
 };
