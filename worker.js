@@ -1270,13 +1270,17 @@ let syncRev = null;   // server revision this client last saw
 let syncBase = {};    // last known shared state — we diff against this to build a patch
 let syncPollTimer = null;
 let syncSafetyTimer = null;
+// Identifies THIS tab. The server echoes it back on the broadcast so we can ignore our
+// own writes — otherwise every keystroke you save comes straight back, re-renders the
+// DOM, and yanks the caret out of the field you are typing in.
+const SYNC_CLIENT_ID = 'c' + Math.random().toString(36).slice(2) + Date.now().toString(36);
 let syncWs = null;
 let syncWsRetry = 0;
 let syncWsTimer = null;
 
 // Must match MERGE_KEYS on the server: id-keyed maps where we send only the changed
 // entries, so two people editing different leaders/players never collide.
-const CLIENT_MERGE_KEYS = ['rally', 'teamRally', 'msSubmissionsByPlayer'];
+const CLIENT_MERGE_KEYS = ['rally', 'teamRally', 'msSubmissionsByPlayer', 'msAllocByBoard'];
 
 // ── Server-authoritative clock ──────────────────────────────────────────────────
 // Device clocks drift (a desktop being 10s off is completely normal). Every timer
@@ -1546,7 +1550,7 @@ async function syncPushNow() {
     const res = await fetch(SYNC_API_URL.replace(/\\/$/, '') + '/state', {
       method: 'PUT',
       headers: stateHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ _baseRev: syncRev, patch: patch, _replace: replaceKeys })
+      body: JSON.stringify({ _baseRev: syncRev, patch: patch, _replace: replaceKeys, _client: SYNC_CLIENT_ID })
     });
     if (!res.ok) { updateSyncStatus('error'); return; }
     const out = await res.json();
@@ -1680,6 +1684,9 @@ function syncWsConnect(){
     } else if (m.type === 'patch') {
       syncSetSkew(m.now);
       if (typeof m.rev === 'number') syncRev = m.rev;
+      // Our own edit coming back to us. We already applied it locally; re-applying
+      // would rebuild the DOM and steal focus mid-keystroke. Take the rev, drop the rest.
+      if (m.from && m.from === SYNC_CLIENT_ID) { updateSyncStatus('synced'); return; }
       syncApplyPatchFromServer(m.patch, m.replace);
       updateSyncStatus('synced');
     }
@@ -2243,7 +2250,7 @@ function bsAddPetPlan(){
   const v=inp.value; if(!v){ toast('Pick a UTC time'); return; }
   if(!bsPetSel.length){ toast('Select at least one leader'); return; }
   const parts=v.split(':'); const hh=parseInt(parts[0],10), mm=parseInt(parts[1],10);
-  const now=new Date();
+  const now=new Date(nowSync());
   let t=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate(),hh,mm,0);
   if(t<=nowSync()) t+=86400000;
   bsPetPlans.push({id:'pp'+Date.now(),targetMs:t,hh:hh,mm:mm,leaderIds:bsPetSel.slice(),fired:false});
@@ -2318,7 +2325,7 @@ function bsLeaderCardHTML(l){
   const p=l.pet||{active:false,startMs:null};
   let petCls='off',petTxt='No pet — tap to start',petPct=0;
   if(p.active&&p.startMs){
-    const rem=PET_DUR-(Date.now()-p.startMs);
+    const rem=PET_DUR-(nowSync()-p.startMs);
     if(rem>0){ petCls=(rem<=WARN_MS)?'warn':'on'; petTxt=fmtSec(Math.ceil(rem/1000)); petPct=Math.max(0,Math.min(100,rem/PET_DUR*100)); }
   }
   // Team color accent reflects the leader's ACTUAL current placement (bsSlot), not the
@@ -4963,7 +4970,7 @@ function msClearAllSubs(){
   if(!confirm('⚠️ Admin action: clear ALL Minister Spots submissions for every board? This cannot be undone.')) return;
   MS.submissions=[];
   MS.submissionsByPlayer={};
-  MS._pendingReplace=['msSubmissionsByPlayer']; // wipe, don't merge (one-shot)
+  MS._pendingReplace=['msSubmissionsByPlayer','msAllocByBoard']; // wipe, don't merge (one-shot)
   MS._lastAllocation=null;
   MS._submittedEntry=null;
   MS._allocByBoard={};   // clear every board's ranked winners too — otherwise stale
@@ -6558,7 +6565,7 @@ function bearer(request){ return (request.headers.get('Authorization')||'').repl
 // people touching different entries (different leaders, different players) can never
 // overwrite each other. A null entry is a tombstone = delete. Wholesale replacement
 // requires an explicit _replace directive (used by admin "clear all submissions").
-const MERGE_KEYS = ['rally', 'teamRally', 'msSubmissionsByPlayer'];
+const MERGE_KEYS = ['rally', 'teamRally', 'msSubmissionsByPlayer', 'msAllocByBoard'];
 
 function kingdomStub(env){
   return env.KINGDOM.get(env.KINGDOM.idFromName('1057'));
@@ -6683,6 +6690,7 @@ export class KingdomState {
     if (url.pathname === '/put'){
       let body = {}; try { body = await request.json(); } catch(e){}
       const role  = body.role || null;
+      const from  = body.client || null;   // who sent this — so we can skip echoing it back
       const patch = body.patch && typeof body.patch === 'object' ? body.patch : {};
       const baseRev = (typeof body.baseRev === 'number') ? body.baseRev : null;
       const revBefore = this.rev;
@@ -6719,7 +6727,7 @@ export class KingdomState {
 
       // Push the change to everyone else, right now. This is what replaces polling.
       if (touched){
-        this.broadcast({ type:'patch', rev:this.rev, now:Date.now(), patch:patch, replace:replaceKeys });
+        this.broadcast({ type:'patch', rev:this.rev, now:Date.now(), patch:patch, replace:replaceKeys, from:from });
       }
 
       const conflict = (baseRev !== null && baseRev !== revBefore);
@@ -7119,7 +7127,7 @@ Reply with ONLY one line of raw JSON, no explanation, no markdown. Use 0 for any
       const res = await kingdomStub(env).fetch('https://kingdom/put', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ role: role, baseRev: baseRev, patch: patch, replace: replaceKeys })
+        body: JSON.stringify({ role: role, baseRev: baseRev, patch: patch, replace: replaceKeys, client: (incoming && incoming._client) || null })
       });
       return new Response(await res.text(), {status:res.status, headers:{'Content-Type':'application/json',...cors()}});
     }
