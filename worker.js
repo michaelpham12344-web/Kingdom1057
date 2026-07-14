@@ -511,7 +511,7 @@ select.lgInput{cursor:pointer;font-size:15px;}
 .bs4zone .bs4zh{font-family:var(--head);font-size:12px;letter-spacing:.08em;margin-bottom:11px;color:var(--accent2);}
 @media (max-width:700px){.bs4pane{padding:16px 14px 26px;}.bs4tabs{padding:0 14px;}.bs4top{padding:14px;}.bs4tab{margin-right:18px;}}
 /* ══ MINISTER SPOTS (design 2a) ══ */
-.ms2wrap{max-width:560px;margin:0 auto;}
+.ms2wrap{width:100%;margin:0 0 4px 0;}
 .ms2head{padding:24px 22px 18px;border-bottom:1px solid rgba(201,165,92,.12);background:linear-gradient(180deg,rgba(168,50,44,.16),transparent);border-radius:16px 16px 0 0;}
 .ms2id{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
 .ms2crest{position:relative;width:38px;height:44px;flex-shrink:0;}
@@ -527,7 +527,9 @@ select.lgInput{cursor:pointer;font-size:15px;}
 /* stepper — the .ms-step-tab buttons keep their IDs, msGoStep still toggles .active */
 .ms2stepper{display:flex;align-items:flex-start;padding:16px 6px 6px;gap:0;}
 .phase-tabs.ms2stepper{margin-bottom:14px;}
-.ms2stepper .ms-step-tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;background:none;border:none;padding:0;position:relative;min-width:0;}
+.ms2stepper .ms-step-tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;background:none;border:none;padding:0;position:relative;min-width:0;white-space:normal;letter-spacing:0;font-size:inherit;}
+.ms2stepper .ms-step-tab.active,.ms2stepper .ms-step-tab:hover{background:none;border-top-color:transparent;color:inherit;}
+.ms2stepper .ms-step-tab.active::after{display:none;content:none;}
 .ms2stepper .ms-step-tab .ms2dot{width:26px;height:26px;flex-shrink:0;border-radius:50%;background:transparent;border:1.5px solid var(--border2);color:var(--text3);font-family:var(--head);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;transition:.18s;}
 .ms2stepper .ms-step-tab .ms2lab{font-size:9.5px;font-weight:600;letter-spacing:.03em;color:var(--text3);text-align:center;line-height:1.25;}
 .ms2stepper .ms-step-tab.active .ms2dot{background:var(--gold);border-color:var(--gold);color:#100c0a;}
@@ -3501,9 +3503,20 @@ function msRenderStepTabs(){
   const tabA = document.getElementById('msStepTabA');
   if(tabA){
     const doneA = hasBoards || hasSubmission;
-    tabA.textContent = (doneA?'✓ ':'')+'1. Apply';
-    if(doneA && !tabA.classList.contains('active')) tabA.style.color='var(--green)';
-    else tabA.style.color='';
+    // Design 2a: the button holds a dot + a label span. Write into them rather than
+    // replacing the button's children with a text node (that wiped out the stepper).
+    const labA = tabA.querySelector('.ms2lab');
+    const dotA = tabA.querySelector('.ms2dot');
+    if(labA && dotA){
+      labA.textContent = 'Apply';
+      dotA.innerHTML = doneA ? '✓' : '1';
+      tabA.classList.toggle('done', doneA && !tabA.classList.contains('active'));
+      tabA.style.color = '';
+    } else {
+      tabA.textContent = (doneA?'✓ ':'')+'1. Apply';
+      if(doneA && !tabA.classList.contains('active')) tabA.style.color='var(--green)';
+      else tabA.style.color='';
+    }
   }
 
   // Step 0 (overview) - shown whenever the person has submitted, same for everyone
@@ -3515,6 +3528,8 @@ function msRenderStepTabs(){
   if(tab5) tab5.style.display = isR4 ? '' : 'none';
 
   const baseLabels={1:'2. Upload',2:'3. Verify',3:'4. Commitment',4:'5. Timeslots & Submit'};
+  const stepShort={1:'Upload',2:'Verify',3:'Commit',4:'Timeslots'};
+  const stepNum={1:'2',2:'3',3:'4',4:'5'};
   for(let i=1;i<=4;i++){
     const tab=document.getElementById('msStepTab'+i);
     if(!tab) continue;
@@ -3524,9 +3539,19 @@ function msRenderStepTabs(){
     tab.style.cursor=isLocked?'not-allowed':'pointer';
     tab.title=isLocked?'Complete the previous step first':'';
     const done=(MS._completedSteps||[]).indexOf(i)>=0;
-    tab.textContent=(done?'✓ ':'')+baseLabels[i];
-    if(done && !tab.classList.contains('active')) tab.style.color='var(--green)';
-    else if(!isLocked) tab.style.color='';
+    // Design 2a: write into the dot + label spans, not over the button's children.
+    const lab=tab.querySelector('.ms2lab');
+    const dot=tab.querySelector('.ms2dot');
+    if(lab && dot){
+      lab.textContent=stepShort[i];
+      dot.innerHTML=done?'✓':stepNum[i];
+      tab.classList.toggle('done', done && !tab.classList.contains('active'));
+      tab.style.color='';
+    } else {
+      tab.textContent=(done?'✓ ':'')+baseLabels[i];
+      if(done && !tab.classList.contains('active')) tab.style.color='var(--green)';
+      else if(!isLocked) tab.style.color='';
+    }
   }
 }
 
