@@ -2619,7 +2619,7 @@ function bsLeaderCardHTML(l){
   const removeBtn = inPool ? '' : '<span onclick="event.stopPropagation();bsRemoveFromSlot(\\''+l.id+'\\')" title="Remove — back to pool" style="cursor:pointer;color:#ff8080;font-size:14px;padding:6px 8px">✕</span>';
   return \`<div class="bs-leader-card" id="bsleader-\${l.id}" style="\${accent}">
     <div class="bs-leader-name" style="display:flex;align-items:center;gap:4px"><span style="flex:1">\${l.name} <span class="badge badge-\${l.tier.toLowerCase()}" style="margin-left:3px">\${l.tier}</span></span>\${removeBtn}<span onclick="event.stopPropagation();bsOpenMoveModal('\${l.id}')" title="Move" style="cursor:pointer;color:var(--text3);font-size:14px;padding:6px 8px">⇄</span></div>
-    <div class="bs-leader-meta">\${placedTeam?placedTeam.name+' · ':''}\${l.march}s march</div>
+    <div class="bs-leader-meta">March time: \${l.march}s</div>
     <div class="bs-pet-bar" style="cursor:pointer" onclick="bsTogglePet(event,'\${l.id}')" title="Click to toggle 2.5h pet buff"><div class="bs-pet-bar-fill \${petCls}" id="bspetfill-\${l.id}" style="width:\${petPct}%"></div></div>
     <div class="bs-pet-label \${petCls}" id="bspetlabel-\${l.id}" style="cursor:pointer" onclick="bsTogglePet(event,'\${l.id}')">\${petTxt}</div>
   </div>\`;
