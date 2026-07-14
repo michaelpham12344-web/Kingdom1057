@@ -1690,6 +1690,8 @@ let syncApplyRemote = function(data) {
 
 async function syncPull() {
 if (!syncEnabled()) return false;
+  // Not logged in yet — /state requires a token, so this could only 401. Stay quiet.
+  if (typeof AUTH === 'undefined' || !AUTH.token) { updateSyncStatus('off'); return false; }
   try {
     const res = await fetch(SYNC_API_URL.replace(/\\/$/, '') + '/state', { cache: 'no-store', headers: stateHeaders() });
   if (res.status === 401) { syncSessionExpired(); return false; }
@@ -1853,9 +1855,14 @@ function syncApplyPatchFromServer(patch, replaceKeys) {
 // The token is dead (expired, or issued before the identity fix). Send them back to the
 // landing page rather than leaving a permanent "Sync error" on screen.
 function syncSessionExpired() {
+  // If we never had a token, this 401 is not an expired session — it just means
+  // "nobody has logged in yet". The landing page polls /state before auth, and
+  // reloading on that 401 traps the user in a ~1.5s reload loop on the login screen.
+  if (typeof AUTH === 'undefined' || !AUTH.token) { updateSyncStatus('off'); return; }
+
   updateSyncStatus('error');
   try { sessionStorage.removeItem('auth_token'); } catch(e){}
-  if (typeof AUTH !== 'undefined') { AUTH.token = null; AUTH.role = null; }
+  AUTH.token = null; AUTH.role = null;
   if (typeof toast === 'function') toast('Your session has expired — please log in again.');
   setTimeout(function(){ location.reload(); }, 1500);
 }
