@@ -1419,9 +1419,9 @@ document.addEventListener('touchend',function(e){
             <input type="datetime-local" id="msDeadlineInput" style="width:200px">
           </div>
           <button class="btn btn-primary btn-sm" onclick="msSetDeadline()">Set Deadline</button>
-          <button class="btn btn-ghost btn-sm" onclick="msReopenSubmissions()">🔓 Reopen</button>
+          <button class="btn btn-ghost btn-sm" onclick="msReopenSubmissions()" title="Removes the admin override and returns the board to the KvK schedule. If that deadline has passed, the board closes again.">↩ Clear override</button>
         </div>
-        <div style="font-size:11px;color:var(--text3);margin:-6px 0 12px">Admin only. Overrides the computed KvK schedule for the chosen board(s) — use this to reopen a board for testing.</div>
+        <div style="font-size:11px;color:var(--text3);margin:-6px 0 12px">Admin only. <b>Set Deadline</b> with a future time is what <em>opens</em> a closed board (use this to test). <b>Clear override</b> just hands the board back to the KvK schedule — if that deadline has already passed, the board closes again.</div>
         <button class="btn btn-gold" onclick="msRunAllocation()">⚙️ Run Allocation (rank + assign slots)</button>
         <button class="btn btn-ghost btn-sm" onclick="msClearAllSubs()" style="margin-left:8px">🗑 Clear all submissions</button>
         <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
@@ -4629,10 +4629,34 @@ function msSetDeadline() {
   if (typeof msRenderBoardTimers==='function') msRenderBoardTimers();
   toast('Deadline set for ' + names + ': ' + new Date(iso).toUTCString());
 }
+// Clears the admin override and hands the board back to the computed KvK schedule.
+// NOTE: this does NOT "reopen" anything — if the KvK deadline has already passed,
+// the board goes straight back to CLOSED. To open a closed board, Set Deadline to a
+// future time instead.
 function msReopenSubmissions() {
   const targets = _msTargetBoards();
   const names = _msBoardNames(targets);
-  if (!confirm('⚠️ Reopen submissions for ' + names + '?\\n\\nThis clears the admin override and returns ' + (targets.length>1 ? 'them' : 'it') + ' to the normal computed KvK deadline — which may itself already have passed. Continue?')) return;
+
+  // Work out, per board, what clearing the override would actually leave it as.
+  const outcome = targets.map(function(b){
+    var comp = null;
+    try { comp = msSchedule(Date.now()).boards[b].deadline; } catch(e){}
+    var label = (MS_BOARD_META[b]||{}).label || b;
+    var willClose = (comp != null) && (Date.now() >= comp);
+    return { board:b, label:label, willClose:willClose, comp:comp };
+  });
+  const closing = outcome.filter(function(o){ return o.willClose; });
+
+  var msg = 'Clear the admin override for ' + names + '?\\n\\n'
+          + (targets.length>1 ? 'They go' : 'It goes') + ' back to the computed KvK schedule.';
+  if (closing.length) {
+    msg += '\\n\\n⚠️ Heads up — the KvK deadline has ALREADY PASSED for: '
+         + closing.map(function(o){ return o.label; }).join(', ')
+         + '.\\nClearing the override will CLOSE ' + (closing.length>1 ? 'these boards' : 'this board') + ' again.'
+         + '\\n\\nTo keep ' + (closing.length>1 ? 'them' : 'it') + ' open, use "Set Deadline" with a future time instead.';
+  }
+  if (!confirm(msg)) return;
+
   MS.boardDeadlines = MS.boardDeadlines || {};
   targets.forEach(function(b){ delete MS.boardDeadlines[b]; });
   if (targets.length === MS_BOARDS.length) MS.deadline = null;
@@ -4640,7 +4664,11 @@ function msReopenSubmissions() {
   msUpdateDeadlineBanners();
   if (typeof msRenderScheduleStrip==='function') msRenderScheduleStrip();
   if (typeof msRenderBoardTimers==='function') msRenderBoardTimers();
-  toast('Reopened: ' + names);
+
+  const nowClosed = outcome.filter(function(o){ return o.willClose; }).map(function(o){ return o.label; });
+  toast(nowClosed.length
+    ? ('Override cleared — now CLOSED: ' + nowClosed.join(', '))
+    : ('Override cleared — back on the KvK schedule: ' + names));
 }
 function msUpdateDeadlineBanners() {
   if(typeof msUpdateSubmitState==='function') msUpdateSubmitState();
@@ -4953,15 +4981,43 @@ function msBoardTimerBlocksHTML(){
   var sched;
   try { sched = msSchedule(now); } catch(e){ return ''; }
   return MS_BOARDS.map(function(b){
-    var m = MS_BOARD_META[b]; var bs = sched.boards[b];
-    var allocMs = bs.allocAt - now, dlMs = bs.deadline - now;
-    var allocDone = msAllocIsCurrent(b, sched);
-    var allocStr = allocDone ? 'Already run' : (allocMs>0 ? 'Happens in '+msFmtCountdown(allocMs) : 'Overdue — pending next check');
-    var dlStr = dlMs>0 ? 'Closes in '+msFmtCountdown(dlMs) : 'Closed';
-    return '<div style="flex:1;min-width:220px;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px 12px">'+
+    var m = MS_BOARD_META[b];
+    var bs = sched.boards[b];
+
+    // The deadline the board is ACTUALLY judged by — admin override wins.
+    var dl = msBoardDeadline(b);
+    if(dl == null) dl = bs.deadline;
+    var dlMs = dl - now;
+    var overridden = msBoardIsOverridden(b);
+
+    // Allocation status comes from whether a result actually exists, never the clock.
+    var res = (MS._allocByBoard || {})[b] || null;
+    var ranThisCycle = msAllocIsCurrent(b, sched);
+    var allocMs = bs.allocAt - now;
+    var allocStr, allocCol;
+    if(ranThisCycle && res){
+      var placed = (res.winners && res.winners.length) || 0;
+      allocStr = 'Run — ' + placed + '/' + MS_TOTAL_SLOTS + ' placed';
+      allocCol = placed > 0 ? 'var(--green)' : 'var(--text2)';
+    } else if(allocMs > 0){
+      allocStr = 'Happens in ' + msFmtCountdown(allocMs);
+      allocCol = '#ff9d4d';
+    } else {
+      allocStr = 'Not run yet';
+      allocCol = '#ff7070';
+    }
+
+    var dlStr = dlMs > 0 ? ('Closes in ' + msFmtCountdown(dlMs)) : 'Closed';
+    var dlCol = dlMs > 0 ? '#ff9d4d' : '#ff7070';
+    var tag = overridden
+      ? '<div style="font-size:10.5px;color:var(--gold);margin-top:3px">✎ Admin override — not the KvK schedule</div>'
+      : '';
+
+    return '<div style="flex:1;min-width:220px;background:var(--bg4);border:1px solid '+(overridden?'rgba(217,166,72,.45)':'var(--border)')+';border-radius:8px;padding:10px 12px">'+
       '<div style="font-weight:700;color:'+m.color+';font-size:13px;margin-bottom:4px">'+m.icon+' '+m.label+' Minister Spot</div>'+
-      '<div style="font-size:12px;color:var(--text2)">⚙️ Automatic assignment: <strong style="color:'+(allocDone?'var(--green)':(allocMs>0?'#ff9d4d':'#ff7070'))+'">'+allocStr+'</strong></div>'+
-      '<div style="font-size:12px;color:var(--text2)">⏰ Submission deadline: <strong style="color:'+(dlMs>0?'#ff9d4d':'#ff7070')+'">'+dlStr+'</strong></div>'+
+      '<div style="font-size:12px;color:var(--text2)">⚙️ Automatic assignment: <strong style="color:'+allocCol+'">'+allocStr+'</strong></div>'+
+      '<div style="font-size:12px;color:var(--text2)">⏰ Submission deadline: <strong style="color:'+dlCol+'">'+dlStr+'</strong></div>'+
+      tag+
     '</div>';
   }).join('');
 }
