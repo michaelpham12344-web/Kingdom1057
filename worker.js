@@ -541,6 +541,13 @@ select.lgInput{cursor:pointer;font-size:15px;}
 .ms2stepper .ms-step-tab:first-child .ms2line-l,.ms2stepper .ms-step-tab:last-child .ms2line-r{background:transparent;}
 .ms2manage{margin-left:8px;flex:0 0 auto!important;}
 @media (max-width:560px){.ms2head{padding:20px 16px 14px;}.ms2stepper{padding:14px 2px 4px;}.ms2stepper .ms-step-tab .ms2lab{font-size:8.5px;}}
+/* ══ Alliance zones — full-width alliances, teams spread across, 2 leaders per row ══ */
+.bs4ally{width:100%;flex:0 0 100%;margin-bottom:14px;}
+.bs4teamgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;align-items:start;}
+/* was flex + 140px fixed cards, so only one card fitted per 320px column */
+.bs-team-zone{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;align-content:start;}
+.bs-team-zone .bs-leader-card{width:auto;min-width:0;cursor:default;}
+@media (max-width:640px){.bs-team-zone{grid-template-columns:1fr;}.bs4teamgrid{grid-template-columns:1fr;}}
 .field{display:flex;flex-direction:column;}
 .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;}
 .btn{font-family:var(--body);font-size:13px;font-weight:600;letter-spacing:.03em;padding:7px 16px;border-radius:6px;border:none;cursor:pointer;transition:all .15s;white-space:nowrap;}
@@ -1009,7 +1016,7 @@ document.addEventListener('touchend',function(e){
 
         <div class="bs4lbl">Alliances</div>
         <div id="bsAllianceList" style="margin-bottom:10px"></div>
-        <div class="bs4row" style="margin-bottom:20px">
+        <div class="bs4row" id="bsAddAllianceRow" style="margin-bottom:20px">
           <input type="text" id="bsNewAllianceName" placeholder="New alliance name…" style="flex:1;min-width:150px">
           <button class="btn btn-ghost btn-sm" onclick="bsAddAlliance()">+ Add Alliance</button>
         </div>
@@ -2694,7 +2701,7 @@ function teamBoxHTML(t){
       : ('background:var(--bg4);color:var(--text2);border-color:var(--border2);');
     return '<span class="ally-pill" style="'+st+'" onclick="bsSetTeamAlliance('+"'"+t.id+"'"+','+"'"+a.id+"'"+')">'+a.name+'</span>';
   }).join('');
-  return \`<div class="bs-team-box" id="bsteam-\${t.id}" style="background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px">
+  return \`<div class="bs-team-box" id="bsteam-\${t.id}" style="background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:10px">
       <div class="bs-team-header" style="display:flex;align-items:center;gap:6px"><span style="flex:1;font-weight:600">\${t.name}</span><span onclick="bsRenameTeam('\${t.id}')" title="Rename" style="cursor:pointer;color:var(--text3);font-size:12px">✎</span><span onclick="bsDeleteTeam('\${t.id}')" title="Delete team" style="cursor:pointer;color:#e0685f;font-size:13px">✕</span></div>
       <div class="bs-alliance-toggle" style="display:flex;gap:5px;flex-wrap:wrap;margin:7px 0 8px">\${pills}</div>
       <button style="width:100%;margin-bottom:8px;background:rgba(201,165,92,.15);border:1.5px solid var(--accent);color:var(--accent2);font-weight:700;font-size:12px;padding:7px;border-radius:6px;cursor:pointer;font-family:var(--head);letter-spacing:.03em" onclick="bsOpenAddModal('team','\${t.id}')">➕ Add Leader</button>
@@ -2710,15 +2717,21 @@ function renderBsAllianceZones(){
   var cards='';
   S.alliances.forEach(function(a){
     var teams=S.teams.filter(function(t){return t.alliance===a.id;});
-    cards+='<div class="card" style="width:320px;flex:0 0 320px;margin-bottom:0"><div class="card-title" style="color:'+a.color+'">🛡️ '+a.name+'</div>'+
-      (teams.length?teams.map(teamBoxHTML).join(''):'<div style="color:var(--text3);font-size:12px">No teams yet. Add a team, then use its alliance buttons to place it here.</div>')+
+    cards+='<div class="card bs4ally"><div class="card-title" style="color:'+a.color+'">🛡️ '+a.name+'</div>'+
+      (teams.length
+        ? '<div class="bs4teamgrid">'+teams.map(teamBoxHTML).join('')+'</div>'
+        : '<div style="color:var(--text3);font-size:12px">No teams yet. Add a team, then use its alliance buttons to place it here.</div>')+
       '</div>';
   });
   var un=S.teams.filter(function(t){return !t.alliance || !known[t.alliance];});
   if(un.length){
-    cards+='<div class="card" style="width:320px;flex:0 0 320px;margin-bottom:0"><div class="card-title" style="color:var(--text3)">📦 Unassigned</div>'+un.map(teamBoxHTML).join('')+'</div>';
+    cards+='<div class="card bs4ally"><div class="card-title" style="color:var(--text3)">📦 Unassigned</div><div class="bs4teamgrid">'+un.map(teamBoxHTML).join('')+'</div></div>';
   }
-  el.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:14px">'+cards+'</div>';
+  el.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:0">'+cards+'</div>';
+
+  // Max 2 alliances — hide the "add alliance" row once both exist.
+  var _row=document.getElementById('bsAddAllianceRow');
+  if(_row) _row.style.display=(S.alliances.length>=2)?'none':'';
 }
 function bsRenameTeam(teamId){
   var t=S.teams.find(function(x){return x.id===teamId;}); if(!t) return;
@@ -2735,9 +2748,14 @@ function bsDeleteTeam(teamId){
   S.teams=S.teams.filter(function(x){return x.id!==teamId;});
   renderBattleStrategy(); if(typeof renderSetup==='function') renderSetup(); syncQueuePush();
 }
+const BS_MAX_ALLIANCES = 2;
 function bsAddAlliance(){
   bsEnsureAlliances();
   var el=document.getElementById('bsNewAllianceName'); if(!el) return;
+  if(S.alliances.length >= BS_MAX_ALLIANCES){
+    toast('Maximum ' + BS_MAX_ALLIANCES + ' alliances \u2014 rename or remove one first');
+    return;
+  }
   var name=(el.value||'').trim(); if(!name){ toast('Enter an alliance name'); return; }
   var color=BS_ALLIANCE_PALETTE[S.alliances.length % BS_ALLIANCE_PALETTE.length];
   S.alliances.push({id:'ally_'+Date.now(), name:name, color:color});
