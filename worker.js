@@ -7579,20 +7579,12 @@ export default {
       } catch(e) { return json({ok:false,error:e.message},400); }
     }
 
-    // Gift redemption log
-    if (url.pathname==='/gift-log' && request.method==='GET') {
-      const _role = await verifyToken(env, bearer(request));
-      if (!_role) return json({ok:false, error:'unauthorized'}, 401);
-      const raw = await env.SVS_KV.get(GIFT_LOG_KEY);
-      const log = raw ? JSON.parse(raw) : [];
-      const display = log.map(e=>({
-        time: e.time,
-        code: (e.codes||[]).join(', '),
-        results: (e.results||[]).map(r=>({name:r.name,ok:r.ok,err:r.err}))
-      }));
-      return json({log:display});
-    }
-
+if (url.pathname==='/gift-log' && request.method==='GET') {
+  const _role = await verifyToken(env, bearer(request));
+  if (!_role) return json({ok:false, error:'unauthorized'}, 401);
+  const raw = await env.SVS_KV.get(GIFT_LOG_KEY);
+  return json({ log: raw ? JSON.parse(raw) : [] });
+}
     // ── AI Vision OCR for speedup screenshots ──
     if (url.pathname==='/ocr-speedups' && request.method==='POST') {
       const _role = await verifyToken(env, bearer(request));
