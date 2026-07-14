@@ -510,6 +510,35 @@ select.lgInput{cursor:pointer;font-size:15px;}
 .bs4zone{border-radius:11px;padding:15px;background:#1a140f;border:1px solid var(--border);}
 .bs4zone .bs4zh{font-family:var(--head);font-size:12px;letter-spacing:.08em;margin-bottom:11px;color:var(--accent2);}
 @media (max-width:700px){.bs4pane{padding:16px 14px 26px;}.bs4tabs{padding:0 14px;}.bs4top{padding:14px;}.bs4tab{margin-right:18px;}}
+/* ══ MINISTER SPOTS (design 2a) ══ */
+.ms2wrap{max-width:560px;margin:0 auto;}
+.ms2head{padding:24px 22px 18px;border-bottom:1px solid rgba(201,165,92,.12);background:linear-gradient(180deg,rgba(168,50,44,.16),transparent);border-radius:16px 16px 0 0;}
+.ms2id{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
+.ms2crest{position:relative;width:38px;height:44px;flex-shrink:0;}
+.ms2crest .ms2n{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--head);font-weight:700;font-size:10px;color:var(--gold);padding-top:3px;}
+.ms2title{font-family:var(--head);font-size:18px;font-weight:700;color:var(--text);letter-spacing:.02em;}
+.ms2who{font-size:11.5px;color:var(--text3);}
+.ms2who b{color:var(--text2);}
+.ms2dl{display:flex;align-items:center;gap:10px;background:rgba(217,166,72,.08);border:1px solid rgba(217,166,72,.25);border-radius:10px;padding:9px 13px;}
+.ms2dl.closed{background:rgba(224,69,69,.08);border-color:rgba(224,69,69,.35);}
+.ms2dl .ms2dlt{font-size:11px;color:var(--text2);}
+.ms2dl .ms2dlv{font-family:var(--mono);font-size:15px;color:var(--gold);}
+.ms2dl.closed .ms2dlv{color:var(--enemy);}
+/* stepper — the .ms-step-tab buttons keep their IDs, msGoStep still toggles .active */
+.ms2stepper{display:flex;align-items:flex-start;padding:16px 6px 6px;gap:0;}
+.phase-tabs.ms2stepper{margin-bottom:14px;}
+.ms2stepper .ms-step-tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;background:none;border:none;padding:0;position:relative;min-width:0;}
+.ms2stepper .ms-step-tab .ms2dot{width:26px;height:26px;flex-shrink:0;border-radius:50%;background:transparent;border:1.5px solid var(--border2);color:var(--text3);font-family:var(--head);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;transition:.18s;}
+.ms2stepper .ms-step-tab .ms2lab{font-size:9.5px;font-weight:600;letter-spacing:.03em;color:var(--text3);text-align:center;line-height:1.25;}
+.ms2stepper .ms-step-tab.active .ms2dot{background:var(--gold);border-color:var(--gold);color:#100c0a;}
+.ms2stepper .ms-step-tab.active .ms2lab{color:var(--text);}
+.ms2stepper .ms-step-tab.done .ms2dot{background:var(--green);border-color:var(--green);color:#100c0a;}
+.ms2stepper .ms-step-tab.done .ms2lab{color:var(--text2);}
+.ms2stepper .ms-step-tab .ms2bar{display:flex;align-items:center;width:100%;}
+.ms2stepper .ms-step-tab .ms2line{flex:1;height:2px;background:rgba(201,165,92,.2);}
+.ms2stepper .ms-step-tab:first-child .ms2line-l,.ms2stepper .ms-step-tab:last-child .ms2line-r{background:transparent;}
+.ms2manage{margin-left:8px;flex:0 0 auto!important;}
+@media (max-width:560px){.ms2head{padding:20px 16px 14px;}.ms2stepper{padding:14px 2px 4px;}.ms2stepper .ms-step-tab .ms2lab{font-size:8.5px;}}
 .field{display:flex;flex-direction:column;}
 .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;}
 .btn{font-family:var(--body);font-size:13px;font-weight:600;letter-spacing:.03em;padding:7px 16px;border-radius:6px;border:none;cursor:pointer;transition:all .15s;white-space:nowrap;}
@@ -1104,30 +1133,64 @@ document.addEventListener('touchend',function(e){
 
 <!-- MINISTER SPOTS PAGE -->
 <div id="page-minister" class="page">
+ <div class="ms2wrap">
 
-  <div class="card" style="margin-bottom:14px">
-    <div class="card-title">👑 Minister Spots</div>
-    <div style="color:var(--text2);font-size:13px;line-height:1.8">
-      <strong style="color:var(--text)">How to use:</strong><br>
-      1. Each player uploads a screenshot of their in-game speedup inventory and fills in their amounts.<br>
-      2. Set how much of each speedup type you plan to use this KvK using the sliders.<br>
-      3. Pick your preferred timeslots (minimum 4) — these are UTC 30-minute windows across a full day.<br>
-      4. The leader runs the allocation to rank players and assign slots — highest committed hours gets priority.<br>
+  <!-- HEADER — crest, identity, deadline strip (design 2a) -->
+  <div class="ms2head">
+    <div class="ms2id">
+      <div class="ms2crest">
+        <svg width="38" height="44" viewBox="0 0 60 68" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M30 2 L56 11 V35 C56 51 44 61 30 66 C16 61 4 51 4 35 V11 Z" fill="rgba(217,166,72,.1)" stroke="#d9a648" stroke-width="2.6"/></svg>
+        <div class="ms2n">1057</div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="ms2title">Minister Spots</div>
+        <div class="ms2who" id="ms2Who">Kingdom 1057</div>
+      </div>
     </div>
-    <!-- KvK schedule (embedded, same design as the Manage Spots board timers) -->
+    <div class="ms2dl" id="ms2Deadline">
+      <span style="font-size:15px" id="ms2DlIcon">&#8987;</span>
+      <div style="flex:1;min-width:0">
+        <div class="ms2dlt" id="ms2DlLabel">Submissions close in</div>
+        <div class="ms2dlv" id="ms2DlValue">&#8212;</div>
+      </div>
+    </div>
+    <!-- KvK schedule strip (unchanged — msRenderScheduleStrip writes here) -->
     <div id="msScheduleStrip" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"></div>
   </div>
 
-  <!-- STEP TABS -->
-  <div class="phase-tabs" style="margin-bottom:18px;align-items:center">
-    <button class="tab ms-step-tab" id="msStepTab0" onclick="msGoStep(0)" style="display:none">📋 My Submission</button>
-    <button class="tab ms-step-tab" id="msStepTabA" onclick="msGoApply()">1. Apply</button>
-    <button class="tab ms-step-tab active" id="msStepTab1" onclick="msGoStep(1)">2. Upload</button>
-    <button class="tab ms-step-tab" id="msStepTab2" onclick="msGoStep(2)">3. Verify</button>
-    <button class="tab ms-step-tab" id="msStepTab3" onclick="msGoStep(3)">4. Commitment</button>
-    <button class="tab ms-step-tab" id="msStepTab4" onclick="msGoStep(4)">5. Timeslots &amp; Submit</button>
-    <button class="tab ms-step-tab" id="msStepTab5" onclick="msOpenManage()" style="display:none;color:var(--gold);border-color:var(--gold);margin-left:auto">👑 Manage Spots <span title="Leader controls for Minister Spots. Lock players into specific slots, manually assign or move anyone (even non-submitters), and review who wasn't selected and why." style="cursor:help;opacity:.7;font-size:11px">ⓘ</span></button>
+  <!-- STEPPER — same button IDs, so msGoStep()'s .active logic is untouched -->
+  <div class="phase-tabs ms2stepper">
+    <button class="tab ms-step-tab" id="msStepTab0" onclick="msGoStep(0)" style="display:none">
+      <span class="ms2bar"><span class="ms2line ms2line-l"></span><span class="ms2dot">&#10003;</span><span class="ms2line ms2line-r"></span></span>
+      <span class="ms2lab">My Entry</span>
+    </button>
+    <button class="tab ms-step-tab" id="msStepTabA" onclick="msGoApply()">
+      <span class="ms2bar"><span class="ms2line ms2line-l"></span><span class="ms2dot">1</span><span class="ms2line ms2line-r"></span></span>
+      <span class="ms2lab">Apply</span>
+    </button>
+    <button class="tab ms-step-tab active" id="msStepTab1" onclick="msGoStep(1)">
+      <span class="ms2bar"><span class="ms2line ms2line-l"></span><span class="ms2dot">2</span><span class="ms2line ms2line-r"></span></span>
+      <span class="ms2lab">Upload</span>
+    </button>
+    <button class="tab ms-step-tab" id="msStepTab2" onclick="msGoStep(2)">
+      <span class="ms2bar"><span class="ms2line ms2line-l"></span><span class="ms2dot">3</span><span class="ms2line ms2line-r"></span></span>
+      <span class="ms2lab">Verify</span>
+    </button>
+    <button class="tab ms-step-tab" id="msStepTab3" onclick="msGoStep(3)">
+      <span class="ms2bar"><span class="ms2line ms2line-l"></span><span class="ms2dot">4</span><span class="ms2line ms2line-r"></span></span>
+      <span class="ms2lab">Commit</span>
+    </button>
+    <button class="tab ms-step-tab" id="msStepTab4" onclick="msGoStep(4)">
+      <span class="ms2bar"><span class="ms2line ms2line-l"></span><span class="ms2dot">5</span><span class="ms2line ms2line-r"></span></span>
+      <span class="ms2lab">Timeslots</span>
+    </button>
+    <button class="tab ms-step-tab ms2manage" id="msStepTab5" onclick="msOpenManage()" style="display:none;color:var(--gold)">
+      <span class="ms2bar"><span class="ms2dot" style="border-color:var(--gold);color:var(--gold)">&#9881;</span></span>
+      <span class="ms2lab" style="color:var(--gold)">Manage</span>
+    </button>
   </div>
+ </div>
+
 
   <!-- STEP 1: APPLY / BOARD PICK (rendered below the step tabs, like every other step) -->
   <div id="msBoardPick" class="card" style="display:none;margin-bottom:18px">
@@ -4276,6 +4339,65 @@ function msFillRangeDropdowns(){
     fromSel.value=14; toSel.value=44;
   } catch(e){ console.error('msFillRangeDropdowns failed:', e); }
 }
+
+// ── Minister Spots design 2a — header sync. Read-only: it mirrors the identity
+//    that msStep1 already renders and formats the deadline msBoardDeadline() already
+//    computes. No state is written, no logic branches on it.
+function ms2SyncHeader(){
+  try {
+    var who = document.getElementById('ms2Who');
+    if(who){
+      var n = document.getElementById('msIdentityName');
+      var a = document.getElementById('msIdentityAlliance');
+      var nm = (n && n.textContent && n.textContent !== '—') ? n.textContent : '';
+      var al = (a && a.textContent && a.textContent !== '—') ? a.textContent : '';
+      who.innerHTML = nm ? ('Signed in as <b>' + nm + '</b>' + (al ? ' · ' + al : '')) : 'Kingdom 1057';
+    }
+
+    var box = document.getElementById('ms2Deadline');
+    var lab = document.getElementById('ms2DlLabel');
+    var val = document.getElementById('ms2DlValue');
+    var ico = document.getElementById('ms2DlIcon');
+    if(!box || !val) return;
+
+    // Earliest live board deadline; falls back to the manual global override.
+    var dl = null;
+    try {
+      var boards = (MS.draft && MS.draft.boards && MS.draft.boards.length) ? MS.draft.boards : null;
+      if(boards){
+        boards.forEach(function(b){
+          var d = msBoardDeadline(b);
+          if(d != null && (dl == null || d < dl)) dl = d;
+        });
+      }
+    } catch(e){}
+    if(dl == null){ var g = msGetDeadline(); dl = g ? g.getTime() : null; }
+
+    if(dl == null){
+      box.classList.remove('closed');
+      if(lab) lab.textContent = 'Submissions';
+      val.textContent = 'Deadline not set';
+      if(ico) ico.innerHTML = '&#8987;';
+      return;
+    }
+    var rem = dl - Date.now();
+    if(rem <= 0){
+      box.classList.add('closed');
+      if(lab) lab.textContent = 'Submissions are';
+      val.textContent = 'CLOSED';
+      if(ico) ico.innerHTML = '&#128274;';
+      return;
+    }
+    box.classList.remove('closed');
+    if(lab) lab.textContent = 'Submissions close in';
+    if(ico) ico.innerHTML = '&#8987;';
+    var s = Math.floor(rem/1000);
+    var d = Math.floor(s/86400), h = Math.floor(s%86400/3600), m = Math.floor(s%3600/60), sec = s%60;
+    var p = function(x){ return String(x).padStart(2,'0'); };
+    val.textContent = (d ? d + 'd ' : '') + p(h) + ':' + p(m) + ':' + p(sec);
+  } catch(e) {}
+}
+setInterval(ms2SyncHeader, 1000);
 
 // ── Deadline management ──
 function msGetDeadline() {
