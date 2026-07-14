@@ -480,6 +480,36 @@ select.lgInput{cursor:pointer;font-size:15px;}
 .lgPwErr{color:#ff7070;font-size:12.5px;margin-top:8px;}
 .lgFoot{text-align:center;font-family:var(--head);font-size:9.5px;letter-spacing:.26em;color:#3e352a;text-transform:uppercase;margin-top:26px;}
 @media (max-width:520px){.lgBody{padding:18px 18px 26px;}.lgWord{font-size:23px;}}
+/* ══ BATTLE STRATEGY (design 4a) ══ */
+.bs4app{max-width:1000px;margin:0 auto;border:1px solid rgba(201,165,92,.22);border-radius:20px;overflow:hidden;background:radial-gradient(900px 400px at 50% -5%,rgba(168,50,44,.12),transparent 60%),#150f0c;box-shadow:0 34px 90px rgba(0,0,0,.5);}
+.bs4top{display:flex;justify-content:space-between;align-items:center;padding:16px 22px;border-bottom:1px solid var(--border);background:rgba(11,9,8,.6);flex-wrap:wrap;gap:14px;}
+.bs4brand{display:flex;align-items:center;gap:12px;}
+.bs4crest{position:relative;width:34px;height:39px;flex-shrink:0;}
+.bs4crest .bs4num1057{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--head);font-weight:700;font-size:9px;color:var(--gold);padding-top:3px;}
+.bs4title{font-family:var(--head);font-size:16px;font-weight:700;letter-spacing:.03em;color:var(--text);}
+.bs4sub{font-size:11px;color:var(--text3);}
+.bs4clockrow{display:flex;align-items:center;gap:5px;justify-content:flex-end;}
+.bs4clockrow .mono{font-family:var(--mono);font-size:20px;color:var(--gold);background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:4px 9px;min-width:40px;text-align:center;}
+.bs4clocklbl{font-size:9.5px;color:var(--text3);letter-spacing:.16em;text-align:right;margin-top:4px;}
+.bs4tabs{display:flex;padding:0 22px;border-bottom:1px solid var(--border);background:rgba(11,9,8,.35);}
+.bs4tab{padding:15px 4px;margin-right:28px;cursor:pointer;font-family:var(--head);font-size:14px;font-weight:600;color:var(--text3);background:none;border:none;border-bottom:2.5px solid transparent;display:flex;align-items:center;gap:8px;}
+.bs4tab .bs4n{font-family:var(--mono);font-size:11px;background:var(--bg4);color:var(--text3);border-radius:5px;padding:2px 7px;}
+.bs4tab.active{color:var(--text);border-bottom-color:var(--gold);}
+.bs4tab.active .bs4n{background:var(--gold);color:#100c0a;}
+.bs4pane{padding:22px 22px 30px;}
+.bs4hint{font-size:13px;color:var(--text3);margin-bottom:18px;display:flex;align-items:center;gap:8px;}
+.bs4card{background:#16130f;border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px;}
+.bs4card h3{font-family:var(--head);font-size:15px;font-weight:600;color:var(--text);margin:0 0 4px 0;}
+.bs4card .bs4desc{font-size:12.5px;color:var(--text3);margin-bottom:16px;}
+.bs4grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;}
+.bs4lbl{font-size:10.5px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;}
+.bs4row{display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;}
+.bs4console{background:radial-gradient(400px 200px at 20% 0%,rgba(217,166,72,.1),transparent),#16130f;border:1.5px solid rgba(217,166,72,.3);border-radius:14px;padding:18px;margin-bottom:16px;}
+.bs4console h3{color:var(--gold);}
+.bs4converge{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.bs4zone{border-radius:11px;padding:15px;background:#1a140f;border:1px solid var(--border);}
+.bs4zone .bs4zh{font-family:var(--head);font-size:12px;letter-spacing:.08em;margin-bottom:11px;color:var(--accent2);}
+@media (max-width:700px){.bs4pane{padding:16px 14px 26px;}.bs4tabs{padding:0 14px;}.bs4top{padding:14px;}.bs4tab{margin-right:18px;}}
 .field{display:flex;flex-direction:column;}
 .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;}
 .btn{font-family:var(--body);font-size:13px;font-weight:600;letter-spacing:.03em;padding:7px 16px;border-radius:6px;border:none;cursor:pointer;transition:all .15s;white-space:nowrap;}
@@ -881,163 +911,196 @@ document.addEventListener('touchend',function(e){
 <div id="toast">Copied!</div>
 
 <!-- ══════════════════════ RALLY COORDINATOR ══════════════════════ -->
-<div id="page-coordinator" class="page">
-  <div class="card">
-    <div class="card-title">👥 Rally Leaders</div>
-    <div class="row">
-      <div class="field"><label>Name</label><input type="text" id="rlName" placeholder="e.g. Olaf" style="width:120px"></div>
-      <div class="field"><label>March time (sec)</label><input type="number" id="rlMarch" placeholder="35" min="1" max="300" style="width:90px"></div>
-      <div class="field"><label>TG Tier</label>
-        <select id="rlTier" style="width:80px"><option value="TG5">TG5</option><option value="TG4">TG4</option><option value="TG3">TG3</option></select>
-      </div>
-      <div class="field"><label>Rally duration</label>
-        <select id="rlDur" style="width:90px"><option value="300">5 min</option><option value="600">10 min</option></select>
-      </div>
-      <div class="field"><label>Team</label><select id="rlTeam" style="width:110px"><option value="">No team</option></select></div>
-      <button class="btn btn-primary" onclick="addLeader()">+ Add Leader</button>
-    </div>
-    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
-    <table style="min-width:680px"><thead><tr><th>Name</th><th>March</th><th>Tier</th><th>Team</th><th>Status</th><th>Duration</th><th>Launch Time</th><th>Timer</th><th>Cooldown</th><th></th></tr></thead>
-    <tbody id="leaderBody"></tbody></table>
-    </div>
-  </div>
-
-
-</div>
-
-<!-- BATTLE STRATEGY PAGE -->
+<!-- ══════════════════ BATTLE STRATEGY — design 4a ══════════════════ -->
+<!-- Replaces the old page-coordinator (Rally Leaders table) and page-setup (Team Setup).
+     Every element ID those pages owned that is still read by JS lives on below:
+     garrisonAllianceName / attackAllianceName (read by the sync payload + bsEnsureAlliances). -->
 <div id="page-strategy" class="page">
-  <div class="bs-layout">
-  <aside class="bs-sidebar" id="bsSidebar"><div class="side-brand"><div style="font-family:var(--head);font-weight:700;letter-spacing:.06em;font-size:16px;color:var(--accent2)">KINGDOM·1057</div><div style="font-size:11px;color:var(--text3)">Battle Strategy</div></div></aside>
-  <div class="bs-main">
-  <div class="card" style="margin-bottom:14px">
-    <div onclick="bsToggleHowTo()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none">
-      <strong style="color:var(--text);font-size:13px">ℹ️ How to use</strong>
-      <span id="bsHowToChevron" style="color:var(--text3);font-size:12px">▼</span>
-    </div>
-    <div class="sim-info" id="bsHowToBody" style="margin:10px 0 0 0">
-      Add leaders by Player ID in the sidebar, then tap <b>+ Add leader</b> on a turret or team — or the ⇄ button on any leader card — to place them. (On desktop you can also drag cards.) A leader can only occupy one slot at a time. The purple bar is the 2.5h pet buff — tap it to start or stop.
-    </div>
-  </div>
+  <div class="bs4app">
 
-  <div class="card">
-    <div class="card-title">🗼 Turret Assignments</div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px" id="bsTurretGrid"></div>
-  </div>
-
-  <div id="bsAllianceZones" style="margin-bottom:18px"></div>
-
-  <!-- SHARED SETUP -->
-  <div class="card">
-    <div class="card-title">⚙️ Shared Setup</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;flex-wrap:wrap">
-      <div>
-        <label>Rally Arrival Time</label>
-        <select id="bsDur" style="width:160px;margin-bottom:4px" onchange="bsDurChanged()">
-          <option value="300">5 min</option>
-          <option value="600">10 min</option>
-        </select>
+    <!-- TOP BAR -->
+    <div class="bs4top">
+      <div class="bs4brand">
+        <div class="bs4crest">
+          <svg width="34" height="39" viewBox="0 0 60 68" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M30 2 L56 11 V35 C56 51 44 61 30 66 C16 61 4 51 4 35 V11 Z" fill="rgba(217,166,72,.1)" stroke="#d9a648" stroke-width="2.6"/></svg>
+          <div class="bs4num1057">1057</div>
+        </div>
+        <div>
+          <div class="bs4title">Battle Strategy</div>
+          <div class="bs4sub">Kingdom 1057 &#183; R4/R5 planning</div>
+        </div>
       </div>
       <div>
-        <label>Rally Start Time (UTC) — live</label>
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-          <div id="bsClockHH" class="mono" style="font-size:20px;color:var(--text);background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:6px 12px;min-width:46px;text-align:center">00</div>
-          <span style="color:var(--text2);font-size:18px">:</span>
-          <div id="bsClockMM" class="mono" style="font-size:20px;color:var(--text);background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:6px 12px;min-width:46px;text-align:center">00</div>
-          <span style="color:var(--text2);font-size:18px">:</span>
-          <div id="bsClockSS" class="mono" style="font-size:20px;color:var(--text);background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:6px 12px;min-width:46px;text-align:center">00</div>
-          <span style="font-size:11px;color:var(--text3);margin-left:6px">UTC now</span>
+        <div class="bs4clockrow">
+          <div id="bsClockHH" class="mono">00</div><span style="color:var(--text2)">:</span>
+          <div id="bsClockMM" class="mono">00</div><span style="color:var(--text2)">:</span>
+          <div id="bsClockSS" class="mono">00</div>
         </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          <button class="btn btn-gold btn-sm" id="bsOffsetBtn-15" onclick="bsSetOffset(15)">+15s</button>
-          <button class="btn btn-gold btn-sm" id="bsOffsetBtn-30" onclick="bsSetOffset(30)">+30s</button>
-          <button class="btn btn-gold btn-sm" id="bsOffsetBtn-45" onclick="bsSetOffset(45)">+45s</button>
-          <button class="btn btn-gold btn-sm" id="bsOffsetBtn-60" onclick="bsSetOffset(60)">+1m</button>
-          <button class="btn btn-gold btn-sm" id="bsOffsetBtn-120" onclick="bsSetOffset(120)">+2m</button>
-          <button class="btn btn-gold btn-sm" id="bsOffsetBtn-180" onclick="bsSetOffset(180)">+3m</button>
-          <button class="btn btn-gold btn-sm" id="bsOffsetBtn-240" onclick="bsSetOffset(240)">+4m</button>
-          <div id="bsCustomOffsetWrap" style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:8px;border:2px solid var(--border2);background:var(--bg3)">
-            <input type="number" id="bsOffsetManual" min="0" placeholder="Custom seconds" style="width:140px;font-size:14px;font-weight:600" onkeydown="if(event.key==='Enter')bsSetOffsetManual()">
-            <button class="btn btn-primary btn-sm" onclick="bsSetOffsetManual()">Set</button>
+        <div class="bs4clocklbl">UTC NOW &#183; LIVE</div>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="bs4tabs">
+      <button class="bs4tab active" id="bs4TabSetup" onclick="bsShowTab('setup')"><span class="bs4n">1</span>Setup</button>
+      <button class="bs4tab" id="bs4TabLaunch" onclick="bsShowTab('launch')"><span class="bs4n">2</span>Launch</button>
+    </div>
+
+    <!-- ══════════ TAB 1 — SETUP ══════════ -->
+    <div class="bs4pane" id="bs4PaneSetup">
+      <div class="bs4hint"><span>&#128736;</span>Set this up once at the start of a battle. You won't need to touch it again while rallies are live.</div>
+
+      <!-- HOW TO USE -->
+      <div class="bs4card" style="padding:14px 18px">
+        <div onclick="bsToggleHowTo()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none">
+          <strong style="color:var(--text);font-size:13px">&#8505;&#65039; How to use</strong>
+          <span id="bsHowToChevron" style="color:var(--text3);font-size:12px">&#9660;</span>
+        </div>
+        <div class="sim-info" id="bsHowToBody" style="margin:10px 0 0 0">
+          Add leaders by Player ID below, then tap <b>+ Add leader</b> on a turret or team — or the &#8646; button on any leader card — to place them. A leader can only occupy one slot at a time. The purple bar is the 2.5h pet buff — tap it to start or stop.
+        </div>
+      </div>
+
+      <!-- ALLIANCES & TEAMS -->
+      <div class="bs4card">
+        <h3>&#127984; Alliances &amp; Teams</h3>
+        <div class="bs4desc">Name each alliance, then create the teams that fight under them.</div>
+        <div class="bs4grid" style="margin-bottom:16px">
+          <div class="bs4zone">
+            <div class="bs4zh">&#128737; GARRISON</div>
+            <input type="text" id="garrisonAllianceName" placeholder="e.g. [GRD] Guardians" style="width:100%" oninput="updateAllianceNames()">
+          </div>
+          <div class="bs4zone">
+            <div class="bs4zh">&#9876; ATTACKING</div>
+            <input type="text" id="attackAllianceName" placeholder="e.g. [ATK] Vanguard" style="width:100%" oninput="updateAllianceNames()">
           </div>
         </div>
-        <div id="bsOffsetPreview" class="mono" style="font-size:12px;color:var(--gold);margin-top:8px"></div>
+
+        <div class="bs4lbl">Alliances</div>
+        <div id="bsAllianceList" style="margin-bottom:10px"></div>
+        <div class="bs4row" style="margin-bottom:20px">
+          <input type="text" id="bsNewAllianceName" placeholder="New alliance name…" style="flex:1;min-width:150px">
+          <button class="btn btn-ghost btn-sm" onclick="bsAddAlliance()">+ Add Alliance</button>
+        </div>
+
+        <div class="bs4lbl">Teams</div>
+        <div id="bsTeamList" style="margin-bottom:10px"></div>
+        <div class="bs4row">
+          <input type="text" id="bsNewTeamName" placeholder="New team name…" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')bsAddTeam()">
+          <button class="btn btn-primary" onclick="bsAddTeam()">+ Create Team</button>
+        </div>
+      </div>
+
+      <!-- RALLY LEADERS -->
+      <div class="bs4card">
+        <h3>&#128101; Rally Leaders</h3>
+        <div class="bs4desc">Add each rally leader by Player ID. March time drives the launch calculation.</div>
+        <div class="bs4row" style="margin-bottom:10px">
+          <div style="flex:1;min-width:150px">
+            <div class="bs4lbl">Player ID</div>
+            <div style="display:flex;gap:6px">
+              <input type="text" id="bsAddPlayerId" placeholder="158134757" style="flex:1">
+              <button class="btn btn-ghost btn-sm" onclick="bsLookupPlayer()">Look up</button>
+            </div>
+          </div>
+          <div style="width:120px">
+            <div class="bs4lbl">March (s)</div>
+            <input type="number" id="bsAddMarch" placeholder="42" min="0" max="300" style="width:100%">
+          </div>
+          <button class="btn btn-primary" onclick="bsAddLeaderById()">+ Add</button>
+        </div>
+        <div id="bsAddPreview" style="margin-bottom:16px"></div>
+
+        <div class="bs4lbl">All rally leaders</div>
+        <div id="bsLeaderOverview" style="margin-bottom:18px"></div>
+
+        <div class="bs4lbl">Rally Leader Pool &#183; unassigned</div>
+        <div id="bsLeaderPool" style="display:flex;flex-wrap:wrap;gap:10px;min-height:70px;border:2px dashed var(--border);border-radius:8px;padding:12px"></div>
+      </div>
+
+      <!-- TURRETS -->
+      <div class="bs4card">
+        <h3>&#128508; Turret Assignments</h3>
+        <div class="bs4desc">Place each leader on a turret with <b>+ Add leader</b>, or the &#8646; button on a card. Tap &#10005; to send them back to the pool.</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px" id="bsTurretGrid"></div>
+      </div>
+
+      <!-- ALLIANCE ZONES (teams + their placed leaders) -->
+      <div id="bsAllianceZones" style="margin-bottom:0"></div>
+    </div>
+
+    <!-- ══════════ TAB 2 — LAUNCH ══════════ -->
+    <div class="bs4pane" id="bs4PaneLaunch" style="display:none">
+      <div class="bs4hint"><span>&#9889;</span>Use this live, seconds before you launch. Set the offset, click a team, call out the launch times.</div>
+
+      <!-- LAUNCH CONSOLE -->
+      <div class="bs4console">
+        <h3 style="margin-bottom:14px">&#9881;&#65039; Launch Console</h3>
+        <div class="bs4grid">
+          <div>
+            <div class="bs4lbl">Rally arrival window</div>
+            <select id="bsDur" style="width:100%" onchange="bsDurChanged()">
+              <option value="300">5 min</option>
+              <option value="600">10 min</option>
+            </select>
+          </div>
+          <div>
+            <div class="bs4lbl">Launch offset from now</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+              <button class="btn btn-gold btn-sm" id="bsOffsetBtn-15" onclick="bsSetOffset(15)">+15s</button>
+              <button class="btn btn-gold btn-sm" id="bsOffsetBtn-30" onclick="bsSetOffset(30)">+30s</button>
+              <button class="btn btn-gold btn-sm" id="bsOffsetBtn-45" onclick="bsSetOffset(45)">+45s</button>
+              <button class="btn btn-gold btn-sm" id="bsOffsetBtn-60" onclick="bsSetOffset(60)">+1m</button>
+              <button class="btn btn-gold btn-sm" id="bsOffsetBtn-120" onclick="bsSetOffset(120)">+2m</button>
+              <button class="btn btn-gold btn-sm" id="bsOffsetBtn-180" onclick="bsSetOffset(180)">+3m</button>
+              <button class="btn btn-gold btn-sm" id="bsOffsetBtn-240" onclick="bsSetOffset(240)">+4m</button>
+            </div>
+            <div id="bsCustomOffsetWrap" style="display:flex;align-items:center;gap:6px;margin-top:8px;padding:4px 8px;border-radius:8px;border:2px solid var(--border2);background:var(--bg3);width:fit-content">
+              <input type="number" id="bsOffsetManual" min="0" placeholder="Custom seconds" style="width:140px;font-size:14px;font-weight:600" onkeydown="if(event.key==='Enter')bsSetOffsetManual()">
+              <button class="btn btn-primary btn-sm" onclick="bsSetOffsetManual()">Set</button>
+            </div>
+          </div>
+        </div>
+        <div class="bs4converge">
+          <div id="bsOffsetPreview" class="mono" style="font-size:14px;color:var(--gold)"></div>
+        </div>
+      </div>
+
+      <!-- FINAL CALCULATION -->
+      <div class="bs4card">
+        <h3>&#128203; Final Calculation</h3>
+        <div class="bs4desc">Click a team to calculate launch times for its leaders, using the offset above. The longest march launches first so every rally lands together.</div>
+        <div style="display:flex;gap:14px;align-items:center;margin-bottom:10px;font-size:11px;color:var(--text3)">
+          <span><span class="team-dot free"></span>Free</span>
+          <span><span class="team-dot rallying"></span>Rallying</span>
+        </div>
+        <div id="bsTeamButtons" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
+        <div id="bsFinalResult">
+          <div style="color:var(--text3);font-size:13px">Select an offset, then click a team to see the schedule.</div>
+        </div>
+      </div>
+
+      <!-- PET ACTIVATION PLAN -->
+      <div class="bs4card">
+        <h3>&#128062; Pet Activation Plan</h3>
+        <div class="bs4desc">Select leaders, pick a UTC time, and add a plan. At that time their 2.5h pet buff auto-activates for everyone in the plan.</div>
+        <div id="bsPetSelChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
+        <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+          <div class="field" style="margin:0"><label>Activation time (UTC)</label><input type="time" id="bsPetPlanTime" step="60" style="width:130px"></div>
+          <button class="btn btn-primary" onclick="bsAddPetPlan()">+ Add Plan</button>
+        </div>
+        <div id="bsPetPlanList"></div>
       </div>
     </div>
+
   </div>
 
-  <!-- FINAL CALCULATION -->
-  <div class="card">
-    <div class="card-title">📋 Final Calculation</div>
-    <p style="color:var(--text2);font-size:12px;margin-bottom:12px">Click a team below to calculate launch times for its leaders, based on the offset selected above.</p>
-    <div id="bsTeamButtons" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
-    <div style="display:flex;gap:14px;align-items:center;margin-bottom:10px;font-size:11px;color:var(--text3)">
-      <span><span class="team-dot free"></span>Free</span>
-      <span><span class="team-dot rallying"></span>Rallying</span>
-    </div>
-    <div id="bsFinalResult">
-      <div style="color:var(--text3);font-size:13px">Select an offset, then click a team to see the schedule.</div>
-    </div>
-  </div>
-
-<!-- PET ACTIVATION PLAN -->
-  <div class="card">
-    <div class="card-title">🐾 Pet Activation Plan</div>
-    <p style="color:var(--text2);font-size:12px;margin-bottom:10px">Select leaders, pick a UTC time, and add a plan. At that time their 2.5h pet buff auto-activates for everyone in the plan.</p>
-    <div id="bsPetSelChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
-    <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-      <div class="field" style="margin:0"><label>Activation time (UTC)</label><input type="time" id="bsPetPlanTime" step="60" style="width:130px"></div>
-      <button class="btn btn-primary" onclick="bsAddPetPlan()">+ Add Plan</button>
-    </div>
-    <div id="bsPetPlanList"></div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">👥 Rally Leader Pool</div>
-    <p style="color:var(--text2);font-size:12px;margin-bottom:12px">Unassigned leaders. Use the ⇄ button on a card to place it, or a + Add leader button on a turret or team.</p>
- <div id="bsLeaderPool"
-      style="display:flex;flex-wrap:wrap;gap:10px;min-height:70px;border:2px dashed var(--border);border-radius:8px;padding:12px">
-    </div>
-  </div>
   <div id="bsStickyBar" style="display:none">
     <span id="bsStickyInfo" style="flex:1;font-size:12px;color:var(--text2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-    <button class="btn btn-gold btn-sm" onclick="bsCopySelectedTeam()">📋 Copy</button>
-  </div>
-  </div>
+    <button class="btn btn-gold btn-sm" onclick="bsCopySelectedTeam()">&#128203; Copy</button>
   </div>
 </div>
 
-
-<!-- ══════════════════════ TEAM SETUP ══════════════════════ -->
-<div id="page-setup" class="page">
-  <div class="grid2">
-    <div class="card">
-      <div class="card-title">🏰 Garrison Alliance</div>
-      <div class="row" style="margin-bottom:10px">
-        <div class="field"><label>Alliance name</label><input type="text" id="garrisonAllianceName" placeholder="e.g. [GRD]" style="width:140px" oninput="updateAllianceNames()"></div>
-      </div>
-      <div class="sec-title">Teams assigned to Garrison</div>
-      <div id="garrisonTeamList"><div style="color:var(--text3);font-size:12px">No teams assigned.</div></div>
-    </div>
-    <div class="card">
-      <div class="card-title">⚔️ Attacking Alliance</div>
-      <div class="row" style="margin-bottom:10px">
-        <div class="field"><label>Alliance name</label><input type="text" id="attackAllianceName" placeholder="e.g. [ATK]" style="width:140px" oninput="updateAllianceNames()"></div>
-      </div>
-      <div class="sec-title">Teams assigned to Attacking</div>
-      <div id="attackTeamList"><div style="color:var(--text3);font-size:12px">No teams assigned.</div></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">👥 Teams</div>
-    <div class="row">
-      <div class="field"><label>New team name</label><input type="text" id="newTeamName" placeholder="e.g. Team Alpha" style="width:150px"></div>
-      <button class="btn btn-primary" onclick="addTeam()">+ Create Team</button>
-    </div>
-    <div id="teamsList"></div>
-  </div>
-</div>
 
 <!-- MINISTER SPOTS PAGE -->
 <div id="page-minister" class="page">
@@ -2036,7 +2099,9 @@ function copyAllLaunch(){
   copyText(lines.join('\\n'));
 }
 function addLeader(){
-  const name=document.getElementById('rlName').value.trim();
+  const _rn=document.getElementById('rlName');
+  if(!_rn) return;                       // page-coordinator removed — bsAddLeaderById() is the live path
+  const name=_rn.value.trim();
   const march=parseInt(document.getElementById('rlMarch').value);
   const tier=document.getElementById('rlTier').value;
   const dur=parseInt(document.getElementById('rlDur').value);
@@ -2167,10 +2232,12 @@ renderLeaderTable();
 
 // ════════════ TEAM SETUP ════════════
 function addTeam(){
-  const name=document.getElementById('newTeamName').value.trim();
+  const _nt=document.getElementById('newTeamName');
+  if(!_nt) return;                       // page-setup removed — bsAddTeam() is the live path
+  const name=_nt.value.trim();
   if(!name) return;
   S.teams.push({id:uid(),name,alliance:null});
-  document.getElementById('newTeamName').value='';
+  _nt.value='';
   renderSetup(); renderLeaderTable();
   if(typeof renderBattleStrategy==='function') renderBattleStrategy();
   syncQueuePush();
@@ -3114,6 +3181,30 @@ function bsUnfreezeSchedule(){
 }
 
 // ── Collapsible "How to use" card (state remembered) ──
+// ── Battle Strategy design 4a — tab switcher. Presentation only: it shows/hides
+//    the two panes and re-runs the existing renderers. No state, no auth, no maths.
+function bsShowTab(tab){
+  try {
+    var setup  = document.getElementById('bs4PaneSetup');
+    var launch = document.getElementById('bs4PaneLaunch');
+    var tS     = document.getElementById('bs4TabSetup');
+    var tL     = document.getElementById('bs4TabLaunch');
+    if(!setup || !launch) return;
+    var onSetup = (tab !== 'launch');
+    setup.style.display  = onSetup ? '' : 'none';
+    launch.style.display = onSetup ? 'none' : '';
+    if(tS) tS.classList.toggle('active', onSetup);
+    if(tL) tL.classList.toggle('active', !onSetup);
+    if(onSetup){
+      if(typeof renderBattleStrategy==='function') renderBattleStrategy();
+    } else {
+      if(typeof bsRenderTeamButtons==='function') bsRenderTeamButtons();
+      if(typeof renderPetPlans==='function') renderPetPlans();
+      if(typeof bsTickClock==='function') bsTickClock();
+    }
+  } catch(e) {}
+}
+
 function bsToggleHowTo(){
   var body=document.getElementById('bsHowToBody');
   var chev=document.getElementById('bsHowToChevron');
