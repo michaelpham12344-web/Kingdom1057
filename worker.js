@@ -543,11 +543,12 @@ select.lgInput{cursor:pointer;font-size:15px;}
 @media (max-width:560px){.ms2head{padding:20px 16px 14px;}.ms2stepper{padding:14px 2px 4px;}.ms2stepper .ms-step-tab .ms2lab{font-size:8.5px;}}
 /* ══ Alliance zones — full-width alliances, teams spread across, 2 leaders per row ══ */
 .bs4ally{width:100%;flex:0 0 100%;margin-bottom:14px;}
-.bs4teamgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;align-items:start;}
-/* was flex + 140px fixed cards, so only one card fitted per 320px column */
-.bs-team-zone{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;align-content:start;}
-.bs-team-zone .bs-leader-card{width:auto;min-width:0;cursor:default;}
-@media (max-width:640px){.bs-team-zone{grid-template-columns:1fr;}.bs4teamgrid{grid-template-columns:1fr;}}
+.bs4teamgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px;align-items:start;}
+/* Leader cards stay the same fixed width everywhere (turrets, teams, pool) and simply
+   wrap — that's what keeps them uniform. Team zones just need room to fit two across. */
+.bs-team-zone{align-content:start;}
+.bs-team-zone .bs-leader-card{cursor:default;}
+@media (max-width:640px){.bs4teamgrid{grid-template-columns:1fr;}}
 .field{display:flex;flex-direction:column;}
 .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;}
 .btn{font-family:var(--body);font-size:13px;font-weight:600;letter-spacing:.03em;padding:7px 16px;border-radius:6px;border:none;cursor:pointer;transition:all .15s;white-space:nowrap;}
