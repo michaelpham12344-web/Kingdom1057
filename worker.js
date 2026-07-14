@@ -220,9 +220,36 @@ function json(data, status=200) {
 // dependency, so the cron can clear/allocate without a browser open. Suffixed
 // "Srv" throughout to keep this fully independent of the identically-named
 // client functions living inside the SITE_HTML string.
-const KVK_ANCHOR_UTC_SRV = Date.UTC(2026,6,13,0,0,0);
-const KVK_CYCLE_MS_SRV   = 28*24*60*60*1000;
-const MS_BOARD_DAY_OFFSET_SRV = { buildings:0, research:1, troops:3 };
+// ══════════════════════════════════════════════════════════════════════
+// KvK SCHEDULE — SINGLE SOURCE OF TRUTH
+// This object is used by the server AND injected verbatim into the client
+// (see ${JSON.stringify(KVK)} inside SITE_HTML), so the two can never drift.
+//
+// A KvK runs 6 days: Prep Day 1-5 (Mon-Fri), then Battle Day (Sat), ending
+// Sat 23:59:59 UTC. It repeats every 28 days, forever.
+//
+//   Day 1  Mon  Prep Day 1   <- Construction Minister
+//   Day 2  Tue  Prep Day 2   <- Research Minister
+//   Day 3  Wed  Prep Day 3
+//   Day 4  Thu  Prep Day 4   <- Troops Minister
+//   Day 5  Fri  Prep Day 5
+//   Day 6  Sat  BATTLE DAY
+//
+// Submissions OPEN the moment the previous KvK ends (Sun 00:00, 22 days before
+// Day 1) and CLOSE 24h before each board's own day. Allocation runs 1 minute
+// after close. To move the schedule, change ANCHOR — nothing else.
+// ══════════════════════════════════════════════════════════════════════
+const KVK = {
+  ANCHOR:       Date.UTC(2026, 6, 13, 0, 0, 0),  // Mon 13 Jul 2026 00:00 UTC = Prep Day 1
+  CYCLE_MS:     28 * 86400000,                   // repeats every 28 days
+  PREP_DAYS:    5,                               // Prep Day 1..5
+  TOTAL_DAYS:   6,                               // + Battle Day
+  BOARD_DAY:    { buildings:0, research:1, troops:3 },  // 0-based day offset
+  CLOSE_LEAD_MS: 24 * 3600000,                   // submissions close 24h before the board's day
+  OPEN_LEAD_MS:  22 * 86400000                   // open when the previous KvK ends
+};
+
+const MS_BOARD_DAY_OFFSET_SRV = KVK.BOARD_DAY;
 const MS_BOARDS_SRV = ['buildings','research','troops'];
 const MS_BOARD_LABEL_SRV = { buildings:'Construction', research:'Research', troops:'Troops' };
 const MS_PTS_SRV = { perMin: 30, truegold: 2000, dust: 1000 };
@@ -230,22 +257,34 @@ const MS_TOTAL_SLOTS_SRV = 48;
 const MS_MIN_SLOTS_PICKED_SRV = 4;
 const _DAY_SRV = 86400000, _H_SRV = 3600000;
 
-function nextKvKStartSrv(now){ let t=KVK_ANCHOR_UTC_SRV; if(now>=t){ t += Math.ceil((now-t+1)/KVK_CYCLE_MS_SRV)*KVK_CYCLE_MS_SRV; } return t; }
+function nextKvKStartSrv(now){ let t=KVK.ANCHOR; if(now>=t){ t += Math.ceil((now-t+1)/KVK.CYCLE_MS)*KVK.CYCLE_MS; } return t; }
+// Day-1 of the KvK we're currently *inside*, or the next one if we're between events.
+// The window reaches back OPEN_LEAD_MS so the submission period counts as "this KvK".
 function currentKvKDay1Srv(now, override){
   if(override) return override;
-  var k = Math.floor((now - KVK_ANCHOR_UTC_SRV) / KVK_CYCLE_MS_SRV);
-  for(var i=k; i<=k+1; i++){
-    var day1 = KVK_ANCHOR_UTC_SRV + i*KVK_CYCLE_MS_SRV;
-    if(now >= day1 - 8*_DAY_SRV && now < day1 + 6*_DAY_SRV) return day1;
+  var k = Math.floor((now - KVK.ANCHOR) / KVK.CYCLE_MS);
+  for(var i=k-1; i<=k+1; i++){
+    var day1 = KVK.ANCHOR + i*KVK.CYCLE_MS;
+    if(now >= day1 - KVK.OPEN_LEAD_MS && now < day1 + KVK.TOTAL_DAYS*_DAY_SRV) return day1;
   }
   return nextKvKStartSrv(now);
 }
 function msScheduleSrv(now, override){
   var day1 = currentKvKDay1Srv(now, override);
-  var sched = { day1:day1, openAt: day1 - 7*_DAY_SRV, boards:{} };
+  var sched = {
+    day1: day1,
+    openAt:  day1 - KVK.OPEN_LEAD_MS,               // the moment the previous KvK ended
+    clearAt: day1 - KVK.OPEN_LEAD_MS,               // old submissions are wiped then
+    endAt:   day1 + KVK.TOTAL_DAYS*_DAY_SRV,        // Sun 00:00 after Battle Day
+    boards:{}
+  };
   Object.keys(MS_BOARD_DAY_OFFSET_SRV).forEach(function(b){
     var dStart = day1 + MS_BOARD_DAY_OFFSET_SRV[b]*_DAY_SRV;
-    sched.boards[b] = { dayStart: dStart, deadline: dStart - (36*_H_SRV + 60000), allocAt: dStart - 36*_H_SRV };
+    sched.boards[b] = {
+      dayStart: dStart,
+      deadline: dStart - KVK.CLOSE_LEAD_MS - 60000, // submissions close 24h01m before the day
+      allocAt:  dStart - KVK.CLOSE_LEAD_MS          // allocation runs 24h before (1 min after close)
+    };
   });
   return sched;
 }
@@ -943,7 +982,7 @@ document.addEventListener('touchend',function(e){
   <div class="tab" id="tabTrialliance" onclick="showPage('trialliance')" style="display:none">Tri Alliance</div>
   <div class="tab" id="tabAdmin" onclick="showPage('admin')" style="display:none">⚙️ Admin</div>
   <div id="syncStatusNav" style="font-family:var(--head);font-size:11px;font-weight:600;letter-spacing:.04em;margin-right:14px;color:var(--text3);white-space:nowrap;flex-shrink:0"></div>
-  <div id="kvkTimer" style="flex-shrink:0;display:flex;align-items:center;gap:6px;margin-left:auto;font-family:var(--head);font-size:12px;font-weight:600;letter-spacing:.04em;background:var(--bg3);border:1px solid var(--border);border-radius:16px;padding:4px 12px;margin-right:12px;white-space:nowrap"><span style="color:var(--text3)">⚔️ Next KvK</span><span id="kvkCountdown" style="color:#6ab0ff;font-family:var(--mono)">—</span></div>
+  <div id="kvkTimer" style="flex-shrink:0;display:flex;align-items:center;gap:6px;margin-left:auto;font-family:var(--head);font-size:12px;font-weight:600;letter-spacing:.04em;background:var(--bg3);border:1px solid var(--border);border-radius:16px;padding:4px 12px;margin-right:12px;white-space:nowrap"><span id="kvkLabel" style="color:var(--text3)">⚔️ Next KvK</span><span id="kvkCountdown" style="color:#6ab0ff;font-family:var(--mono)">—</span></div>
   <div class="utc-clock" id="utcClock" style="flex-shrink:0;margin-left:0">00:00:00</div>
 </nav>
 </div>
@@ -1368,12 +1407,21 @@ document.addEventListener('touchend',function(e){
       <div id="msAdminActions" style="display:none">
         <div id="msDeadlineAdminBanner" style="display:none;background:rgba(255,157,77,.1);border:1px solid rgba(255,157,77,.4);border-radius:7px;padding:10px 14px;margin-bottom:12px"></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
-          <div class="field"><label style="font-size:11px">Manual deadline override (UTC) — closes ALL boards at once</label>
+          <div class="field"><label style="font-size:11px">Apply to</label>
+            <select id="msDeadlineBoard" style="width:170px">
+              <option value="all">All boards at once</option>
+              <option value="buildings">🏛️ Construction only</option>
+              <option value="research">🔬 Research only</option>
+              <option value="troops">⚔️ Troops only</option>
+            </select>
+          </div>
+          <div class="field"><label style="font-size:11px">Deadline override (UTC)</label>
             <input type="datetime-local" id="msDeadlineInput" style="width:200px">
           </div>
           <button class="btn btn-primary btn-sm" onclick="msSetDeadline()">Set Deadline</button>
-          <button class="btn btn-ghost btn-sm" onclick="msReopenSubmissions()">🔓 Reopen Submissions</button>
+          <button class="btn btn-ghost btn-sm" onclick="msReopenSubmissions()">🔓 Reopen</button>
         </div>
+        <div style="font-size:11px;color:var(--text3);margin:-6px 0 12px">Admin only. Overrides the computed KvK schedule for the chosen board(s) — use this to reopen a board for testing.</div>
         <button class="btn btn-gold" onclick="msRunAllocation()">⚙️ Run Allocation (rank + assign slots)</button>
         <button class="btn btn-ghost btn-sm" onclick="msClearAllSubs()" style="margin-left:8px">🗑 Clear all submissions</button>
         <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
@@ -1470,6 +1518,7 @@ const MS = {
   submissions: [], // {id, alliance, ign, verify:{cat:{amount,unit,hours}}, commit:{cat:pct}, picks:[slotIdx...], committedHours:{cat:hours}}
   _lastAllocation: null,
   _allocByBoard: {},
+  boardDeadlines: {},   // admin per-board overrides: { buildings:ISO|null, research:..., troops:... }
   _manageBoard: null,
   auditLog: [], // {who, action, when} — last ~25 manual leader changes, shared across leaders
   _currentStep: 1
@@ -1517,7 +1566,7 @@ const CLIENT_KEY_MIN_ROLE = {
   bsSetup: 'rallyleader', bsFrozen: 'rallyleader', finalCalc: 'rallyleader',
   msAllocByBoard: 'r4r5', msLastAllocation: 'r4r5', msAuditLog: 'r4r5',
   msSubmissionsByPlayer: 'member',
-  msDeadline: 'admin', kvkDay1Override: 'admin'
+  msDeadline: 'admin', msBoardDeadlines: 'admin', kvkDay1Override: 'admin'
 };
 function syncCanWrite(key){
   const role = (typeof AUTH !== 'undefined' && AUTH.role) ? AUTH.role : null;
@@ -1562,6 +1611,7 @@ let syncSerialize = function() {
     msLastAllocation: (typeof MS!=='undefined') ? MS._lastAllocation : null,
     msAllocByBoard: (typeof MS!=='undefined') ? MS._allocByBoard : null,
     msDeadline: (typeof MS!=='undefined') ? MS.deadline : null,
+    msBoardDeadlines: (typeof MS!=='undefined') ? (MS.boardDeadlines||{}) : {},
     kvkDay1Override: (typeof MS!=='undefined') ? (MS.kvkDay1Override||null) : null,
     msActionHint: (typeof MS!=='undefined') ? (MS._pendingAction||null) : null,
     msSubmissionsByPlayer: (typeof MS!=='undefined') ? (MS.submissionsByPlayer||{}) : {},
@@ -1686,6 +1736,7 @@ let syncApplyRemote = function(data) {
       MS._lastAllocation = data.msLastAllocation || null;
       MS._allocByBoard = data.msAllocByBoard || MS._allocByBoard || {};
       MS.deadline = data.msDeadline || null;
+      MS.boardDeadlines = data.msBoardDeadlines || {};
       MS.kvkDay1Override = data.kvkDay1Override || null;
       if(data.msSubmissionsByPlayer) { MS.submissionsByPlayer = data.msSubmissionsByPlayer; MS.submissions = Object.values(MS.submissionsByPlayer); }
       if(data.msAuditLog) { MS.auditLog = data.msAuditLog; }
@@ -2022,21 +2073,82 @@ function updateClock(){
 }
 // KvK countdown — next KvK begins at 00:00 UTC on the anchor date, then repeats every 28 days.
 // To change it: set KVK_ANCHOR_UTC to any known KvK start (00:00 UTC). Month is 0-based: 6 = July.
-const KVK_ANCHOR_UTC = Date.UTC(2026,6,13,0,0,0);
-const KVK_CYCLE_MS = 28*24*60*60*1000;
-function nextKvKStart(now){ let t=KVK_ANCHOR_UTC; if(now>=t){ t += Math.ceil((now-t+1)/KVK_CYCLE_MS)*KVK_CYCLE_MS; } return t; }
-function updateKvK(){
-  const el=document.getElementById('kvkCountdown'); if(!el) return;
-  let diff=Math.max(0,nextKvKStart(Date.now())-Date.now());
+// Injected from the server's KVK object at build time — single source of truth.
+const KVK = ${JSON.stringify(KVK)};
+const KVK_ANCHOR_UTC = KVK.ANCHOR;
+const KVK_CYCLE_MS   = KVK.CYCLE_MS;
+function nextKvKStart(now){ let t=KVK.ANCHOR; if(now>=t){ t += Math.ceil((now-t+1)/KVK.CYCLE_MS)*KVK.CYCLE_MS; } return t; }
+
+// Which day of the KvK are we on, and what is it called?
+// Returns null when we're between events.
+function kvkPhase(now){
+  if(now===undefined) now = Date.now();
+  var day1 = currentKvKDay1(now);
+  var end  = day1 + KVK.TOTAL_DAYS*86400000;
+  if(now < day1 || now >= end) return null;              // between KvKs
+  var dayIdx = Math.floor((now - day1)/86400000) + 1;    // 1..6
+  var isBattle = dayIdx > KVK.PREP_DAYS;
+  return {
+    day1: day1,
+    end: end,
+    dayIndex: dayIdx,
+    isBattleDay: isBattle,
+    label: isBattle ? 'KvK Battle Day' : ('KvK Prep Day ' + dayIdx),
+    dayEnd: day1 + dayIdx*86400000,
+    battleStart: day1 + KVK.PREP_DAYS*86400000
+  };
+}
+function _kvkFmt(ms){
+  let diff=Math.max(0,ms);
   const d=Math.floor(diff/86400000); diff%=86400000;
   const h=Math.floor(diff/3600000); diff%=3600000;
   const m=Math.floor(diff/60000); diff%=60000;
   const s=Math.floor(diff/1000);
-  el.textContent=d+'d '+String(h).padStart(2,'0')+'h '+String(m).padStart(2,'0')+'m '+String(s).padStart(2,'0')+'s';
+  return (d?d+'d ':'')+String(h).padStart(2,'0')+'h '+String(m).padStart(2,'0')+'m '+String(s).padStart(2,'0')+'s';
+}
+function updateKvK(){
+  const el=document.getElementById('kvkCountdown'); if(!el) return;
+  const lbl=document.getElementById('kvkLabel');
+  const now=Date.now();
+  const ph=kvkPhase(now);
+
+  // Between KvKs — count down to the next one.
+  if(!ph){
+    if(lbl) lbl.textContent='⚔️ Next KvK';
+    el.style.color='#6ab0ff';
+    el.textContent=_kvkFmt(nextKvKStart(now)-now);
+    return;
+  }
+
+  // Inside a KvK — name the phase, then count down to what matters next.
+  if(lbl) lbl.textContent=(ph.isBattleDay?'⚔️ ':'⛏️ ')+ph.label;
+
+  let target=null, suffix='';
+  try {
+    const sch=msSchedule(now);
+    let soonest=null, which=null;
+    Object.keys(sch.boards).forEach(function(b){
+      const dl=sch.boards[b].deadline;
+      if(dl>now && (soonest===null || dl<soonest)){ soonest=dl; which=b; }
+    });
+    if(soonest!==null){
+      target=soonest;
+      const _bm=(typeof MS_BOARD_META!=='undefined' && MS_BOARD_META[which]) ? MS_BOARD_META[which].label : which;
+      suffix=' · '+_bm+' closes';
+    }
+  } catch(e){}
+
+  if(target===null){
+    if(!ph.isBattleDay){ target=ph.battleStart; suffix=' · to Battle Day'; }
+    else { target=ph.end; suffix=' · KvK ends'; }
+  }
+
+  el.style.color = ph.isBattleDay ? '#e04545' : 'var(--gold)';
+  el.textContent = _kvkFmt(target-now) + suffix;
 }
 // ════════════ KvK SCHEDULE (Minister Spots automation timing) ════════════
 // Board → day offset from KvK Day 1.  Day 1 Construction=buildings, Day 2 Research, Day 4 Troops.
-const MS_BOARD_DAY_OFFSET = { buildings:0, research:1, troops:3 };
+const MS_BOARD_DAY_OFFSET = KVK.BOARD_DAY;
 const _MS_DAY = 86400000, _MS_H = 3600000;
 // Admin override for the next KvK Day-1 start (setter arrives in a later phase). Read-only here.
 function msDay1Override(){
@@ -2047,10 +2159,10 @@ function msDay1Override(){
 // Day 4) computes against the right cycle instead of rolling forward to the next one.
 function currentKvKDay1(now){
   var o = msDay1Override(); if(o) return o;
-  var k = Math.floor((now - KVK_ANCHOR_UTC) / KVK_CYCLE_MS);
-  for(var i=k; i<=k+1; i++){
-    var day1 = KVK_ANCHOR_UTC + i*KVK_CYCLE_MS;
-    if(now >= day1 - 8*_MS_DAY && now < day1 + 6*_MS_DAY) return day1;
+  var k = Math.floor((now - KVK.ANCHOR) / KVK.CYCLE_MS);
+  for(var i=k-1; i<=k+1; i++){
+    var day1 = KVK.ANCHOR + i*KVK.CYCLE_MS;
+    if(now >= day1 - KVK.OPEN_LEAD_MS && now < day1 + KVK.TOTAL_DAYS*_MS_DAY) return day1;
   }
   return nextKvKStart(now);
 }
@@ -2058,13 +2170,19 @@ function currentKvKDay1(now){
 function msSchedule(now){
   if(now===undefined) now = Date.now();
   var day1 = currentKvKDay1(now);
-  var sched = { day1:day1, clearAt: day1 - 7*_MS_DAY, openAt: day1 - 7*_MS_DAY, boards:{} };
+  var sched = {
+    day1: day1,
+    openAt:  day1 - KVK.OPEN_LEAD_MS,          // opens the moment the previous KvK ends
+    clearAt: day1 - KVK.OPEN_LEAD_MS,
+    endAt:   day1 + KVK.TOTAL_DAYS*_MS_DAY,
+    boards:{}
+  };
   Object.keys(MS_BOARD_DAY_OFFSET).forEach(function(b){
     var dStart = day1 + MS_BOARD_DAY_OFFSET[b]*_MS_DAY;
     sched.boards[b] = {
       dayStart: dStart,
-      deadline: dStart - (36*_MS_H + 60000), // submissions close 36h01m before the day
-      allocAt:  dStart - 36*_MS_H            // allocation runs 36h before the day (1 min after close)
+      deadline: dStart - KVK.CLOSE_LEAD_MS - 60000, // submissions close 24h01m before the day
+      allocAt:  dStart - KVK.CLOSE_LEAD_MS          // allocation runs 24h before (1 min after close)
     };
   });
   return sched;
@@ -4461,11 +4579,24 @@ function msIsDeadlinePassed() {
 // ── Per-board deadlines (Phase 2) ──
 // Effective deadline (epoch ms) for a board: an admin's manual global override wins if set,
 // otherwise the computed schedule deadline (36h01m before that board's KvK day).
+// Deadline for a board, in resolution order:
+//   1. that board's own admin override   (per-board — the normal case now)
+//   2. the legacy global override         (kept so old state still works)
+//   3. the computed KvK schedule          (24h before the board's day)
 function msBoardDeadline(board){
+  try {
+    var per = MS.boardDeadlines && MS.boardDeadlines[board];
+    if(per){ var t = new Date(per).getTime(); if(!isNaN(t)) return t; }
+  } catch(e){}
   var man = null;
   try { man = MS.deadline ? new Date(MS.deadline).getTime() : null; } catch(e){ man = null; }
   if(man!=null && !isNaN(man)) return man;
   try { var bs = msSchedule(Date.now()).boards[board]; return bs ? bs.deadline : null; } catch(e){ return null; }
+}
+// True if this board's deadline is an admin override rather than the computed one.
+function msBoardIsOverridden(board){
+  try { if(MS.boardDeadlines && MS.boardDeadlines[board]) return true; } catch(e){}
+  return !!MS.deadline;
 }
 function msBoardClosed(board){
   var d = msBoardDeadline(board);
@@ -4474,23 +4605,42 @@ function msBoardClosed(board){
 function msOpenBoardsList(list){ return (list||MS_BOARDS).filter(function(b){ return !msBoardClosed(b); }); }
 function msClosedBoardsList(list){ return (list||MS_BOARDS).filter(function(b){ return msBoardClosed(b); }); }
 function msAnyBoardOpen(list){ return msOpenBoardsList(list).length>0; }
+function _msTargetBoards(){
+  var sel = document.getElementById('msDeadlineBoard');
+  var v = sel ? sel.value : 'all';
+  return (v === 'all') ? MS_BOARDS.slice() : [v];
+}
+function _msBoardNames(list){
+  return list.map(function(b){ return (MS_BOARD_META[b]||{}).label || b; }).join(', ');
+}
 function msSetDeadline() {
   const input = document.getElementById('msDeadlineInput');
   if (!input || !input.value) { toast('Pick a date and time first.'); return; }
   const iso = new Date(input.value).toISOString();
-  if (!confirm('⚠️ This overrides the computed per-board schedule and closes ALL 3 boards (Construction, Research, Troops) at once, at '+new Date(iso).toUTCString()+'.\\n\\nMembers will immediately see their open boards as locked once this time passes. Continue?')) return;
-  // datetime-local gives local time — store as UTC ISO string
-  MS.deadline = iso;
+  const targets = _msTargetBoards();
+  const names = _msBoardNames(targets);
+  if (!confirm('⚠️ Override the computed schedule for ' + names + '?\\n\\nSubmissions for ' + (targets.length>1 ? 'these boards' : 'this board') + ' will close at ' + new Date(iso).toUTCString() + '. Members see them locked once that time passes. Continue?')) return;
+  MS.boardDeadlines = MS.boardDeadlines || {};
+  targets.forEach(function(b){ MS.boardDeadlines[b] = iso; });
+  MS.deadline = null;   // per-board is now the source of truth; drop the legacy global
   syncQueuePush();
   msUpdateDeadlineBanners();
-  toast('Deadline set: ' + new Date(MS.deadline).toUTCString());
+  if (typeof msRenderScheduleStrip==='function') msRenderScheduleStrip();
+  if (typeof msRenderBoardTimers==='function') msRenderBoardTimers();
+  toast('Deadline set for ' + names + ': ' + new Date(iso).toUTCString());
 }
 function msReopenSubmissions() {
-  if (!confirm('⚠️ Reopen submissions for ALL boards? This clears the manual deadline override and returns each board to its normal computed deadline (or fully open if that has also passed). Continue?')) return;
-  MS.deadline = null;
+  const targets = _msTargetBoards();
+  const names = _msBoardNames(targets);
+  if (!confirm('⚠️ Reopen submissions for ' + names + '?\\n\\nThis clears the admin override and returns ' + (targets.length>1 ? 'them' : 'it') + ' to the normal computed KvK deadline — which may itself already have passed. Continue?')) return;
+  MS.boardDeadlines = MS.boardDeadlines || {};
+  targets.forEach(function(b){ delete MS.boardDeadlines[b]; });
+  if (targets.length === MS_BOARDS.length) MS.deadline = null;
   syncQueuePush();
   msUpdateDeadlineBanners();
-  toast('Submissions reopened.');
+  if (typeof msRenderScheduleStrip==='function') msRenderScheduleStrip();
+  if (typeof msRenderBoardTimers==='function') msRenderBoardTimers();
+  toast('Reopened: ' + names);
 }
 function msUpdateDeadlineBanners() {
   if(typeof msUpdateSubmitState==='function') msUpdateSubmitState();
@@ -7579,12 +7729,20 @@ export default {
       } catch(e) { return json({ok:false,error:e.message},400); }
     }
 
-if (url.pathname==='/gift-log' && request.method==='GET') {
-  const _role = await verifyToken(env, bearer(request));
-  if (!_role) return json({ok:false, error:'unauthorized'}, 401);
-  const raw = await env.SVS_KV.get(GIFT_LOG_KEY);
-  return json({ log: raw ? JSON.parse(raw) : [] });
-}
+    // Gift redemption log
+    if (url.pathname==='/gift-log' && request.method==='GET') {
+      const _role = await verifyToken(env, bearer(request));
+      if (!_role) return json({ok:false, error:'unauthorized'}, 401);
+      const raw = await env.SVS_KV.get(GIFT_LOG_KEY);
+      const log = raw ? JSON.parse(raw) : [];
+      const display = log.map(e=>({
+        time: e.time,
+        code: (e.codes||[]).join(', '),
+        results: (e.results||[]).map(r=>({name:r.name,ok:r.ok,err:r.err}))
+      }));
+      return json({log:display});
+    }
+
     // ── AI Vision OCR for speedup screenshots ──
     if (url.pathname==='/ocr-speedups' && request.method==='POST') {
       const _role = await verifyToken(env, bearer(request));
