@@ -7415,7 +7415,7 @@ function bstatInit(){
 
 // ── load rows + weights from the server ──
 function bstatLoad(){
-  fetch((typeof SYNC_API_URL!=='undefined'?SYNC_API_URL.replace(/\/$/,''):'')+'/battle-stats', {
+  fetch((typeof SYNC_API_URL!=='undefined'?SYNC_API_URL.replace(/\\/$/,''):'')+'/battle-stats', {
     headers: stateHeaders()
   }).then(function(r){ return r.json(); }).then(function(d){
     if(!d || d.ok===false){ return; }
@@ -7468,7 +7468,7 @@ function bstatScan(dataUrl){
   var st=document.getElementById('bstatScanStatus');
   st.style.display='block'; st.textContent='🤖 Reading the report with AI…';
   var base64=dataUrl.split(',')[1];
-  fetch((typeof SYNC_API_URL!=='undefined'?SYNC_API_URL.replace(/\/$/,''):'')+'/ocr-battlestats', {
+  fetch((typeof SYNC_API_URL!=='undefined'?SYNC_API_URL.replace(/\\/$/,''):'')+'/ocr-battlestats', {
     method:'POST', headers: stateHeaders({'Content-Type':'application/json'}), body: JSON.stringify({ image: base64 })
   }).then(function(r){ return r.json(); }).then(function(d){
     if(d && d.ok && d.values){
@@ -7552,7 +7552,7 @@ function bstatSave(){
   var row=bstatGatherRow();
   var patch={}; patch.bstatByPlayer={}; patch.bstatByPlayer[AUTH.pid]=row;
   var btn=document.getElementById('bstatSaveBtn'); btn.disabled=true; btn.textContent='Saving…';
-  fetch((typeof SYNC_API_URL!=='undefined'?SYNC_API_URL.replace(/\/$/,''):'')+'/state', {
+  fetch((typeof SYNC_API_URL!=='undefined'?SYNC_API_URL.replace(/\\/$/,''):'')+'/state', {
     method:'PUT', headers: stateHeaders({'Content-Type':'application/json'}),
     body: JSON.stringify({ _baseRev: (typeof syncRev!=='undefined'?syncRev:0), patch: patch, _client: (typeof SYNC_CLIENT_ID!=='undefined'?SYNC_CLIENT_ID:null) })
   }).then(function(r){ return r.json(); }).then(function(d){
@@ -7734,7 +7734,7 @@ function bstatWtToggleEdit(){
   }
   w.ver = bstatN(BSTAT.weights.ver)+1;
   var btn=document.getElementById('bstatWtEditBtn'); btn.disabled=true; btn.textContent='Saving…';
-  fetch((typeof SYNC_API_URL!=='undefined'?SYNC_API_URL.replace(/\/$/,''):'')+'/state', {
+  fetch((typeof SYNC_API_URL!=='undefined'?SYNC_API_URL.replace(/\\/$/,''):'')+'/state', {
     method:'PUT', headers: stateHeaders({'Content-Type':'application/json'}),
     body: JSON.stringify({ _baseRev:(typeof syncRev!=='undefined'?syncRev:0), patch:{ bstatWeights:w }, _client:(typeof SYNC_CLIENT_ID!=='undefined'?SYNC_CLIENT_ID:null) })
   }).then(function(r){ return r.json(); }).then(function(d){
