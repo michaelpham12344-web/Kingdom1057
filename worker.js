@@ -978,6 +978,7 @@ document.addEventListener('touchend',function(e){
   <div class="nav-logo"><svg width="26" height="30" viewBox="0 0 60 68" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0" aria-hidden="true"><path d="M14 12 L20 4 L30 10 L40 4 L46 12 Z" fill="#d9a648"/><path d="M8 16 H52 V38 C52 52 42 60 30 66 C18 60 8 52 8 38 Z" fill="#7e1f26" stroke="#d9a648" stroke-width="3"/><path d="M14 34 L30 24 L46 34 V42 L30 32 L14 42 Z" fill="#d9a648" opacity="0.92"/></svg>KINGDOM<span>1057</span></div>
   <div class="tab active" onclick="showPage('strategy')">Battle Strategy</div>
   <div class="tab" onclick="showPage('minister')">Minister Spots</div>
+  <div class="tab" id="tabBattleStats" onclick="showPage('battlestats')" style="display:none">Battle Stats</div>
   <div class="tab" id="tabSwordland" onclick="showPage('swordland')" style="display:none">Swordland</div>
   <div class="tab" id="tabTrialliance" onclick="showPage('trialliance')" style="display:none">Tri Alliance</div>
   <div class="tab" id="tabAdmin" onclick="showPage('admin')" style="display:none">⚙️ Admin</div>
@@ -1553,7 +1554,7 @@ let syncWsTimer = null;
 
 // Must match MERGE_KEYS on the server: id-keyed maps where we send only the changed
 // entries, so two people editing different leaders/players never collide.
-const CLIENT_MERGE_KEYS = ['rally', 'teamRally', 'msSubmissionsByPlayer', 'msAllocByBoard'];
+const CLIENT_MERGE_KEYS = ['rally', 'teamRally', 'msSubmissionsByPlayer', 'msAllocByBoard', 'bstatByPlayer'];
 
 // Mirrors the server's ACL. A member's browser still runs the display timers, which can
 // nudge local state (a pet expiring, a rally timer running out) — without this, those
@@ -1566,7 +1567,13 @@ const CLIENT_KEY_MIN_ROLE = {
   bsSetup: 'rallyleader', bsFrozen: 'rallyleader', finalCalc: 'rallyleader',
   msAllocByBoard: 'r4r5', msLastAllocation: 'r4r5', msAuditLog: 'r4r5',
   msSubmissionsByPlayer: 'member',
-  msDeadline: 'admin', msBoardDeadlines: 'admin', kvkDay1Override: 'admin'
+  msDeadline: 'admin', msBoardDeadlines: 'admin', kvkDay1Override: 'admin',
+  // Battle Stats (bstat*) — a rally leader's own combat stats from their Battle Report,
+  // scored into an attack/defense number for battle-assignment ranking. Owner-keyed by
+  // player id. Admin-only for now; to open it to rally leaders later, change
+  // bstatByPlayer to 'rallyleader' here AND in the server KEY_MIN_ROLE, and show the tab
+  // for isRallyLeader(). bstatWeights (the scoring weights + march ratio) stays admin-only.
+  bstatByPlayer: 'admin', bstatWeights: 'admin'
 };
 function syncCanWrite(key){
   const role = (typeof AUTH !== 'undefined' && AUTH.role) ? AUTH.role : null;
@@ -6127,6 +6134,11 @@ function enterApp(role) {
   const adminTab = document.getElementById('tabAdmin');
   if(adminTab) adminTab.style.display = isAdm ? '' : 'none';
 
+  // Battle Stats — admin only for now. To open to rally leaders later, change this to
+  // (isRally || isR4 || isAdm) AND relax the server /battle-stats + KEY_MIN_ROLE gates.
+  const bstatTab = document.getElementById('tabBattleStats');
+  if(bstatTab) bstatTab.style.display = isAdm ? '' : 'none';
+
   // Show user bar
   const stored = verifiedPlayer || (() => { try { const s = sessionStorage.getItem('verifiedPlayer'); return s ? JSON.parse(s) : null; } catch(e) { return null; } })();
   showUserBar(stored, role);
@@ -6151,6 +6163,7 @@ function showPageDirect(p) {
   if (p === 'minister')    { if (typeof msInit==='function') { msInit(); msRenderStepTabs(); msInitResultsTab(); } }
   if (p === 'swordland')   { renderAttendance('sw'); }
   if (p === 'trialliance') { renderAttendance('ta'); }
+  if (p === 'battlestats') { if (typeof bstatInit==='function') bstatInit(); }
   if (p === 'admin') {
     adminRefreshPasswordDisplay();
     adminLoadGiftLog();
@@ -7084,6 +7097,643 @@ document.addEventListener('DOMContentLoaded', initApp);
 
 </script>
 
+<!-- ══════════════════ BATTLE STATS (bstat*) ══════════════════ -->
+<!-- Admin-only for now. Data lives in bstatByPlayer, kept OUT of the shared snapshot and
+     served by GET /battle-stats, so it has its own load/save path (bstatLoad/bstatSave)
+     rather than riding the normal sync. Scores are computed on the server on save. -->
+<div id="page-battlestats" class="page">
+  <div class="bstatWrap">
+    <div class="bstatSubtabs">
+      <div class="bstatSubtab active" data-p="mine" onclick="bstatTab('mine')">My Stats</div>
+      <div class="bstatSubtab" data-p="rank" onclick="bstatTab('rank')">Rankings</div>
+      <div class="bstatSubtab" data-p="prog" onclick="bstatTab('prog')">My Progress</div>
+      <div class="bstatSubtab" data-p="wt" onclick="bstatTab('wt')">Weights</div>
+    </div>
+
+    <!-- ── MY STATS ── -->
+    <div class="bstatPane active" id="bstatPane-mine">
+      <div class="bstatCard">
+        <div class="bstatCardT">Battle Report</div>
+        <div id="bstatDrop" class="bstatDrop" onclick="document.getElementById('bstatFile').click()">
+          <div class="bstatDropIcon">🖼️</div>
+          <div class="bstatDropT">Upload your Battle Report screenshot</div>
+          <div class="bstatDropS">Mail → open the report → screenshot the Bonus Details panel</div>
+        </div>
+        <input type="file" id="bstatFile" accept="image/*" style="display:none" onchange="bstatOnFile(event)">
+        <div id="bstatScanStatus" class="bstatNote" style="display:none;margin:14px 0 0"></div>
+        <div class="bstatNote" style="margin:14px 0 0">
+          <b>Left column only.</b> The scan reads the 12 left-hand percentages — your troops. The right column is the enemy and is ignored. Everything below the stats you fill in yourself.
+        </div>
+      </div>
+
+      <div class="bstatCard" id="bstatReviewCard">
+        <div class="bstatCardT">Review &amp; correct <span class="bstatHint"><span class="bstatFlag"></span> filled by scan — check before saving</span></div>
+        <div id="bstatReview"></div>
+      </div>
+
+      <div class="bstatCard">
+        <div class="bstatCardT">Army</div>
+        <div class="bstatGrid3">
+          <div><label>Rally capacity</label><input type="number" id="bstatRallyCap" value="" placeholder="e.g. 1250000"></div>
+          <div><label>Truegold level</label>
+            <select id="bstatTg">
+              <option value="10">TG 10</option><option value="9">TG 9</option>
+              <option value="8" selected>TG 8</option><option value="7">TG 7</option>
+              <option value="6">TG 6</option><option value="5">TG 5</option>
+              <option value="0">TG 4 or below</option>
+            </select>
+          </div>
+          <div><label>March capacity</label><input type="number" id="bstatMarchCap" value="" placeholder="e.g. 415000"></div>
+        </div>
+        <div class="bstatWarn" style="margin:14px 0 0">
+          <b>Truegold counts as much as the tier badge.</b> A maxed T10 at TG8 out-fights a fresh T11 at TG5 most of the time — the extra troop skills outweigh the tier jump. Both feed your score, so set TG honestly.
+        </div>
+      </div>
+
+      <div class="bstatCard">
+        <div class="bstatCardT">Heroes</div>
+        <div class="bstatNote" style="margin:0 0 14px">
+          <b>Pick the hero you lead each troop type with.</b> Their skills apply to the whole rally — that is your attack and defense skill layer. Their stat bonuses are already inside the Battle Report numbers above, so only skills and gear are counted here (no double-counting). ⚔ = offensive gear, 🛡 = defensive gear.
+        </div>
+        <div class="bstatHeroHead"><span></span><span>Hero</span><span>Gen</span><span>Gear lv.</span></div>
+        <div class="bstatHeroRow"><span class="bstatSlot inf">INF</span><select id="bstatHInf"></select><input type="number" id="bstatGenInf" min="1" max="7" value="1" class="bstatGen"><select id="bstatGearInf" class="bstatGear"></select></div>
+        <div class="bstatHeroRow"><span class="bstatSlot cav">CAV</span><select id="bstatHCav"></select><input type="number" id="bstatGenCav" min="1" max="7" value="7" class="bstatGen"><select id="bstatGearCav" class="bstatGear"></select></div>
+        <div class="bstatHeroRow"><span class="bstatSlot arc">ARC</span><select id="bstatHArc"></select><input type="number" id="bstatGenArc" min="1" max="7" value="6" class="bstatGen"><select id="bstatGearArc" class="bstatGear"></select></div>
+      </div>
+
+      <div class="bstatCard">
+        <div class="bstatCardT">Your scores <span class="bstatHint">preview — the server sets the final number on save</span></div>
+        <div class="bstatDual">
+          <div class="bstatBig atk"><div class="bstatBigL">Attack score</div><div class="bstatBigV" id="bstatPreviewAtk">—</div></div>
+          <div class="bstatBig def"><div class="bstatBigL">Defense score</div><div class="bstatBigV" id="bstatPreviewDef">—</div></div>
+        </div>
+        <div class="bstatFoot">
+          <span class="bstatShare">
+            <span class="bstatSw on" id="bstatShareSw" onclick="this.classList.toggle('on')"></span>
+            Show my scores to other leaders
+          </span>
+          <div style="display:flex;gap:9px">
+            <button class="bstatBtnGhost" onclick="bstatRecalcPreview()">Recalculate preview</button>
+            <button class="bstatBtnPrimary" id="bstatSaveBtn" onclick="bstatSave()">Save stats</button>
+          </div>
+        </div>
+        <div class="bstatFootNote">Sharing off = your row is hidden from everyone, leaders and admin alike. You keep it; nobody else sees it.</div>
+      </div>
+    </div>
+
+    <!-- ── RANKINGS ── -->
+    <div class="bstatPane" id="bstatPane-rank">
+      <div class="bstatCard">
+        <div class="bstatCardT" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          Rankings <span id="bstatRankMeta" class="bstatHint"></span>
+          <span style="margin-left:auto;display:flex;gap:6px">
+            <button class="bstatBtnGold" id="bstatRankAtk" onclick="bstatRankMode('atk')">⚔ Attack</button>
+            <button class="bstatBtnGhost" id="bstatRankDef" onclick="bstatRankMode('def')">🛡 Defense</button>
+          </span>
+        </div>
+        <div class="bstatTblWrap"><table class="bstatTbl"><thead><tr>
+          <th></th><th>Leader</th><th id="bstatRankScoreH">Attack</th><th>Lead gear</th><th>T11</th><th>TG</th><th>Rally cap</th><th>Updated</th>
+        </tr></thead><tbody id="bstatRankRows"></tbody></table></div>
+        <div class="bstatNote" style="margin:16px 0 0">
+          <b>Two lists, one toggle.</b> Attack ranks who hits hardest as a rally lead; Defense ranks who anchors a garrison. Composition and counters are still your call on the day; this ranks the leaders, not the battle.
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MY PROGRESS ── -->
+    <div class="bstatPane" id="bstatPane-prog">
+      <div class="bstatCard">
+        <div class="bstatCardT">My progress</div>
+        <div id="bstatProg"></div>
+        <div class="bstatWarn" style="margin-top:16px">
+          <b>Past uploads are re-scored under today's weights</b>, so the trend is like-for-like even after the weights change. The weights version each row was first scored under is kept alongside it.
+        </div>
+      </div>
+    </div>
+
+    <!-- ── WEIGHTS ── -->
+    <div class="bstatPane" id="bstatPane-wt">
+      <div class="bstatCard">
+        <div class="bstatCardT" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          Weights <span id="bstatWtVer" class="bstatChip on">v1</span>
+          <span style="margin-left:auto"><button class="bstatBtnGold" id="bstatWtEditBtn" onclick="bstatWtToggleEdit()">🔓 Unlock to edit</button></span>
+        </div>
+        <div class="bstatNote"><b>Everyone reads this. Only admin changes it.</b> No hidden maths — if a leader disputes a number, they can see exactly what it is.</div>
+        <div id="bstatWtBody"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<style>
+/* ── Battle Stats (bstat*) ── scoped to #page-battlestats to avoid clashing with app CSS */
+#page-battlestats .bstatWrap{max-width:1140px;margin:0 auto;padding:22px 4px 60px}
+#page-battlestats .bstatSubtabs{display:flex;gap:6px;margin-bottom:20px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+#page-battlestats .bstatSubtab{font-family:var(--head);font-size:11.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:10px 16px;cursor:pointer;color:var(--text3);border-bottom:2px solid transparent}
+#page-battlestats .bstatSubtab:hover{color:var(--text2)}
+#page-battlestats .bstatSubtab.active{color:var(--gold);border-bottom-color:var(--gold)}
+#page-battlestats .bstatPane{display:none}
+#page-battlestats .bstatPane.active{display:block}
+#page-battlestats .bstatCard{background:linear-gradient(180deg,var(--bg4) 0%,var(--bg3) 100%);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:18px}
+#page-battlestats .bstatCardT{font-family:var(--head);font-size:14px;font-weight:600;color:var(--gold);margin-bottom:14px;letter-spacing:.03em;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+#page-battlestats .bstatHint{font-family:var(--body);font-size:11px;font-weight:400;color:var(--text3);letter-spacing:0;display:inline-flex;align-items:center;gap:5px}
+#page-battlestats label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px}
+#page-battlestats input,#page-battlestats select{background:var(--bg4);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-family:var(--body);font-size:13px;padding:7px 10px;outline:none;width:100%}
+#page-battlestats input:focus,#page-battlestats select:focus{border-color:var(--gold)}
+#page-battlestats .bstatBtnPrimary{background:var(--accent);color:#fff;border:1px solid var(--accent);font-family:var(--head);font-weight:600;font-size:12px;border-radius:6px;padding:9px 16px;cursor:pointer}
+#page-battlestats .bstatBtnGhost{background:transparent;color:var(--text2);border:1px solid var(--border2);font-family:var(--head);font-weight:600;font-size:12px;border-radius:6px;padding:9px 16px;cursor:pointer}
+#page-battlestats .bstatBtnGold{background:rgba(217,166,72,.15);color:var(--gold);border:1px solid rgba(217,166,72,.35);font-family:var(--head);font-weight:600;font-size:11px;border-radius:6px;padding:6px 14px;cursor:pointer}
+#page-battlestats .bstatDrop{border:1.5px dashed var(--border2);border-radius:10px;padding:34px 20px;text-align:center;background:rgba(47,36,26,.35);cursor:pointer}
+#page-battlestats .bstatDrop:hover{border-color:var(--gold);background:rgba(217,166,72,.06)}
+#page-battlestats .bstatDropIcon{font-size:32px;margin-bottom:9px;opacity:.55}
+#page-battlestats .bstatDropT{font-family:var(--head);font-size:14px;color:var(--text);margin-bottom:5px}
+#page-battlestats .bstatDropS{font-size:12px;color:var(--text3)}
+#page-battlestats .bstatFlag{width:5px;height:5px;border-radius:50%;background:var(--gold);box-shadow:0 0 5px var(--gold);flex-shrink:0;display:inline-block}
+#page-battlestats .bstatTT{border:1px solid var(--border);border-radius:9px;margin-bottom:12px;overflow:hidden}
+#page-battlestats .bstatTTHead{display:flex;align-items:center;gap:9px;padding:10px 14px;background:var(--bg4);border-bottom:1px solid var(--border)}
+#page-battlestats .bstatDot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+#page-battlestats .bstatTTName{font-family:var(--head);font-size:12.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+#page-battlestats .bstatT11{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:11px;color:var(--text2)}
+#page-battlestats .bstatTTBody{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border)}
+#page-battlestats .bstatStat{background:var(--bg3);padding:11px 13px}
+#page-battlestats .bstatStatL{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:5px;display:flex;align-items:center;gap:5px}
+#page-battlestats .bstatStat input{border:none;background:transparent;font-family:var(--mono);font-size:15px;font-weight:600;color:var(--text);padding:0}
+#page-battlestats .bstatStat input:focus{color:var(--gold)}
+#page-battlestats .bstatSw{position:relative;width:36px;height:19px;background:var(--bg);border:1px solid var(--border2);border-radius:10px;cursor:pointer;flex-shrink:0;transition:all .2s}
+#page-battlestats .bstatSw::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:var(--text3);transition:all .2s}
+#page-battlestats .bstatSw.on{background:rgba(46,204,113,.2);border-color:var(--green)}
+#page-battlestats .bstatSw.on::after{left:18px;background:var(--green)}
+#page-battlestats .bstatGrid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+#page-battlestats .bstatHeroHead{display:grid;grid-template-columns:44px 1.7fr .7fr .9fr;gap:10px;margin-bottom:6px;font-size:12px;color:var(--text2)}
+#page-battlestats .bstatHeroRow{display:grid;grid-template-columns:44px 1.7fr .7fr .9fr;gap:10px;align-items:center;margin-bottom:9px}
+#page-battlestats .bstatSlot{font-family:var(--mono);font-size:11px;text-align:center}
+#page-battlestats .bstatSlot.inf{color:var(--accent2)}
+#page-battlestats .bstatSlot.cav{color:#6ab0ff}
+#page-battlestats .bstatSlot.arc{color:var(--green)}
+#page-battlestats .bstatDual{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+#page-battlestats .bstatBig{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:18px 20px;position:relative;overflow:hidden}
+#page-battlestats .bstatBig::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+#page-battlestats .bstatBig.atk::before{background:var(--accent)}
+#page-battlestats .bstatBig.def::before{background:#6ab0ff}
+#page-battlestats .bstatBigL{font-family:var(--head);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
+#page-battlestats .bstatBigV{font-family:var(--mono);font-size:38px;font-weight:600;line-height:1}
+#page-battlestats .bstatBig.atk .bstatBigV{color:var(--accent2)}
+#page-battlestats .bstatBig.def .bstatBigV{color:#6ab0ff}
+#page-battlestats .bstatFoot{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:6px;padding-top:16px;border-top:1px solid var(--border);flex-wrap:wrap}
+#page-battlestats .bstatShare{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--text2)}
+#page-battlestats .bstatFootNote{font-size:11.5px;color:var(--text3);margin-top:10px;text-align:right}
+#page-battlestats .bstatNote{background:rgba(106,176,255,.07);border:1px solid rgba(106,176,255,.22);border-left:3px solid #6ab0ff;border-radius:6px;padding:11px 14px;font-size:12.5px;color:var(--text2)}
+#page-battlestats .bstatNote b{color:#6ab0ff;font-weight:600}
+#page-battlestats .bstatWarn{background:rgba(217,166,72,.07);border:1px solid rgba(217,166,72,.22);border-left:3px solid var(--gold);border-radius:6px;padding:11px 14px;font-size:12.5px;color:var(--text2)}
+#page-battlestats .bstatWarn b{color:var(--gold);font-weight:600}
+#page-battlestats .bstatTblWrap{overflow-x:auto}
+#page-battlestats .bstatTbl{width:100%;border-collapse:collapse}
+#page-battlestats .bstatTbl th{font-family:var(--head);font-size:10.5px;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;padding:9px 11px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+#page-battlestats .bstatTbl td{padding:10px 11px;border-bottom:1px solid var(--border);font-size:13px;white-space:nowrap}
+#page-battlestats .bstatTbl tbody tr:hover{background:rgba(217,166,72,.04)}
+#page-battlestats .bstatRk{font-family:var(--mono);font-size:12px;color:var(--text3)}
+#page-battlestats .bstatRk.top{color:var(--gold);font-weight:600}
+#page-battlestats .bstatNum{font-family:var(--mono);font-size:13px;font-weight:600}
+#page-battlestats .bstatNum.atk{color:var(--accent2)}
+#page-battlestats .bstatNum.def{color:#6ab0ff}
+#page-battlestats .bstatChip{font-family:var(--mono);font-size:9.5px;font-weight:600;padding:2px 5px;border-radius:3px;border:1px solid var(--border);color:var(--text3);background:var(--bg4)}
+#page-battlestats .bstatChip.on{color:var(--gold);border-color:rgba(217,166,72,.4);background:rgba(217,166,72,.12)}
+#page-battlestats .bstatFresh{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text3)}
+#page-battlestats .bstatFDot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+#page-battlestats .bstatWtRow{display:grid;grid-template-columns:1.3fr 90px 2fr;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:12.5px}
+#page-battlestats .bstatWtRow .bstatWtL{color:var(--text2)}
+#page-battlestats .bstatWtRow .bstatWtD{font-size:11.5px;color:var(--text3)}
+#page-battlestats .bstatWtRow input{font-family:var(--mono);text-align:right}
+#page-battlestats .bstatSecT{font-family:var(--head);font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text2);margin:18px 0 8px;border-left:3px solid var(--gold);padding-left:10px}
+@media(max-width:860px){
+  #page-battlestats .bstatDual{grid-template-columns:1fr}
+  #page-battlestats .bstatTTBody{grid-template-columns:repeat(2,1fr)}
+  #page-battlestats .bstatGrid3{grid-template-columns:1fr}
+}
+</style>
+
+<script>
+// ══════════════════ BATTLE STATS (bstat*) client ══════════════════
+// Battle Stats data is NOT in the shared snapshot, so it has its own load/save path.
+// bstatLoad() → GET /battle-stats ; bstatSave() → PUT /state with only a bstatByPlayer patch.
+// The preview score here mirrors the server's bstatScore so the number the user sees before
+// saving matches what the server stamps. The server is authoritative — this is a preview only.
+
+var BSTAT = { weights:null, rows:{}, mine:null, rankMode:'atk', wtEditing:false, loaded:false };
+
+// Meta hero subset — troop type, gear role (o/d), primary skill op family + magnitude.
+// Mirror of BSTAT_HEROES on the server. Keep the two in step when adding heroes.
+var BSTAT_HEROES = {
+  'Amadeus':{type:'infantry',gear:'o',op:101,mag:1.0}, 'Helga':{type:'infantry',gear:'o',op:101,mag:1.0},
+  'Alcar':{type:'infantry',gear:'d',op:113,mag:1.0}, 'Triton':{type:'infantry',gear:'d',op:112,mag:1.0},
+  'Charles':{type:'infantry',gear:'d',op:113,mag:1.0}, 'Long Fei':{type:'infantry',gear:'d',op:111,mag:1.0},
+  'Eric':{type:'infantry',gear:'d',op:202,mag:0.8}, 'Zoe':{type:'infantry',gear:'d',op:111,mag:0.5},
+  'Ava':{type:'cavalry',gear:'o',op:211,mag:1.0}, 'Thrud':{type:'cavalry',gear:'o',op:101,mag:0.6},
+  'Petra':{type:'cavalry',gear:'o',op:101,mag:0.5}, 'Margot':{type:'cavalry',gear:'d',op:102,mag:1.0},
+  'Sophia':{type:'cavalry',gear:'d',op:111,mag:0.5}, 'Hilde':{type:'cavalry',gear:'d',op:112,mag:1.0},
+  'Jabel':{type:'cavalry',gear:'d',op:113,mag:1.0},
+  'Wee & Woo':{type:'archer',gear:'d',op:101,mag:1.0}, 'Yang':{type:'archer',gear:'o',op:101,mag:0.6},
+  'Vivian':{type:'archer',gear:'d',op:101,mag:1.0}, 'Rosa':{type:'archer',gear:'o',op:101,mag:0.5},
+  'Marlin':{type:'archer',gear:'o',op:101,mag:0.5}, 'Jaeger':{type:'archer',gear:'d',op:111,mag:0.5},
+  'Saul':{type:'archer',gear:'d',op:113,mag:1.0}
+};
+var BSTAT_ATK_OPS = {101:1,102:1,103:1,201:1,202:1,211:1,212:1};
+var BSTAT_DEF_OPS = {111:1,112:1,113:1};
+var BSTAT_TYPES = ['infantry','cavalry','archer'];
+
+function bstatN(v){ var n=Number(v); return isFinite(n)?n:0; }
+
+function bstatTgMult(tg,w){
+  var lvl=Math.max(0,bstatN(tg)); var m=Math.pow(w.tier.tgPerLevel,lvl);
+  if(lvl>=5) m*=w.tier.tg5; if(lvl>=8) m*=w.tier.tg8; return m;
+}
+function bstatSkillMult(heroes,side,w){
+  var wantDef=(side==='def'); var okOps=wantDef?BSTAT_DEF_OPS:BSTAT_ATK_OPS;
+  var sums={}, gearMult=1;
+  BSTAT_TYPES.forEach(function(t){
+    var h=heroes&&heroes[t]; if(!h||!h.hero) return;
+    var meta=BSTAT_HEROES[h.hero]; if(!meta) return;
+    if(okOps[meta.op]) sums[meta.op]=(sums[meta.op]||0)+meta.mag;
+    var gearHelps=wantDef?(meta.gear==='d'):(meta.gear==='o');
+    if(gearHelps){ var lv=Math.max(0,Math.min(10,bstatN(h.gearLv))); if(lv>0) gearMult*=(1+(w.gear.matchLv10-1)*(lv/10)); }
+  });
+  var skill=1; Object.keys(sums).forEach(function(op){ skill*=(1+sums[op]*w.skill.damageUpPer25); });
+  return skill*gearMult;
+}
+function bstatScoreLocal(row,w){
+  var troops=row.troops||{}, t11=row.t11||{};
+  var rSum=(w.ratio.infantry+w.ratio.cavalry+w.ratio.archer)||1;
+  var blendOff=0, blendSurv=0;
+  BSTAT_TYPES.forEach(function(t){
+    var s=troops[t]||{};
+    var off=(1+bstatN(s.atk)/100)*(1+bstatN(s.leth)/100);
+    var surv=(1+bstatN(s.def)/100)*(1+bstatN(s.hp)/100);
+    var tier=(t11[t]?w.tier.t11:1)*bstatTgMult(row.tg,w);
+    var rShare=bstatN(w.ratio[t])/rSum;
+    blendOff+=rShare*off*tier; blendSurv+=rShare*surv*tier;
+  });
+  var cap=Math.max(1,bstatN(row.rallyCap));
+  var capAtk=Math.pow(cap/w.cap.median,w.cap.atkExp);
+  var capDef=Math.pow(cap/w.cap.median,w.cap.defExp);
+  return { atk:Math.round(blendOff*bstatSkillMult(row.heroes,'atk',w)*capAtk*w.scale),
+           def:Math.round(blendSurv*bstatSkillMult(row.heroes,'def',w)*capDef*w.scale) };
+}
+
+// ── sub-tab switching ──
+function bstatTab(p){
+  var subs=document.querySelectorAll('#page-battlestats .bstatSubtab');
+  for(var i=0;i<subs.length;i++){ subs[i].classList.toggle('active', subs[i].getAttribute('data-p')===p); }
+  var panes=document.querySelectorAll('#page-battlestats .bstatPane');
+  for(var j=0;j<panes.length;j++){ panes[j].classList.remove('active'); }
+  var pane=document.getElementById('bstatPane-'+p); if(pane) pane.classList.add('active');
+  if(p==='rank') bstatRenderRank();
+  if(p==='prog') bstatRenderProg();
+  if(p==='wt') bstatRenderWeights();
+}
+
+// ── hero pickers ──
+function bstatFillHeroes(){
+  BSTAT_TYPES.forEach(function(t){
+    var list=[]; Object.keys(BSTAT_HEROES).forEach(function(name){ if(BSTAT_HEROES[name].type===t) list.push(name); });
+    var sel=document.getElementById('bstatH'+t.charAt(0).toUpperCase()+t.slice(1,3));
+    if(!sel) return;
+    sel.innerHTML=list.map(function(n){ var tag=BSTAT_HEROES[n].gear==='o'?' ⚔':' 🛡'; return '<option value="'+n+'">'+n+tag+'</option>'; }).join('');
+  });
+  ['Inf','Cav','Arc'].forEach(function(sfx){
+    var g=document.getElementById('bstatGear'+sfx); if(!g) return;
+    g.innerHTML='<option value="0">0 — none</option><option value="2">2</option><option value="4">4</option><option value="6">6</option><option value="8">8</option><option value="10" selected>10</option>';
+  });
+}
+
+// ── init (called by showPageDirect) ──
+function bstatInit(){
+  bstatFillHeroes();
+  if(!BSTAT.loaded) bstatLoad();
+}
+
+// ── load rows + weights from the server ──
+function bstatLoad(){
+  fetch((typeof SYNC_API_URL!=='undefined'?SYNC_API_URL.replace(/\/$/,''):'')+'/battle-stats', {
+    headers: stateHeaders()
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if(!d || d.ok===false){ return; }
+    BSTAT.weights = d.weights || null;
+    BSTAT.rows = d.bstatByPlayer || {};
+    BSTAT.mine = (AUTH.pid && BSTAT.rows[AUTH.pid]) ? BSTAT.rows[AUTH.pid] : null;
+    BSTAT.loaded = true;
+    bstatHydrateMine();
+    bstatRenderRank();
+  }).catch(function(){ /* leave empty; the user can still enter fresh stats */ });
+}
+
+// If I already have a saved row, fill My Stats from it.
+function bstatHydrateMine(){
+  if(!BSTAT.mine){ bstatRenderReview(null); return; }
+  var m=BSTAT.mine;
+  bstatRenderReview(m.troops||null, m.t11||{});
+  if(m.rallyCap) document.getElementById('bstatRallyCap').value=m.rallyCap;
+  if(m.marchCap) document.getElementById('bstatMarchCap').value=m.marchCap;
+  if(m.tg!==undefined) document.getElementById('bstatTg').value=String(m.tg);
+  if(m.heroes){ BSTAT_TYPES.forEach(function(t){ var h=m.heroes[t]; if(!h) return;
+    var sfx=t.charAt(0).toUpperCase()+t.slice(1,3);
+    if(h.hero) document.getElementById('bstatH'+sfx).value=h.hero;
+    if(h.gen) document.getElementById('bstatGen'+sfx).value=h.gen;
+    if(h.gearLv!==undefined) document.getElementById('bstatGear'+sfx).value=String(h.gearLv);
+  }); }
+  if(m.shared===false) document.getElementById('bstatShareSw').classList.remove('on');
+  bstatRecalcPreview();
+}
+
+// ── OCR upload ──
+function bstatOnFile(ev){
+  var f=ev.target.files&&ev.target.files[0]; if(!f) return;
+  var reader=new FileReader();
+  reader.onload=function(){ bstatScan(reader.result); };
+  reader.readAsDataURL(f);
+}
+function bstatScan(dataUrl){
+  var st=document.getElementById('bstatScanStatus');
+  st.style.display='block'; st.textContent='🤖 Reading the report with AI…';
+  var base64=dataUrl.split(',')[1];
+  fetch((typeof SYNC_API_URL!=='undefined'?SYNC_API_URL.replace(/\/$/,''):'')+'/ocr-battlestats', {
+    method:'POST', headers: stateHeaders({'Content-Type':'application/json'}), body: JSON.stringify({ image: base64 })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if(d && d.ok && d.values){
+      st.textContent='✅ Scan complete — check every value below before saving';
+      bstatRenderReview(d.values, (BSTAT.mine&&BSTAT.mine.t11)||{}, true);
+      bstatRecalcPreview();
+    } else {
+      st.textContent='⚠️ Could not read that screenshot — enter the values by hand below.';
+      bstatRenderReview(null);
+    }
+  }).catch(function(){ st.textContent='⚠️ Scan failed — enter the values by hand below.'; bstatRenderReview(null); });
+}
+
+// ── review grid ──
+function bstatRenderReview(troops, t11, fromScan){
+  t11=t11||{};
+  var colors={infantry:'var(--accent2)',cavalry:'#6ab0ff',archer:'var(--green)'};
+  var html='';
+  BSTAT_TYPES.forEach(function(t){
+    var s=(troops&&troops[t])||{atk:'',def:'',leth:'',hp:''};
+    var flag=fromScan?'<span class="bstatFlag"></span>':'';
+    var on=t11[t]?' on':'';
+    html+='<div class="bstatTT"><div class="bstatTTHead">'
+      +'<span class="bstatDot" style="background:'+colors[t]+'"></span>'
+      +'<span class="bstatTTName" style="color:'+colors[t]+'">'+t+'</span>'
+      +'<span class="bstatT11">Tier 11 <span class="bstatSw'+on+'" data-t11="'+t+'" onclick="this.classList.toggle(\'on\');bstatRecalcPreview()"></span></span>'
+      +'</div><div class="bstatTTBody">'
+      +bstatStatCell(t,'atk','Attack',s.atk,flag)
+      +bstatStatCell(t,'def','Defense',s.def,flag)
+      +bstatStatCell(t,'leth','Lethality',s.leth,flag)
+      +bstatStatCell(t,'hp','Health',s.hp,flag)
+      +'</div></div>';
+  });
+  document.getElementById('bstatReview').innerHTML=html;
+}
+function bstatStatCell(t,key,label,val,flag){
+  return '<div class="bstatStat"><div class="bstatStatL">'+flag+label+'</div>'
+    +'<div style="display:flex;align-items:baseline;gap:3px">'
+    +'<input data-stat="'+t+'.'+key+'" value="'+(val===undefined||val===null?'':val)+'" oninput="bstatRecalcPreview()">'
+    +'<span style="font-family:var(--mono);font-size:12px;color:var(--text3)">%</span></div></div>';
+}
+
+// ── gather the current form into a row object ──
+function bstatGatherRow(){
+  var troops={}, t11={};
+  BSTAT_TYPES.forEach(function(t){ troops[t]={}; });
+  var cells=document.querySelectorAll('#bstatReview input[data-stat]');
+  for(var i=0;i<cells.length;i++){ var parts=cells[i].getAttribute('data-stat').split('.'); troops[parts[0]][parts[1]]=bstatN(cells[i].value); }
+  var t11sw=document.querySelectorAll('#bstatReview .bstatSw[data-t11]');
+  for(var j=0;j<t11sw.length;j++){ t11[t11sw[j].getAttribute('data-t11')]=t11sw[j].classList.contains('on'); }
+  var heroes={};
+  BSTAT_TYPES.forEach(function(t){ var sfx=t.charAt(0).toUpperCase()+t.slice(1,3);
+    heroes[t]={ hero:document.getElementById('bstatH'+sfx).value,
+      gen:bstatN(document.getElementById('bstatGen'+sfx).value),
+      gearLv:bstatN(document.getElementById('bstatGear'+sfx).value) };
+  });
+  return {
+    pid: AUTH.pid || null,
+    ign: (verifiedPlayer&&verifiedPlayer.name)||AUTH.role||'',
+    troops: troops, t11: t11,
+    tg: bstatN(document.getElementById('bstatTg').value),
+    rallyCap: bstatN(document.getElementById('bstatRallyCap').value),
+    marchCap: bstatN(document.getElementById('bstatMarchCap').value),
+    heroes: heroes,
+    shared: document.getElementById('bstatShareSw').classList.contains('on')
+  };
+}
+
+// ── preview score (mirrors server) ──
+function bstatRecalcPreview(){
+  var w=BSTAT.weights; if(!w){ return; }
+  var row=bstatGatherRow();
+  var sc=bstatScoreLocal(row,w);
+  document.getElementById('bstatPreviewAtk').textContent=sc.atk;
+  document.getElementById('bstatPreviewDef').textContent=sc.def;
+}
+
+// ── save: PUT /state with only a bstatByPlayer patch (own row) ──
+function bstatSave(){
+  if(!AUTH.pid){ if(typeof toast==='function') toast('You need a verified Player ID to save Battle Stats.'); return; }
+  var row=bstatGatherRow();
+  var patch={}; patch.bstatByPlayer={}; patch.bstatByPlayer[AUTH.pid]=row;
+  var btn=document.getElementById('bstatSaveBtn'); btn.disabled=true; btn.textContent='Saving…';
+  fetch((typeof SYNC_API_URL!=='undefined'?SYNC_API_URL.replace(/\/$/,''):'')+'/state', {
+    method:'PUT', headers: stateHeaders({'Content-Type':'application/json'}),
+    body: JSON.stringify({ _baseRev: (typeof syncRev!=='undefined'?syncRev:0), patch: patch, _client: (typeof SYNC_CLIENT_ID!=='undefined'?SYNC_CLIENT_ID:null) })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    btn.disabled=false; btn.textContent='Save stats';
+    if(d && d.ok!==false){ if(typeof toast==='function') toast('Battle Stats saved.'); BSTAT.loaded=false; bstatLoad(); }
+    else { if(typeof toast==='function') toast('Save failed'+(d&&d.error?': '+d.error:'')); }
+  }).catch(function(){ btn.disabled=false; btn.textContent='Save stats'; if(typeof toast==='function') toast('Save failed.'); });
+}
+
+// ══════════════════ RANKINGS ══════════════════
+function bstatRankMode(m){
+  BSTAT.rankMode=m;
+  document.getElementById('bstatRankAtk').className=(m==='atk')?'bstatBtnGold':'bstatBtnGhost';
+  document.getElementById('bstatRankDef').className=(m==='def')?'bstatBtnGold':'bstatBtnGhost';
+  bstatRenderRank();
+}
+function bstatFreshDot(updatedAt){
+  var days = updatedAt ? (Date.now()-updatedAt)/86400000 : 999;
+  if(days<=3) return ['#2ecc71', (days<1?'today':(Math.round(days)+'d'))];
+  if(days<=10) return ['#d9a648', Math.round(days)+'d'];
+  return ['#e04545', Math.round(days)+'d'];
+}
+function bstatRenderRank(){
+  var body=document.getElementById('bstatRankRows'); if(!body) return;
+  var mode=BSTAT.rankMode||'atk';
+  var scoreKey = (mode==='atk')?'scoreAtk':'scoreDef';
+  document.getElementById('bstatRankScoreH').textContent = (mode==='atk'?'Attack':'Defense')+' ↓';
+  var rows=[];
+  Object.keys(BSTAT.rows||{}).forEach(function(k){ var r=BSTAT.rows[k]; if(r) rows.push(r); });
+  rows.sort(function(a,b){ return (bstatN(b[scoreKey])) - (bstatN(a[scoreKey])); });
+  // meta line: how many shared vs hidden (admin sees all; the hidden count is informational)
+  var meta=document.getElementById('bstatRankMeta');
+  if(meta){ var shared=rows.filter(function(r){return r.shared!==false;}).length;
+    var hidden=rows.length-shared;
+    meta.textContent = rows.length+' leader'+(rows.length===1?'':'s')+(hidden?(' · '+hidden+' opted out'):''); }
+  if(!rows.length){ body.innerHTML='<tr><td colspan="8" style="color:var(--text3);padding:18px;text-align:center">No stats saved yet.</td></tr>'; return; }
+  body.innerHTML = rows.map(function(r,i){
+    var leadGear = bstatLeadGear(r, mode);
+    var fd = bstatFreshDot(r.updatedAt);
+    var t11=r.t11||{};
+    var chip=function(on,ltr){ return '<span class="bstatChip'+(on?' on':'')+'">'+ltr+'</span>'; };
+    return '<tr>'
+      +'<td class="bstatRk'+(i<3?' top':'')+'">'+(i+1<10?'0':'')+(i+1)+'</td>'
+      +'<td><div style="font-weight:600;color:var(--text)">'+bstatEsc(r.ign||r.pid||'')+'</div>'
+        +'<div style="font-size:11px;color:var(--text3)">'+bstatEsc(r.alliance||'')+'</div></td>'
+      +'<td class="bstatNum '+mode+'">'+bstatN(r[scoreKey])+'</td>'
+      +'<td>'+leadGear+'</td>'
+      +'<td>'+chip(t11.infantry,'I')+' '+chip(t11.cavalry,'C')+' '+chip(t11.archer,'A')+'</td>'
+      +'<td class="bstatNum">'+(r.tg!==undefined?('TG'+r.tg):'—')+'</td>'
+      +'<td class="bstatNum">'+bstatCap(r.rallyCap)+'</td>'
+      +'<td><span class="bstatFresh"><span class="bstatFDot" style="background:'+fd[0]+'"></span>'+fd[1]+'</span></td>'
+      +'</tr>';
+  }).join('');
+}
+// The lead whose gear matches the current mode (offensive gear for attack, defensive for
+// defense). This is informational — it shows WHY a leader ranks where they do on this side.
+function bstatLeadGear(r, mode){
+  var want = (mode==='def')?'d':'o';
+  var found=null;
+  BSTAT_TYPES.forEach(function(t){
+    var h=r.heroes&&r.heroes[t]; if(!h||!h.hero) return;
+    var meta=BSTAT_HEROES[h.hero]; if(!meta) return;
+    if(meta.gear===want && bstatN(h.gearLv)>0 && !found) found={name:h.hero,role:meta.gear};
+  });
+  if(!found) return '<span style="font-size:11px;color:var(--text3)">— none —</span>';
+  var col = found.role==='o'?'var(--accent2)':'#6ab0ff';
+  return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--text2)">'
+    +'<span style="width:7px;height:7px;border-radius:50%;background:'+col+';flex-shrink:0"></span>'+bstatEsc(found.name)+'</span>';
+}
+function bstatCap(v){ v=bstatN(v); if(!v) return '—'; if(v>=1000000) return (v/1000000).toFixed(2)+'M'; if(v>=1000) return Math.round(v/1000)+'K'; return String(v); }
+function bstatEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ══════════════════ MY PROGRESS ══════════════════
+// Re-score every saved snapshot under CURRENT weights, so the trend is like-for-like even
+// after the weights change. The stored per-snapshot score is what it was scored at the time;
+// the "now" column re-runs it under today's weights.
+function bstatRenderProg(){
+  var host=document.getElementById('bstatProg'); if(!host) return;
+  var mine=BSTAT.mine;
+  if(!mine || !Array.isArray(mine.history) || !mine.history.length){
+    host.innerHTML='<div style="color:var(--text3);padding:8px 0">No saved uploads yet. Save your stats and your progress trend will appear here.</div>';
+    return;
+  }
+  var w=BSTAT.weights||null;
+  var hist=mine.history.slice();
+  // re-score each snapshot under current weights
+  var reAtk=[], reDef=[];
+  hist.forEach(function(h){
+    if(w){ var sc=bstatScoreLocal({troops:h.troops,t11:h.t11,tg:h.tg,rallyCap:h.rallyCap,heroes:h.heroes}, w); reAtk.push(sc.atk); reDef.push(sc.def); }
+    else { reAtk.push(bstatN(h.scoreAtk)); reDef.push(bstatN(h.scoreDef)); }
+  });
+  var html='';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px">';
+  html+=bstatSpark('Attack score', reAtk);
+  html+=bstatSpark('Defense score', reDef);
+  html+='</div>';
+  // table
+  html+='<div class="bstatTblWrap"><table class="bstatTbl"><thead><tr>'
+    +'<th>Saved</th><th>Attack (now)</th><th>Defense (now)</th><th>Rally cap</th><th>TG</th><th>Weights then</th></tr></thead><tbody>';
+  for(var i=hist.length-1;i>=0;i--){ var h=hist[i];
+    html+='<tr><td class="bstatNum">'+bstatDate(h.savedAt)+'</td>'
+      +'<td class="bstatNum atk">'+reAtk[i]+'</td>'
+      +'<td class="bstatNum def">'+reDef[i]+'</td>'
+      +'<td class="bstatNum">'+bstatCap(h.rallyCap)+'</td>'
+      +'<td class="bstatNum">'+(h.tg!==undefined?('TG'+h.tg):'—')+'</td>'
+      +'<td><span class="bstatChip'+((BSTAT.weights&&h.weightsVer===BSTAT.weights.ver)?' on':'')+'">v'+bstatN(h.weightsVer)+'</span></td></tr>';
+  }
+  html+='</tbody></table></div>';
+  host.innerHTML=html;
+}
+function bstatSpark(label, arr){
+  var max=Math.max.apply(null, arr.concat([1]));
+  var bars=arr.map(function(v,i){ var h=Math.max(3,Math.round(v/max*100)); var last=(i===arr.length-1);
+    return '<div style="flex:1;border-radius:2px 2px 0 0;min-height:3px;height:'+h+'%;background:'+(last?'linear-gradient(180deg,var(--gold),rgba(217,166,72,.25))':'linear-gradient(180deg,var(--accent2),rgba(224,141,94,.2))')+'"></div>';
+  }).join('');
+  var first=arr.length?arr[0]:0, now=arr.length?arr[arr.length-1]:0;
+  return '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:15px">'
+    +'<div class="bstatBigL" style="margin-bottom:9px">'+label+' — last '+arr.length+'</div>'
+    +'<div style="display:flex;align-items:flex-end;gap:3px;height:34px">'+bars+'</div>'
+    +'<div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--text3);margin-top:7px"><span>'+first+'</span><span style="color:var(--gold)">'+now+' now</span></div></div>';
+}
+function bstatDate(ms){ if(!ms) return '—'; var d=new Date(ms); var mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return d.getUTCDate()+' '+mo[d.getUTCMonth()]; }
+
+// ══════════════════ WEIGHTS ══════════════════
+function bstatRenderWeights(){
+  var host=document.getElementById('bstatWtBody'); if(!host) return;
+  var w=BSTAT.weights;
+  if(!w){ host.innerHTML='<div style="color:var(--text3);padding:8px 0">Weights not loaded.</div>'; return; }
+  document.getElementById('bstatWtVer').textContent='v'+bstatN(w.ver);
+  var ed=BSTAT.wtEditing;
+  var isAdm=(typeof isAdmin==='function'&&isAdmin());
+  var editBtn=document.getElementById('bstatWtEditBtn');
+  if(editBtn){ editBtn.style.display=isAdm?'':'none'; editBtn.textContent=ed?'💾 Save weights':'🔓 Unlock to edit'; }
+  var ro = ed ? '' : ' readonly style="opacity:.65;pointer-events:none"';
+  function row(path,label,val,desc){
+    return '<div class="bstatWtRow"><span class="bstatWtL">'+label+'</span>'
+      +'<input data-wt="'+path+'" value="'+val+'"'+ro+'>'
+      +'<span class="bstatWtD">'+desc+'</span></div>';
+  }
+  var h='';
+  h+='<div class="bstatSecT">Standing march ratio</div>';
+  h+='<div style="display:flex;height:32px;border-radius:6px;overflow:hidden;border:1px solid var(--border);margin-bottom:8px">'
+    +'<div style="display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:600;color:#fff;background:rgba(224,141,94,.75);width:'+w.ratio.infantry+'%">'+w.ratio.infantry+'% INF</div>'
+    +'<div style="display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:600;color:#fff;background:rgba(106,176,255,.6);width:'+w.ratio.cavalry+'%">'+w.ratio.cavalry+'%</div>'
+    +'<div style="display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:600;color:#fff;background:rgba(46,204,113,.6);width:'+w.ratio.archer+'%">'+w.ratio.archer+'% ARC</div></div>';
+  h+=row('ratio.infantry','Infantry %',w.ratio.infantry,'Share of every march')
+    + row('ratio.cavalry','Cavalry %',w.ratio.cavalry,'')
+    + row('ratio.archer','Archer %',w.ratio.archer,'Should sum to ~100');
+  h+='<div class="bstatSecT">Troop tier</div>';
+  h+=row('tier.t11','Tier 11 multiplier',w.tier.t11,'≈15–20% over T10 (community-tested)')
+    + row('tier.tgPerLevel','Truegold, per level',w.tier.tgPerLevel,'Compounds — TG8 ≈ ×1.17')
+    + row('tier.tg5','TG5 skill step',w.tier.tg5,'First Truegold troop skill')
+    + row('tier.tg8','TG8 skill step',w.tier.tg8,'Why TG8 T10 beats TG5 T11');
+  h+='<div class="bstatSecT">Heroes &amp; gear</div>';
+  h+=row('gear.matchLv10','Gear lv10 — role matches',w.gear.matchLv10,'Max +15%, leader only, whole rally')
+    + row('gear.mismatch','Gear — role mismatch',w.gear.mismatch,'Offensive gear does nothing on defense')
+    + row('skill.damageUpPer25','Damage-up per +25%',w.skill.damageUpPer25,'Same op-code adds, different multiplies')
+    + row('skill.proc','Proc/chance skill',w.skill.proc,'Counted once — no per-copy stack');
+  h+='<div class="bstatSecT">Capacity</div>';
+  h+=row('cap.atkExp','Attack — exponent',w.cap.atkExp,'√ — twice the troops ≈ 41% more damage')
+    + row('cap.defExp','Defense — exponent',w.cap.defExp,'HP pool to grind through — ~linear')
+    + row('cap.median','Kingdom median rally',w.cap.median,'Puts a typical leader at ×1.00');
+  h+='<div class="bstatSecT">Display</div>';
+  h+=row('scale','Score scale',w.scale,'Tuning constant → typical leader ~100–200');
+  h+='<div class="bstatWarn" style="margin-top:16px"><b>Starting values, not gospel.</b> The formula\'s shape is well-evidenced; the exact figures are community estimates. Once real reports are in, tune them against what happened on the field.</div>';
+  host.innerHTML=h;
+}
+function bstatWtToggleEdit(){
+  if(!(typeof isAdmin==='function'&&isAdmin())){ if(typeof toast==='function') toast('Only admin can edit weights.'); return; }
+  if(!BSTAT.wtEditing){ BSTAT.wtEditing=true; bstatRenderWeights(); return; }
+  // Saving: gather inputs into a fresh weights object, bump ver, PUT it.
+  var w=JSON.parse(JSON.stringify(BSTAT.weights));
+  var inputs=document.querySelectorAll('#bstatWtBody input[data-wt]');
+  for(var i=0;i<inputs.length;i++){
+    var path=inputs[i].getAttribute('data-wt').split('.');
+    var val=Number(inputs[i].value); if(!isFinite(val)) continue;
+    if(path.length===2){ if(!w[path[0]]) w[path[0]]={}; w[path[0]][path[1]]=val; }
+    else { w[path[0]]=val; }
+  }
+  w.ver = bstatN(BSTAT.weights.ver)+1;
+  var btn=document.getElementById('bstatWtEditBtn'); btn.disabled=true; btn.textContent='Saving…';
+  fetch((typeof SYNC_API_URL!=='undefined'?SYNC_API_URL.replace(/\/$/,''):'')+'/state', {
+    method:'PUT', headers: stateHeaders({'Content-Type':'application/json'}),
+    body: JSON.stringify({ _baseRev:(typeof syncRev!=='undefined'?syncRev:0), patch:{ bstatWeights:w }, _client:(typeof SYNC_CLIENT_ID!=='undefined'?SYNC_CLIENT_ID:null) })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    btn.disabled=false;
+    if(d && d.ok!==false){ BSTAT.wtEditing=false; if(typeof toast==='function') toast('Weights saved. All scores re-calculated.'); BSTAT.loaded=false; bstatLoad(); bstatRenderWeights(); }
+    else { btn.textContent='💾 Save weights'; if(typeof toast==='function') toast('Save failed'+(d&&d.error?': '+d.error:'')); }
+  }).catch(function(){ btn.disabled=false; btn.textContent='💾 Save weights'; if(typeof toast==='function') toast('Save failed.'); });
+}
+</script>
+
 <!-- ADMIN PAGE -->
 <div id="page-admin" class="page">
   <div class="card" style="margin-bottom:14px">
@@ -7266,6 +7916,140 @@ function isBenchStub(e){
   return true;
 }
 function stripPw(s){ if (s && typeof s==='object'){ delete s.pw_rallyleader; delete s.pw_r4r5; delete s.pw_admin; } return s; }
+
+// ═══════════════ BATTLE STATS SCORING ═══════════════
+// Turns a player's Battle Report stats + army + heroes into one ATTACK number and one
+// DEFENSE number, used to rank rally leaders for battle assignments. The score is always
+// computed HERE, on the server, from the stored row + current weights — the client's copy
+// is never trusted (same rule as msSubmissions). The MODEL is well-evidenced; the exact
+// COEFFICIENTS are community estimates, which is why every one of them lives in editable
+// bstatWeights rather than being hard-coded. See the Weights tab.
+//
+// Why multiplicative, not a weighted sum: in the game's damage formula Attack and Lethality
+// multiply each other, and Defense and Health multiply on the defender's side. Adding the
+// four would rank a 1000/300 sheet equal to a 650/650 one, when the second is far deadlier.
+
+// Defaults seeded on first use. Admin edits these in the Weights tab (key: bstatWeights).
+const BSTAT_WEIGHTS_DEFAULT = {
+  ver: 1,
+  ratio: { infantry: 50, cavalry: 20, archer: 30 },   // standing march ratio (must sum ~100)
+  tier:  { t11: 1.17, tgPerLevel: 1.02, tg5: 1.10, tg8: 1.10 },
+  gear:  { matchLv10: 1.15, mismatch: 1.00 },          // widget/exclusive gear, leader only
+  skill: { damageUpPer25: 0.25, proc: 0.50 },          // op-code contributions
+  cap:   { atkExp: 0.50, defExp: 1.00, median: 1100000 },
+  scale: 0.45                                          // tuning constant → typical leader ~100-200
+};
+
+// Compact hero reference: which troop type a hero leads, whether their exclusive gear is
+// Offensive (rally) or Defensive (garrison), and their primary skill's op-code family with a
+// magnitude in "+25% units". Op families: 101/102 = DamageUp (attack side), 111/112/113 =
+// DefenseUp (defense side), 201/202 = enemy debuff (attack side). Same family adds across
+// heroes; different families multiply — that is the whole point of mixing heroes. This is a
+// deliberately small meta subset; unknown heroes fall back to a neutral 1.0 so the score
+// degrades gracefully rather than throwing. Extend from the roster research as needed.
+const BSTAT_HEROES = {
+  // Infantry
+  'Amadeus': { type:'infantry', gear:'o', op:101, mag:1.0 },
+  'Helga':   { type:'infantry', gear:'o', op:101, mag:1.0 },
+  'Alcar':   { type:'infantry', gear:'d', op:113, mag:1.0 },
+  'Triton':  { type:'infantry', gear:'d', op:112, mag:1.0 },
+  'Charles': { type:'infantry', gear:'d', op:113, mag:1.0 },
+  'Long Fei':{ type:'infantry', gear:'d', op:111, mag:1.0 },
+  'Eric':    { type:'infantry', gear:'d', op:202, mag:0.8 },
+  'Zoe':     { type:'infantry', gear:'d', op:111, mag:0.5 },
+  // Cavalry
+  'Ava':     { type:'cavalry',  gear:'o', op:211, mag:1.0 },
+  'Thrud':   { type:'cavalry',  gear:'o', op:101, mag:0.6 },
+  'Petra':   { type:'cavalry',  gear:'o', op:101, mag:0.5 },
+  'Margot':  { type:'cavalry',  gear:'d', op:102, mag:1.0 },
+  'Sophia':  { type:'cavalry',  gear:'d', op:111, mag:0.5 },
+  'Hilde':   { type:'cavalry',  gear:'d', op:112, mag:1.0 },
+  'Jabel':   { type:'cavalry',  gear:'d', op:113, mag:1.0 },
+  // Archer
+  'Wee & Woo':{type:'archer',   gear:'d', op:101, mag:1.0 },
+  'Yang':    { type:'archer',   gear:'o', op:101, mag:0.6 },
+  'Vivian':  { type:'archer',   gear:'d', op:101, mag:1.0 },
+  'Rosa':    { type:'archer',   gear:'o', op:101, mag:0.5 },
+  'Marlin':  { type:'archer',   gear:'o', op:101, mag:0.5 },
+  'Jaeger':  { type:'archer',   gear:'d', op:111, mag:0.5 },
+  'Saul':    { type:'archer',   gear:'d', op:113, mag:1.0 }
+};
+const BSTAT_ATK_OPS = { 101:1, 102:1, 103:1, 201:1, 202:1, 211:1, 212:1 }; // families that help attack
+const BSTAT_DEF_OPS = { 111:1, 112:1, 113:1 };                            // families that help defense
+
+function bstatNum(v){ const n = Number(v); return isFinite(n) ? n : 0; }
+
+// Truegold multiplier: a compounding per-level stat bump plus the two skill-unlock steps
+// (TG5, TG8). This is why a maxed T10-TG8 can out-fight a fresh T11-TG5.
+function bstatTgMult(tg, w){
+  const lvl = Math.max(0, bstatNum(tg));
+  let m = Math.pow(w.tier.tgPerLevel, lvl);
+  if (lvl >= 5) m *= w.tier.tg5;
+  if (lvl >= 8) m *= w.tier.tg8;
+  return m;
+}
+
+// Fold the leader's three heroes into a single attack- or defense-side skill multiplier.
+// Same op family sums, different families multiply. Gear adds its matchLv10 bonus (scaled by
+// gear level /10) only when the hero's gear role matches the side (offense gear → attack).
+function bstatSkillMult(heroes, side, w){
+  const wantDef = (side === 'def');
+  const okOps = wantDef ? BSTAT_DEF_OPS : BSTAT_ATK_OPS;
+  const sums = {};          // op family -> summed magnitude (in +25% units)
+  let gearMult = 1;
+  ['infantry','cavalry','archer'].forEach(function(t){
+    const h = heroes && heroes[t];
+    if (!h || !h.hero) return;
+    const meta = BSTAT_HEROES[h.hero];
+    if (!meta) return;
+    // Skill side match
+    if (okOps[meta.op]){
+      sums[meta.op] = (sums[meta.op] || 0) + meta.mag;
+    }
+    // Gear side + level match (offense gear helps attack, defensive gear helps defense)
+    const gearHelps = wantDef ? (meta.gear === 'd') : (meta.gear === 'o');
+    if (gearHelps){
+      const lv = Math.max(0, Math.min(10, bstatNum(h.gearLv)));
+      if (lv > 0) gearMult *= (1 + (w.gear.matchLv10 - 1) * (lv / 10));
+    }
+  });
+  let skill = 1;
+  Object.keys(sums).forEach(function(op){
+    skill *= (1 + sums[op] * w.skill.damageUpPer25);   // different families multiply
+  });
+  return skill * gearMult;
+}
+
+// The whole model. Returns { atk, def } as rounded integers.
+function bstatScore(row, weights){
+  const w = weights || BSTAT_WEIGHTS_DEFAULT;
+  const troops = row.troops || {};
+  const t11 = row.t11 || {};
+  const ratioSum = (w.ratio.infantry + w.ratio.cavalry + w.ratio.archer) || 1;
+
+  let blendOff = 0, blendSurv = 0;
+  ['infantry','cavalry','archer'].forEach(function(t){
+    const s = troops[t] || {};
+    const off  = (1 + bstatNum(s.atk)/100) * (1 + bstatNum(s.leth)/100);
+    const surv = (1 + bstatNum(s.def)/100) * (1 + bstatNum(s.hp)/100);
+    const tier = (t11[t] ? w.tier.t11 : 1) * bstatTgMult(row.tg, w);
+    const rShare = (bstatNum(w.ratio[t]) / ratioSum);
+    blendOff  += rShare * off  * tier;
+    blendSurv += rShare * surv * tier;
+  });
+
+  const skillsAtk = bstatSkillMult(row.heroes, 'atk', w);
+  const skillsDef = bstatSkillMult(row.heroes, 'def', w);
+
+  const cap = Math.max(1, bstatNum(row.rallyCap));
+  const capAtk = Math.pow(cap / w.cap.median, w.cap.atkExp);
+  const capDef = Math.pow(cap / w.cap.median, w.cap.defExp);
+
+  const atk = blendOff  * skillsAtk * capAtk * w.scale;
+  const def = blendSurv * skillsDef * capDef * w.scale;
+  return { atk: Math.round(atk), def: Math.round(def) };
+}
+
 function bearer(request){ return (request.headers.get('Authorization')||'').replace(/^Bearer\s+/,''); }
 
 // ═══════════════ DURABLE OBJECT: single source of truth ═══════════════
@@ -7277,7 +8061,7 @@ function bearer(request){ return (request.headers.get('Authorization')||'').repl
 // people touching different entries (different leaders, different players) can never
 // overwrite each other. A null entry is a tombstone = delete. Wholesale replacement
 // requires an explicit _replace directive (used by admin "clear all submissions").
-const MERGE_KEYS = ['rally', 'teamRally', 'msSubmissionsByPlayer', 'msAllocByBoard'];
+const MERGE_KEYS = ['rally', 'teamRally', 'msSubmissionsByPlayer', 'msAllocByBoard', 'bstatByPlayer'];
 
 // Minimum role required to write each top-level key. Anything not listed is admin-only:
 // deny by default, so a new key can't accidentally be world-writable.
@@ -7291,8 +8075,15 @@ const KEY_MIN_ROLE = {
   // Manage Spots — R4/R5 and up
   msAllocByBoard: 'r4r5', msLastAllocation: 'r4r5', msAuditLog: 'r4r5',
   // Submissions are owner-scoped; the per-entry rules in /put do the real work.
-  msSubmissionsByPlayer: 'member'
+  msSubmissionsByPlayer: 'member',
   // msDeadline, kvkDay1Override, msAuto, pw_* : absent => admin only
+
+  // Battle Stats (bstat*) — rally leaders' own combat stats, scored for battle ranking.
+  // bstatByPlayer is owner-keyed (like msSubmissionsByPlayer): the per-entry check in the
+  // PUT path lets a writer touch only their OWN row. Admin-only for now; to open to rally
+  // leaders later, change 'admin' to 'rallyleader' here AND in the client CLIENT_KEY_MIN_ROLE.
+  // bstatWeights (scoring weights + standing march ratio) stays admin-only permanently.
+  bstatByPlayer: 'admin', bstatWeights: 'admin'
 };
 function canWriteKey(role, key){
   const need = KEY_MIN_ROLE[key] || 'admin';
@@ -7419,6 +8210,12 @@ export class KingdomState {
 
   snapshot(){
     const s = stripPw(JSON.parse(JSON.stringify(this.st)));
+    // Battle Stats never rides the shared snapshot. A player who turns sharing OFF must be
+    // invisible to everyone — including admin — so their row cannot travel on the broadcast
+    // channel that every socket receives. It is served only by GET /battle-stats, which
+    // filters per caller. Stripping it here is what makes "hidden from everyone" real rather
+    // than cosmetic; without this line an unshared row would land in every open browser.
+    delete s.bstatByPlayer;
     s._rev = this.rev;
     s._now = Date.now();
     return s;
@@ -7451,6 +8248,12 @@ export class KingdomState {
       }
       this.st = st || {};
       this.rev = rv || 1;
+      // Seed Battle Stats weights once, in memory. Not persisted here on its own — it lands
+      // on the next real write. Existing DOs pick up the defaults without a migration pass;
+      // admin edits then overwrite them via the Weights tab.
+      if (!this.st.bstatWeights || !this.st.bstatWeights.ver){
+        this.st.bstatWeights = JSON.parse(JSON.stringify(BSTAT_WEIGHTS_DEFAULT));
+      }
       this.ready = true;
     });
     await this.scheduleAlarm();
@@ -7577,6 +8380,70 @@ export class KingdomState {
         }
       }
 
+      // ── Battle Stats belong to the player whose Battle Report they came from ──────
+      // Same rule as submissions: you may only write your OWN row (bstatByPlayer[yourPid]).
+      // No manager exception — R4/R5 and admin do not edit someone's combat stats for them.
+      // Wiping the whole map is admin-only. While the feature is admin-only overall this is
+      // belt-and-suspenders, but it is the exact hook that keeps widening access safe later.
+      const bstat = patch.bstatByPlayer;
+      if (bstat && typeof bstat === 'object' && !Array.isArray(bstat)) {
+        const isAdmin = (role === 'admin');
+        if (replaceKeys.indexOf('bstatByPlayer') >= 0 && !isAdmin) {
+          return json({ ok:false, error:'admin-required' }, 403);
+        }
+        for (const key of Object.keys(bstat)) {
+          const v = bstat[key];
+          if (pid && key === pid) {
+            // Your own row. Identity on the row must match the token; the client cannot
+            // claim to be someone else. (null = you deleted your own row, which is fine.)
+            if (v !== null && String(v.pid || '') !== pid) {
+              return json({ ok:false, error:'bstat-identity-mismatch' }, 403);
+            }
+            continue;
+          }
+          // Someone else's row. Only admin may touch it (e.g. remove a stale leaver).
+          if (!isAdmin) return json({ ok:false, error:'bstat-not-yours' }, 403);
+        }
+        // Score every incoming row HERE, from its own stats + current weights. The client
+        // shows a preview, but the authoritative scoreAtk/scoreDef, the cycle, updatedAt and
+        // weightsVer are all stamped on the server so a browser can't inflate its own ranking.
+        // (null entries are deletions — skip them.) History is appended server-side too, so
+        // the "my progress" trail is trustworthy and capped.
+        const bw = (this.st.bstatWeights && this.st.bstatWeights.ver) ? this.st.bstatWeights : BSTAT_WEIGHTS_DEFAULT;
+        const nowMs = Date.now();
+        const cycle = currentKvKDay1Srv(nowMs, this.st.kvkDay1Override ? new Date(this.st.kvkDay1Override).getTime() : null);
+        for (const key of Object.keys(bstat)) {
+          const v = bstat[key];
+          if (v === null) continue;
+          const sc = bstatScore(v, bw);
+          v.scoreAtk = sc.atk;
+          v.scoreDef = sc.def;
+          v.updatedAt = nowMs;
+          v.cycle = cycle;
+          v.weightsVer = bw.ver;
+          // Append a compact snapshot to this player's own history (cap 20). Stored raw so
+          // it can be re-scored under future weights for a like-for-like progress trend.
+          const prev = (this.st.bstatByPlayer && this.st.bstatByPlayer[key]) ? this.st.bstatByPlayer[key] : null;
+          const hist = (prev && Array.isArray(prev.history)) ? prev.history.slice() : [];
+          hist.push({ savedAt: nowMs, cycle: cycle, troops: v.troops, t11: v.t11, tg: v.tg,
+                      rallyCap: v.rallyCap, heroes: v.heroes, scoreAtk: sc.atk, scoreDef: sc.def, weightsVer: bw.ver });
+          v.history = hist.slice(-20);
+        }
+      }
+
+      // If the weights themselves change, every stored score is now stale. Re-score all rows
+      // under the new weights so the ranking and everyone's "current" number stay consistent.
+      if (('bstatWeights' in patch) && patch.bstatWeights && role === 'admin'){
+        const nw = patch.bstatWeights;
+        const map = this.st.bstatByPlayer || {};
+        for (const key of Object.keys(map)){
+          const row = map[key]; if (!row) continue;
+          const sc = bstatScore(row, nw);
+          row.scoreAtk = sc.atk; row.scoreDef = sc.def; row.weightsVer = nw.ver;
+        }
+        this.st.bstatByPlayer = map;
+      }
+
       // The action hint is a one-shot signal for this write only — never persist it.
       delete patch.msActionHint;
       // Passwords are server-side only; a non-admin may never set them.
@@ -7594,7 +8461,17 @@ export class KingdomState {
 
       // Push the change to everyone else, right now. This is what replaces polling.
       if (touched){
-        this.broadcast({ type:'patch', rev:this.rev, now:Date.now(), patch:patch, replace:replaceKeys, from:from });
+        // Battle Stats never goes out on the broadcast. The saver already has their own
+        // row locally; everyone else pulls the filtered view from GET /battle-stats, which
+        // hides unshared rows. So we broadcast a copy of the patch with bstatByPlayer removed
+        // rather than leaking rows to every socket. Other keys in the same patch still fan out.
+        let bcast = patch;
+        if ('bstatByPlayer' in patch){
+          bcast = {}; for (const k of Object.keys(patch)){ if (k !== 'bstatByPlayer') bcast[k] = patch[k]; }
+        }
+        if (Object.keys(bcast).length){
+          this.broadcast({ type:'patch', rev:this.rev, now:Date.now(), patch:bcast, replace:replaceKeys, from:from });
+        }
       }
 
       const conflict = (baseRev !== null && baseRev !== revBefore);
@@ -7603,6 +8480,35 @@ export class KingdomState {
       // truth so it re-syncs immediately rather than waiting for the next poll.
       if (conflict) out.state = this.snapshot();
       return json(out);
+    }
+
+    // ── Filtered read of Battle Stats ────────────────────────────────────────────
+    // The ONLY way Battle Stats rows leave the server. They are stripped from the shared
+    // snapshot, so this endpoint decides per caller who sees what:
+    //   • admin           → every row (shared or not), plus the weights
+    //   • rally leader/r4r5 (once access widens) → rows with shared !== false, plus own row
+    //   • anyone else      → own row only
+    // A player who turns sharing off is therefore invisible to everyone but themselves.
+    // The Worker in front of this has already checked the token and passes role/pid in.
+    if (url.pathname === '/battle-stats'){
+      const role = url.searchParams.get('role') || null;
+      const pid  = url.searchParams.get('pid') ? String(url.searchParams.get('pid')) : null;
+      const all  = (this.st.bstatByPlayer && typeof this.st.bstatByPlayer === 'object') ? this.st.bstatByPlayer : {};
+      const isAdmin   = (role === 'admin');
+      const isManager = isAdmin || role === 'r4r5' || role === 'rallyleader';
+      const rows = {};
+      for (const k of Object.keys(all)){
+        const row = all[k];
+        if (!row) continue;
+        const mine   = (pid && k === pid);
+        const shared = (row.shared !== false);
+        if (isAdmin || mine || (isManager && shared)) rows[k] = row;
+      }
+      const outBs = { ok:true, rev:this.rev, now:Date.now(), bstatByPlayer:rows };
+      // Weights are readable by any leader (needed to render the score breakdown); only
+      // admin can WRITE them (enforced by KEY_MIN_ROLE). Members never reach this endpoint.
+      if (this.st.bstatWeights) outBs.weights = this.st.bstatWeights;
+      return json(outBs);
     }
 
     if (url.pathname === '/automation'){
@@ -7919,6 +8825,103 @@ Reply with ONLY one line of raw JSON, no explanation, no markdown. Use 0 for any
       }
     }
 
+    // ── AI Vision OCR for Battle Report screenshots (Battle Stats) ──
+    // Reads ONLY the 12 left-column percentages (the player's own troops). The right column
+    // is the opponent and is deliberately never read. Same engine and license-agree flow as
+    // /ocr-speedups. The model reports raw numbers; we validate the shape — no scoring here,
+    // that happens on save. Admin-only for now (matches the rest of Battle Stats); widen the
+    // gate to verifyTokenFull + role rank when the feature opens to rally leaders.
+    if (url.pathname==='/ocr-battlestats' && request.method==='POST') {
+      const who = await verifyTokenFull(env, bearer(request));
+      if (!who) return json({ok:false, error:'unauthorized'}, 401);
+      if (who.role !== 'admin') return json({ok:false, error:'admin-required'}, 403);
+      try {
+        if (!env.AI) return json({ok:false, error:'AI binding not configured'}, 500);
+
+        const body = await request.json();
+        const imageBase64 = body.image;
+        if (!imageBase64) return json({ok:false, error:'No image provided'}, 400);
+
+        const imageBytes = Uint8Array.from(atob(imageBase64), c => c.charCodeAt(0));
+        const MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
+
+        // Same one-time Meta license agreement as the speedups OCR.
+        const agreedKey = 'llama_vision_agreed';
+        const agreed = await env.SVS_KV.get(agreedKey);
+        if (!agreed) {
+          try {
+            await env.AI.run(MODEL, { prompt: 'agree' });
+            await env.SVS_KV.put(agreedKey, '1');
+          } catch(e) { /* ignore - may already be agreed */ }
+        }
+
+const prompt = `You are reading a Kingshot mobile game "Battle Report" screenshot, the "Bonus Details" panel.
+It lists 12 rows, each with a label in the middle and a percentage on the LEFT and a percentage on the RIGHT.
+Read ONLY the LEFT percentage of each row. The LEFT column is the player. IGNORE the RIGHT column completely.
+The 12 rows, in this exact order:
+Infantry Attack, Infantry Defense, Infantry Lethality, Infantry Health,
+Cavalry Attack, Cavalry Defense, Cavalry Lethality, Cavalry Health,
+Archer Attack, Archer Defense, Archer Lethality, Archer Health.
+Report each LEFT value as a number (e.g. "987.6"), dropping the leading + and the % sign. Do NOT do any math.
+Reply with ONLY one line of raw JSON, no explanation, no markdown. Format exactly:
+{"infantry":{"atk":0,"def":0,"leth":0,"hp":0},"cavalry":{"atk":0,"def":0,"leth":0,"hp":0},"archer":{"atk":0,"def":0,"leth":0,"hp":0}}`;
+
+        const response = await env.AI.run(MODEL, {
+          prompt,
+          image: [...imageBytes],
+          max_tokens: 500,
+          temperature: 0.1
+        });
+
+        // Normalize the model output to a string no matter what shape it comes in
+        let text = '';
+        if (typeof response === 'string') {
+          text = response;
+        } else if (response && typeof response.response === 'string') {
+          text = response.response;
+        } else if (response && typeof response.result === 'string') {
+          text = response.result;
+        } else if (response && response.result && typeof response.result.response === 'string') {
+          text = response.result.response;
+        } else {
+          text = JSON.stringify(response);
+        }
+
+        const num = (v) => { const n = Number(v); return isFinite(n) ? n : 0; };
+        const cleanType = (o) => {
+          if (!o || typeof o !== 'object') return { atk:0, def:0, leth:0, hp:0 };
+          return { atk:num(o.atk), def:num(o.def), leth:num(o.leth), hp:num(o.hp) };
+        };
+
+        let values = null;
+
+        // 1) Preferred: parse the JSON object the model returns
+        const jsonMatch = text.match(/\{[\s\S]*infantry[\s\S]*\}/i);
+        if (jsonMatch) {
+          try {
+            let p = JSON.parse(jsonMatch[0]);
+            if (p.response && typeof p.response === 'object') p = p.response;
+            if (p.infantry || p.cavalry || p.archer) {
+              values = {
+                infantry: cleanType(p.infantry),
+                cavalry:  cleanType(p.cavalry),
+                archer:   cleanType(p.archer)
+              };
+            }
+          } catch (e) { /* fall through */ }
+        }
+
+        if (!values) return json({ok:false, error:'Could not parse AI response', raw: text}, 422);
+
+        // The scan is a first draft — the client shows every value for review and correction
+        // before anything is saved. So we return whatever we read without rejecting low/zero
+        // fields; a misread digit is fixed by the human, not by us guessing.
+        return json({ok:true, values});
+      } catch(e) {
+        return json({ok:false, error:e.message}, 500);
+      }
+    }
+
     // Shared state
     if (url.pathname==='/auth' && request.method==='POST') {
       let b={}; try { b = await request.json(); } catch(e) {}
@@ -7976,6 +8979,19 @@ Reply with ONLY one line of raw JSON, no explanation, no markdown. Use 0 for any
       const role = await verifyToken(env, bearer(request));
       if (!role) return json({ok:false, error:'unauthorized'}, 401);
       const res = await kingdomStub(env).fetch('https://kingdom/get');
+      return new Response(await res.text(), {status:res.status, headers:{'Content-Type':'application/json',...cors()}});
+    }
+
+    // Battle Stats filtered read. Verified here, then the DO decides which rows this caller
+    // may see (see the /battle-stats handler in the DO). Admin-only for now: to open it to
+    // rally leaders later, relax this gate to `if (!who || ROLE_RANK[who.role] < 2)` and the
+    // DO's per-caller filter already does the right thing (shared rows + own row).
+    if (url.pathname==='/battle-stats' && request.method==='GET') {
+      const who = await verifyTokenFull(env, bearer(request));
+      if (!who) return json({ok:false, error:'unauthorized'}, 401);
+      if (who.role !== 'admin') return json({ok:false, error:'admin-required'}, 403);
+      const res = await kingdomStub(env).fetch('https://kingdom/battle-stats?role='
+        + encodeURIComponent(who.role) + '&pid=' + encodeURIComponent(who.pid || ''));
       return new Response(await res.text(), {status:res.status, headers:{'Content-Type':'application/json',...cors()}});
     }
 
