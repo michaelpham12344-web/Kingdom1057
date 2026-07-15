@@ -7134,7 +7134,6 @@ document.addEventListener('DOMContentLoaded', initApp);
       <div class="bstatCard">
         <div class="bstatCardT">Army</div>
         <div class="bstatGrid3">
-          <div><label>Rally capacity</label><input type="number" id="bstatRallyCap" value="" placeholder="e.g. 1250000"></div>
           <div><label>Truegold level</label>
             <select id="bstatTg">
               <option value="10">TG 10</option><option value="9">TG 9</option>
@@ -7144,9 +7143,22 @@ document.addEventListener('DOMContentLoaded', initApp);
             </select>
           </div>
           <div><label>March capacity</label><input type="number" id="bstatMarchCap" value="" placeholder="e.g. 415000"></div>
+          <div><label>Rally capacity</label><input type="number" id="bstatRallyCap" value="" placeholder="e.g. 1250000"></div>
         </div>
         <div class="bstatWarn" style="margin:14px 0 0">
           <b>Truegold counts as much as the tier badge.</b> A maxed T10 at TG8 out-fights a fresh T11 at TG5 most of the time — the extra troop skills outweigh the tier jump. Both feed your score, so set TG honestly.
+        </div>
+      </div>
+
+      <div class="bstatCard">
+        <div class="bstatCardT">Pets</div>
+        <div class="bstatGrid3">
+          <div><label>Fearless Roar</label><select id="bstatPetRoar"></select></div>
+          <div><label>Antler Impact</label><select id="bstatPetAntler"></select></div>
+          <div></div>
+        </div>
+        <div class="bstatNote" style="margin:14px 0 0">
+          <b>Recorded, not yet scored.</b> Pet levels are saved with your row, but they don't feed the attack/defense number yet — the exact combat values aren't pinned down. Once we know what each level is worth, they plug into the score with no re-entry needed.
         </div>
       </div>
 
@@ -7155,10 +7167,10 @@ document.addEventListener('DOMContentLoaded', initApp);
         <div class="bstatNote" style="margin:0 0 14px">
           <b>Pick the hero you lead each troop type with.</b> Their skills apply to the whole rally — that is your attack and defense skill layer. Their stat bonuses are already inside the Battle Report numbers above, so only skills and gear are counted here (no double-counting). ⚔ = offensive gear, 🛡 = defensive gear.
         </div>
-        <div class="bstatHeroHead"><span></span><span>Hero</span><span>Gen</span><span>Gear lv.</span></div>
-        <div class="bstatHeroRow"><span class="bstatSlot inf">INF</span><select id="bstatHInf"></select><input type="number" id="bstatGenInf" min="1" max="7" value="1" class="bstatGen"><select id="bstatGearInf" class="bstatGear"></select></div>
-        <div class="bstatHeroRow"><span class="bstatSlot cav">CAV</span><select id="bstatHCav"></select><input type="number" id="bstatGenCav" min="1" max="7" value="7" class="bstatGen"><select id="bstatGearCav" class="bstatGear"></select></div>
-        <div class="bstatHeroRow"><span class="bstatSlot arc">ARC</span><select id="bstatHArc"></select><input type="number" id="bstatGenArc" min="1" max="7" value="6" class="bstatGen"><select id="bstatGearArc" class="bstatGear"></select></div>
+        <div class="bstatHeroHead"><span></span><span>Hero</span><span>Widget lvl</span></div>
+        <div class="bstatHeroRow"><span class="bstatSlot inf">INF</span><select id="bstatHInf"></select><select id="bstatGearInf" class="bstatGear"></select></div>
+        <div class="bstatHeroRow"><span class="bstatSlot cav">CAV</span><select id="bstatHCav"></select><select id="bstatGearCav" class="bstatGear"></select></div>
+        <div class="bstatHeroRow"><span class="bstatSlot arc">ARC</span><select id="bstatHArc"></select><select id="bstatGearArc" class="bstatGear"></select></div>
       </div>
 
       <div class="bstatCard">
@@ -7266,8 +7278,8 @@ document.addEventListener('DOMContentLoaded', initApp);
 #page-battlestats .bstatSw.on{background:rgba(46,204,113,.2);border-color:var(--green)}
 #page-battlestats .bstatSw.on::after{left:18px;background:var(--green)}
 #page-battlestats .bstatGrid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
-#page-battlestats .bstatHeroHead{display:grid;grid-template-columns:44px 1.7fr .7fr .9fr;gap:10px;margin-bottom:6px;font-size:12px;color:var(--text2)}
-#page-battlestats .bstatHeroRow{display:grid;grid-template-columns:44px 1.7fr .7fr .9fr;gap:10px;align-items:center;margin-bottom:9px}
+#page-battlestats .bstatHeroHead{display:grid;grid-template-columns:44px 1.7fr .9fr;gap:10px;margin-bottom:6px;font-size:12px;color:var(--text2)}
+#page-battlestats .bstatHeroRow{display:grid;grid-template-columns:44px 1.7fr .9fr;gap:10px;align-items:center;margin-bottom:9px}
 #page-battlestats .bstatSlot{font-family:var(--mono);font-size:11px;text-align:center}
 #page-battlestats .bstatSlot.inf{color:var(--accent2)}
 #page-battlestats .bstatSlot.cav{color:#6ab0ff}
@@ -7330,6 +7342,15 @@ function bstatApiBase(){
   var u = (typeof SYNC_API_URL!=='undefined' && SYNC_API_URL) ? String(SYNC_API_URL) : '';
   if(u.charAt(u.length-1)==='/') u=u.slice(0,-1);
   return u;
+}
+
+// The player id for Battle Stats. AUTH.pid is only set during a fresh /auth login; on a
+// restored session (token loaded from storage) it can be null even though the user is fully
+// verified. So fall back to verifiedPlayer.id, which is the app's real identity object.
+function bstatPid(){
+  if(typeof AUTH!=='undefined' && AUTH.pid) return String(AUTH.pid);
+  if(typeof verifiedPlayer!=='undefined' && verifiedPlayer && verifiedPlayer.id) return String(verifiedPlayer.id);
+  return null;
 }
 
 // Meta hero subset — troop type, gear role (o/d), primary skill op family + magnitude.
@@ -7412,8 +7433,16 @@ function bstatFillHeroes(){
   });
   ['Inf','Cav','Arc'].forEach(function(sfx){
     var g=document.getElementById('bstatGear'+sfx); if(!g) return;
-    g.innerHTML='<option value="0">0 — none</option><option value="2">2</option><option value="4">4</option><option value="6">6</option><option value="8">8</option><option value="10" selected>10</option>';
+    g.innerHTML=bstatLevelOpts();
   });
+  ['Roar','Antler'].forEach(function(p){
+    var el=document.getElementById('bstatPet'+p); if(el) el.innerHTML=bstatLevelOpts();
+  });
+}
+// Reusable 1–10 option list (widgets and pets share it), default selected = 10.
+function bstatLevelOpts(){
+  var o=''; for(var i=1;i<=10;i++){ o+='<option value="'+i+'"'+(i===10?' selected':'')+'>'+i+'</option>'; }
+  return o;
 }
 
 // ── init (called by showPageDirect) ──
@@ -7430,7 +7459,7 @@ function bstatLoad(){
     if(!d || d.ok===false){ return; }
     BSTAT.weights = d.weights || null;
     BSTAT.rows = d.bstatByPlayer || {};
-    BSTAT.mine = (AUTH.pid && BSTAT.rows[AUTH.pid]) ? BSTAT.rows[AUTH.pid] : null;
+    BSTAT.mine = (bstatPid() && BSTAT.rows[bstatPid()]) ? BSTAT.rows[bstatPid()] : null;
     BSTAT.loaded = true;
     bstatHydrateMine();
     bstatRenderRank();
@@ -7445,10 +7474,13 @@ function bstatHydrateMine(){
   if(m.rallyCap) document.getElementById('bstatRallyCap').value=m.rallyCap;
   if(m.marchCap) document.getElementById('bstatMarchCap').value=m.marchCap;
   if(m.tg!==undefined) document.getElementById('bstatTg').value=String(m.tg);
+  if(m.pets){
+    if(m.pets.fearlessRoar && document.getElementById('bstatPetRoar')) document.getElementById('bstatPetRoar').value=String(m.pets.fearlessRoar);
+    if(m.pets.antlerImpact && document.getElementById('bstatPetAntler')) document.getElementById('bstatPetAntler').value=String(m.pets.antlerImpact);
+  }
   if(m.heroes){ BSTAT_TYPES.forEach(function(t){ var h=m.heroes[t]; if(!h) return;
     var sfx=t.charAt(0).toUpperCase()+t.slice(1,3);
     if(h.hero) document.getElementById('bstatH'+sfx).value=h.hero;
-    if(h.gen) document.getElementById('bstatGen'+sfx).value=h.gen;
     if(h.gearLv!==undefined) document.getElementById('bstatGear'+sfx).value=String(h.gearLv);
   }); }
   if(m.shared===false) document.getElementById('bstatShareSw').classList.remove('on');
@@ -7531,17 +7563,18 @@ function bstatGatherRow(){
   var heroes={};
   BSTAT_TYPES.forEach(function(t){ var sfx=t.charAt(0).toUpperCase()+t.slice(1,3);
     heroes[t]={ hero:document.getElementById('bstatH'+sfx).value,
-      gen:bstatN(document.getElementById('bstatGen'+sfx).value),
       gearLv:bstatN(document.getElementById('bstatGear'+sfx).value) };
   });
   return {
-    pid: AUTH.pid || null,
+    pid: bstatPid() || null,
     ign: (verifiedPlayer&&verifiedPlayer.name)||AUTH.role||'',
     troops: troops, t11: t11,
     tg: bstatN(document.getElementById('bstatTg').value),
     rallyCap: bstatN(document.getElementById('bstatRallyCap').value),
     marchCap: bstatN(document.getElementById('bstatMarchCap').value),
     heroes: heroes,
+    pets: { fearlessRoar: bstatN((document.getElementById('bstatPetRoar')||{}).value),
+            antlerImpact: bstatN((document.getElementById('bstatPetAntler')||{}).value) },
     shared: document.getElementById('bstatShareSw').classList.contains('on')
   };
 }
@@ -7557,9 +7590,9 @@ function bstatRecalcPreview(){
 
 // ── save: PUT /state with only a bstatByPlayer patch (own row) ──
 function bstatSave(){
-  if(!AUTH.pid){ if(typeof toast==='function') toast('You need a verified Player ID to save Battle Stats.'); return; }
+  if(!bstatPid()){ if(typeof toast==='function') toast('You need a verified Player ID to save Battle Stats.'); return; }
   var row=bstatGatherRow();
-  var patch={}; patch.bstatByPlayer={}; patch.bstatByPlayer[AUTH.pid]=row;
+  var patch={}; patch.bstatByPlayer={}; patch.bstatByPlayer[bstatPid()]=row;
   var btn=document.getElementById('bstatSaveBtn'); btn.disabled=true; btn.textContent='Saving…';
   fetch(bstatApiBase()+'/state', {
     method:'PUT', headers: stateHeaders({'Content-Type':'application/json'}),
