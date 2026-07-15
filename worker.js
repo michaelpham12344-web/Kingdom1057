@@ -7323,6 +7323,15 @@ document.addEventListener('DOMContentLoaded', initApp);
 
 var BSTAT = { weights:null, rows:{}, mine:null, rankMode:'atk', wtEditing:false, loaded:false };
 
+// Base URL for API calls. Strips one trailing slash WITHOUT a regex — a regex literal inside
+// this template-literal page is a known escaping trap (it rendered to a // comment and broke
+// the whole script). Plain string ops have no such pitfall.
+function bstatApiBase(){
+  var u = (typeof SYNC_API_URL!=='undefined' && SYNC_API_URL) ? String(SYNC_API_URL) : '';
+  if(u.charAt(u.length-1)==='/') u=u.slice(0,-1);
+  return u;
+}
+
 // Meta hero subset — troop type, gear role (o/d), primary skill op family + magnitude.
 // Mirror of BSTAT_HEROES on the server. Keep the two in step when adding heroes.
 var BSTAT_HEROES = {
@@ -7415,7 +7424,7 @@ function bstatInit(){
 
 // ── load rows + weights from the server ──
 function bstatLoad(){
-  fetch((typeof SYNC_API_URL!=='undefined'?SYNC_API_URL.replace(/\\/$/,''):'')+'/battle-stats', {
+  fetch(bstatApiBase()+'/battle-stats', {
     headers: stateHeaders()
   }).then(function(r){ return r.json(); }).then(function(d){
     if(!d || d.ok===false){ return; }
@@ -7468,7 +7477,7 @@ function bstatScan(dataUrl){
   var st=document.getElementById('bstatScanStatus');
   st.style.display='block'; st.textContent='🤖 Reading the report with AI…';
   var base64=dataUrl.split(',')[1];
-  fetch((typeof SYNC_API_URL!=='undefined'?SYNC_API_URL.replace(/\\/$/,''):'')+'/ocr-battlestats', {
+  fetch(bstatApiBase()+'/ocr-battlestats', {
     method:'POST', headers: stateHeaders({'Content-Type':'application/json'}), body: JSON.stringify({ image: base64 })
   }).then(function(r){ return r.json(); }).then(function(d){
     if(d && d.ok && d.values){
@@ -7552,7 +7561,7 @@ function bstatSave(){
   var row=bstatGatherRow();
   var patch={}; patch.bstatByPlayer={}; patch.bstatByPlayer[AUTH.pid]=row;
   var btn=document.getElementById('bstatSaveBtn'); btn.disabled=true; btn.textContent='Saving…';
-  fetch((typeof SYNC_API_URL!=='undefined'?SYNC_API_URL.replace(/\\/$/,''):'')+'/state', {
+  fetch(bstatApiBase()+'/state', {
     method:'PUT', headers: stateHeaders({'Content-Type':'application/json'}),
     body: JSON.stringify({ _baseRev: (typeof syncRev!=='undefined'?syncRev:0), patch: patch, _client: (typeof SYNC_CLIENT_ID!=='undefined'?SYNC_CLIENT_ID:null) })
   }).then(function(r){ return r.json(); }).then(function(d){
@@ -7717,7 +7726,7 @@ function bstatRenderWeights(){
     + row('cap.median','Kingdom median rally',w.cap.median,'Puts a typical leader at ×1.00');
   h+='<div class="bstatSecT">Display</div>';
   h+=row('scale','Score scale',w.scale,'Tuning constant → typical leader ~100–200');
-  h+='<div class="bstatWarn" style="margin-top:16px"><b>Starting values, not gospel.</b> The formula\'s shape is well-evidenced; the exact figures are community estimates. Once real reports are in, tune them against what happened on the field.</div>';
+  h+='<div class="bstatWarn" style="margin-top:16px"><b>Starting values, not gospel.</b> The formula shape is well-evidenced; the exact figures are community estimates. Once real reports are in, tune them against what happened on the field.</div>';
   host.innerHTML=h;
 }
 function bstatWtToggleEdit(){
@@ -7734,7 +7743,7 @@ function bstatWtToggleEdit(){
   }
   w.ver = bstatN(BSTAT.weights.ver)+1;
   var btn=document.getElementById('bstatWtEditBtn'); btn.disabled=true; btn.textContent='Saving…';
-  fetch((typeof SYNC_API_URL!=='undefined'?SYNC_API_URL.replace(/\\/$/,''):'')+'/state', {
+  fetch(bstatApiBase()+'/state', {
     method:'PUT', headers: stateHeaders({'Content-Type':'application/json'}),
     body: JSON.stringify({ _baseRev:(typeof syncRev!=='undefined'?syncRev:0), patch:{ bstatWeights:w }, _client:(typeof SYNC_CLIENT_ID!=='undefined'?SYNC_CLIENT_ID:null) })
   }).then(function(r){ return r.json(); }).then(function(d){
