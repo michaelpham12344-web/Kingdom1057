@@ -7114,12 +7114,12 @@ document.addEventListener('DOMContentLoaded', initApp);
     <div class="bstatPane active" id="bstatPane-mine">
       <div class="bstatCard">
         <div class="bstatCardT">Battle Report</div>
-        <div id="bstatDrop" class="bstatDrop" onclick="document.getElementById('bstatFile').click()">
+        <label for="bstatFile" id="bstatDrop" class="bstatDrop" style="display:block;cursor:pointer">
           <div class="bstatDropIcon">🖼️</div>
           <div class="bstatDropT">Upload your Battle Report screenshot</div>
           <div class="bstatDropS">Mail → open the report → screenshot the Bonus Details panel</div>
-        </div>
-        <input type="file" id="bstatFile" accept="image/*" style="display:none" onchange="bstatOnFile(event)">
+        </label>
+        <input type="file" id="bstatFile" accept="image/*" style="display:none">
         <div id="bstatScanStatus" class="bstatNote" style="display:none;margin:14px 0 0"></div>
         <div class="bstatNote" style="margin:14px 0 0">
           <b>Left column only.</b> The scan reads the 12 left-hand percentages — your troops. The right column is the enemy and is ignored. Everything below the stats you fill in yourself.
@@ -7447,12 +7447,18 @@ function bstatHydrateMine(){
 }
 
 // ── OCR upload ──
-function bstatOnFile(ev){
-  var f=ev.target.files&&ev.target.files[0]; if(!f) return;
-  var reader=new FileReader();
-  reader.onload=function(){ bstatScan(reader.result); };
-  reader.readAsDataURL(f);
-}
+// File upload is wired the same way the (working) Minister Spots upload is: a native
+// <label for="bstatFile"> opens the picker, and a DELEGATED change listener catches the
+// file. This avoids the hidden-input .click() trick, which mobile browsers often ignore —
+// which is exactly why an inline onclick/onchange version "did nothing" after selecting a file.
+document.addEventListener('change', function(e){
+  if(e.target && e.target.id==='bstatFile'){
+    var f=e.target.files && e.target.files[0]; if(!f) return;
+    var reader=new FileReader();
+    reader.onload=function(ev){ bstatScan(ev.target.result); };
+    reader.readAsDataURL(f);
+  }
+});
 function bstatScan(dataUrl){
   var st=document.getElementById('bstatScanStatus');
   st.style.display='block'; st.textContent='🤖 Reading the report with AI…';
