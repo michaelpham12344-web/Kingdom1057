@@ -7459,6 +7459,11 @@ document.addEventListener('change', function(e){
     reader.readAsDataURL(f);
   }
 });
+// T11 toggles are delegated too (no fragile inline onclick inside a built HTML string).
+document.addEventListener('click', function(e){
+  var sw=e.target && e.target.closest ? e.target.closest('#bstatReview .bstatSw[data-t11]') : null;
+  if(sw){ sw.classList.toggle('on'); bstatRecalcPreview(); }
+});
 function bstatScan(dataUrl){
   var st=document.getElementById('bstatScanStatus');
   st.style.display='block'; st.textContent='🤖 Reading the report with AI…';
@@ -7489,7 +7494,7 @@ function bstatRenderReview(troops, t11, fromScan){
     html+='<div class="bstatTT"><div class="bstatTTHead">'
       +'<span class="bstatDot" style="background:'+colors[t]+'"></span>'
       +'<span class="bstatTTName" style="color:'+colors[t]+'">'+t+'</span>'
-      +'<span class="bstatT11">Tier 11 <span class="bstatSw'+on+'" data-t11="'+t+'" onclick="this.classList.toggle(\'on\');bstatRecalcPreview()"></span></span>'
+      +'<span class="bstatT11">Tier 11 <span class="bstatSw'+on+'" data-t11="'+t+'"></span></span>'
       +'</div><div class="bstatTTBody">'
       +bstatStatCell(t,'atk','Attack',s.atk,flag)
       +bstatStatCell(t,'def','Defense',s.def,flag)
