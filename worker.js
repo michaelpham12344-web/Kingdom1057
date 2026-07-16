@@ -7108,6 +7108,7 @@ document.addEventListener('DOMContentLoaded', initApp);
       <div class="bstatSubtab" data-p="rank" onclick="bstatTab('rank')">Rankings</div>
       <div class="bstatSubtab" data-p="prog" onclick="bstatTab('prog')">My Progress</div>
       <div class="bstatSubtab" data-p="wt" onclick="bstatTab('wt')">Weights</div>
+      <div class="bstatSubtab" data-p="how" onclick="bstatTab('how')">How scoring works</div>
     </div>
 
     <!-- ── MY STATS ── -->
@@ -7143,22 +7144,27 @@ document.addEventListener('DOMContentLoaded', initApp);
             </select>
           </div>
           <div><label>March capacity</label><input type="number" id="bstatMarchCap" value="" placeholder="e.g. 415000"></div>
-          <div><label>Rally capacity</label><input type="number" id="bstatRallyCap" value="" placeholder="e.g. 1250000"></div>
+          <div><label>Fearless Roar (pet)</label><select id="bstatPetRoar"></select></div>
+        </div>
+        <div class="bstatGrid3" style="margin-top:12px">
+          <div><label>Antler Impact (pet)</label><select id="bstatPetAntler"></select></div>
+          <div></div>
+          <div></div>
         </div>
         <div class="bstatWarn" style="margin:14px 0 0">
-          <b>Truegold counts as much as the tier badge.</b> A maxed T10 at TG8 out-fights a fresh T11 at TG5 most of the time — the extra troop skills outweigh the tier jump. Both feed your score, so set TG honestly.
+          <b>Truegold counts as much as the tier badge.</b> A maxed T10 at TG8 out-fights a fresh T11 at TG5 most of the time — the extra troop skills outweigh the tier jump. Pets are recorded but not yet scored — the exact combat values aren't pinned down.
         </div>
       </div>
 
       <div class="bstatCard">
-        <div class="bstatCardT">Pets</div>
+        <div class="bstatCardT">Rally capacity</div>
         <div class="bstatGrid3">
-          <div><label>Fearless Roar</label><select id="bstatPetRoar"></select></div>
-          <div><label>Antler Impact</label><select id="bstatPetAntler"></select></div>
+          <div><label>Rally capacity</label><input type="number" id="bstatRallyCap" value="" placeholder="e.g. 1250000"></div>
+          <div></div>
           <div></div>
         </div>
         <div class="bstatNote" style="margin:14px 0 0">
-          <b>Recorded, not yet scored.</b> Pet levels are saved with your row, but they don't feed the attack/defense number yet — the exact combat values aren't pinned down. Once we know what each level is worth, they plug into the score with no re-entry needed.
+          <b>Total troops you can lead in a rally.</b> Feeds the capacity term — √ for attack (twice the troops ≈ 41% more damage), near-linear for defense.
         </div>
       </div>
 
@@ -7235,8 +7241,70 @@ document.addEventListener('DOMContentLoaded', initApp);
       </div>
     </div>
 
+    <!-- ── HOW SCORING WORKS ── -->
+    <div class="bstatPane" id="bstatPane-how">
+      <div class="bstatCard">
+        <div class="bstatCardT">How the score is calculated</div>
+        <div class="bstatNote" style="margin:0 0 16px">
+          Every number here is a <b>multiplier</b>, chained together — not a sum. This mirrors the game's actual damage formula, where the stats multiply each other. The whole point is that you can change your stats, re-upload, and watch the number move in a way that reflects real power.
+        </div>
+
+        <div class="bstatSecT">The two scores</div>
+        <p style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:14px">
+          You get an <span style="color:var(--accent2)">attack</span> score and a <span style="color:#6ab0ff">defense</span> score, and they are <b>not interchangeable</b>. A leader is geared for one role: an offensive widget (Amadeus, Ava…) pumps attack and does nothing on defense; a defensive widget (Charles, Triton…) does the reverse. So a pure rally leader will show a high attack and a low defense — that is correct, it is telling you what they are built for. Rank attackers by the attack score, garrison holders by the defense score.
+        </p>
+
+        <div class="bstatSecT">Step 1 — stats multiply, per troop type</div>
+        <div class="bstatFormula">
+offense_t  = (1 + Attack%) <span class="bstatK">×</span> (1 + Lethality%)
+survival_t = (1 + Defense%) <span class="bstatK">×</span> (1 + Health%)
+        </div>
+        <p style="font-size:13px;color:var(--text2);line-height:1.7;margin:10px 0 14px">
+          Attack and Lethality multiply each other; Defense and Health multiply each other. This is why 1000 Attack / 300 Lethality is <b>weaker</b> than 650 / 650 — 11×4 is less than 7.5×7.5, even though both "add" to the same total. Adding the four stats would rank people wrong; multiplying them is the whole reason this tool exists.
+        </p>
+
+        <div class="bstatSecT">Step 2 — blend the three troop types, by ratio</div>
+        <p style="font-size:13px;color:var(--text2);line-height:1.7;margin:0 0 10px">
+          Every rally marches a fixed mix, so the score blends all three types by that mix. <b>Attack uses the attack ratio</b> (e.g. 50/20/30). <b>Defense uses the defense ratio</b> (e.g. 60/40/0 — a wall, no archers). They are separate on purpose: scoring a garrison as if it carried 30% archers it would never bring is simply wrong. Both ratios are editable in Weights.
+        </p>
+        <div class="bstatFormula">
+blendOff  = Σ ( attackRatio_t  <span class="bstatK">×</span> offense_t  <span class="bstatK">×</span> tier_t )
+blendSurv = Σ ( defenseRatio_t <span class="bstatK">×</span> survival_t <span class="bstatK">×</span> tier_t )
+        </div>
+
+        <div class="bstatSecT">Step 3 — troop tier</div>
+        <p style="font-size:13px;color:var(--text2);line-height:1.7;margin:0 0 10px">
+          <b>tier_t</b> = T11 multiplier (×1.17 if you have T11 of that type) × Truegold. Truegold compounds per level and gets a step at TG5 and TG8, because those unlock troop skills — which is why a maxed T10-TG8 beats a fresh T11-TG5.
+        </p>
+
+        <div class="bstatSecT">Step 4 — hero skills &amp; widget</div>
+        <p style="font-size:13px;color:var(--text2);line-height:1.7;margin:0 0 10px">
+          Your leader's three heroes contribute their <b>skills</b> (not their stats — those are already in the Battle Report). Same skill type adds; different types multiply. The widget adds up to +15%, <b>but only on the matching side</b> — offensive widget → attack only, defensive → defense only. This is what makes a leader an attacker or a defender.
+        </p>
+
+        <div class="bstatSecT">Step 5 — rally capacity</div>
+        <p style="font-size:13px;color:var(--text2);line-height:1.7;margin:0 0 10px">
+          <b>Attack</b> scales with the <b>square root</b> of capacity — double your troops, ~41% more damage, not double (that's how the game scales). <b>Defense</b> is near-linear — more bodies means more HP to grind through.
+        </p>
+
+        <div class="bstatSecT">Putting it together</div>
+        <div class="bstatFormula">
+<span class="bstatA">Attack</span>  = blendOff  <span class="bstatK">×</span> heroSkills(attack)  <span class="bstatK">×</span> <span class="bstatK">√</span>(cap / median) <span class="bstatK">×</span> scale
+<span class="bstatD">Defense</span> = blendSurv <span class="bstatK">×</span> heroSkills(defense) <span class="bstatK">×</span> (cap / median)   <span class="bstatK">×</span> scale
+        </div>
+        <p style="font-size:13px;color:var(--text2);line-height:1.7;margin:10px 0 0">
+          <b>scale</b> is cosmetic — it shrinks the raw number so a strong leader reads ~180 instead of ~4,800. It changes nobody's rank and re-bases every past score consistently, so your progress trend stays honest even if it's retuned.
+        </p>
+
+        <div class="bstatWarn" style="margin-top:18px">
+          <b>What's solid vs. what's estimated.</b> The <i>shape</i> — multiplicative stats, √ capacity, role-gated widgets, separate ratios — is well-evidenced from the community's reverse-engineering of the damage formula. The <i>exact numbers</i> (1.17, 0.25, etc.) are starting estimates. Tune them in Weights against what actually happens on the field. And pets are recorded but not yet in the score — those values aren't pinned down.
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
+
 
 
 <style>
@@ -7319,6 +7387,10 @@ document.addEventListener('DOMContentLoaded', initApp);
 #page-battlestats .bstatWtRow .bstatWtD{font-size:11.5px;color:var(--text3)}
 #page-battlestats .bstatWtRow input{font-family:var(--mono);text-align:right}
 #page-battlestats .bstatSecT{font-family:var(--head);font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text2);margin:18px 0 8px;border-left:3px solid var(--gold);padding-left:10px}
+#page-battlestats .bstatFormula{background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:13px 15px;font-family:var(--mono);font-size:12px;color:var(--text2);line-height:1.9;white-space:pre-wrap;overflow-x:auto}
+#page-battlestats .bstatFormula .bstatK{color:var(--gold)}
+#page-battlestats .bstatFormula .bstatA{color:var(--accent2)}
+#page-battlestats .bstatFormula .bstatD{color:#6ab0ff}
 @media(max-width:860px){
   #page-battlestats .bstatDual{grid-template-columns:1fr}
   #page-battlestats .bstatTTBody{grid-template-columns:repeat(2,1fr)}
@@ -7394,15 +7466,18 @@ function bstatSkillMult(heroes,side,w){
 }
 function bstatScoreLocal(row,w){
   var troops=row.troops||{}, t11=row.t11||{};
-  var rSum=(w.ratio.infantry+w.ratio.cavalry+w.ratio.archer)||1;
+  var rAtk=w.ratioAtk||w.ratio||{infantry:50,cavalry:20,archer:30};
+  var rDef=w.ratioDef||w.ratio||{infantry:60,cavalry:40,archer:0};
+  var sumAtk=(rAtk.infantry+rAtk.cavalry+rAtk.archer)||1;
+  var sumDef=(rDef.infantry+rDef.cavalry+rDef.archer)||1;
   var blendOff=0, blendSurv=0;
   BSTAT_TYPES.forEach(function(t){
     var s=troops[t]||{};
     var off=(1+bstatN(s.atk)/100)*(1+bstatN(s.leth)/100);
     var surv=(1+bstatN(s.def)/100)*(1+bstatN(s.hp)/100);
     var tier=(t11[t]?w.tier.t11:1)*bstatTgMult(row.tg,w);
-    var rShare=bstatN(w.ratio[t])/rSum;
-    blendOff+=rShare*off*tier; blendSurv+=rShare*surv*tier;
+    blendOff+=(bstatN(rAtk[t])/sumAtk)*off*tier;
+    blendSurv+=(bstatN(rDef[t])/sumDef)*surv*tier;
   });
   var cap=Math.max(1,bstatN(row.rallyCap));
   var capAtk=Math.pow(cap/w.cap.median,w.cap.atkExp);
@@ -7735,14 +7810,27 @@ function bstatRenderWeights(){
       +'<span class="bstatWtD">'+desc+'</span></div>';
   }
   var h='';
-  h+='<div class="bstatSecT">Standing march ratio</div>';
-  h+='<div style="display:flex;height:32px;border-radius:6px;overflow:hidden;border:1px solid var(--border);margin-bottom:8px">'
-    +'<div style="display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:600;color:#fff;background:rgba(224,141,94,.75);width:'+w.ratio.infantry+'%">'+w.ratio.infantry+'% INF</div>'
-    +'<div style="display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:600;color:#fff;background:rgba(106,176,255,.6);width:'+w.ratio.cavalry+'%">'+w.ratio.cavalry+'%</div>'
-    +'<div style="display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:600;color:#fff;background:rgba(46,204,113,.6);width:'+w.ratio.archer+'%">'+w.ratio.archer+'% ARC</div></div>';
-  h+=row('ratio.infantry','Infantry %',w.ratio.infantry,'Share of every march')
-    + row('ratio.cavalry','Cavalry %',w.ratio.cavalry,'')
-    + row('ratio.archer','Archer %',w.ratio.archer,'Should sum to ~100');
+  var rA = w.ratioAtk || w.ratio || {infantry:50,cavalry:20,archer:30};
+  var rD = w.ratioDef || {infantry:60,cavalry:40,archer:0};
+  function ratioBar(r){
+    return '<div style="display:flex;height:32px;border-radius:6px;overflow:hidden;border:1px solid var(--border);margin-bottom:8px">'
+      +'<div style="display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:600;color:#fff;background:rgba(224,141,94,.75);width:'+r.infantry+'%">'+r.infantry+'% INF</div>'
+      +(r.cavalry>0?'<div style="display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:600;color:#fff;background:rgba(106,176,255,.6);width:'+r.cavalry+'%">'+r.cavalry+'%</div>':'')
+      +(r.archer>0?'<div style="display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:600;color:#fff;background:rgba(46,204,113,.6);width:'+r.archer+'%">'+r.archer+'% ARC</div>':'')
+      +'</div>';
+  }
+  h+='<div class="bstatSecT">Attack march ratio</div>';
+  h+='<div style="font-size:11.5px;color:var(--text3);margin-bottom:6px">The mix your rallies march. Drives the <span style="color:var(--accent2)">attack</span> score.</div>';
+  h+=ratioBar(rA);
+  h+=row('ratioAtk.infantry','Infantry %',rA.infantry,'Share of every rally')
+    + row('ratioAtk.cavalry','Cavalry %',rA.cavalry,'')
+    + row('ratioAtk.archer','Archer %',rA.archer,'Should sum to ~100');
+  h+='<div class="bstatSecT" style="margin-top:18px">Defense wall ratio</div>';
+  h+='<div style="font-size:11.5px;color:var(--text3);margin-bottom:6px">The mix you garrison/wall with — usually no archers. Drives the <span style="color:#6ab0ff">defense</span> score.</div>';
+  h+=ratioBar(rD);
+  h+=row('ratioDef.infantry','Infantry %',rD.infantry,'Share of the wall')
+    + row('ratioDef.cavalry','Cavalry %',rD.cavalry,'')
+    + row('ratioDef.archer','Archer %',rD.archer,'Usually 0 on defense');
   h+='<div class="bstatSecT">Troop tier</div>';
   h+=row('tier.t11','Tier 11 multiplier',w.tier.t11,'≈15–20% over T10 (community-tested)')
     + row('tier.tgPerLevel','Truegold, per level',w.tier.tgPerLevel,'Compounds — TG8 ≈ ×1.17')
@@ -7984,8 +8072,9 @@ function stripPw(s){ if (s && typeof s==='object'){ delete s.pw_rallyleader; del
 
 // Defaults seeded on first use. Admin edits these in the Weights tab (key: bstatWeights).
 const BSTAT_WEIGHTS_DEFAULT = {
-  ver: 1,
-  ratio: { infantry: 50, cavalry: 20, archer: 30 },   // standing march ratio (must sum ~100)
+  ver: 2,   // v2: split single march ratio into ratioAtk + ratioDef (defense walls with no archers)
+  ratioAtk: { infantry: 50, cavalry: 20, archer: 30 }, // offense march mix
+  ratioDef: { infantry: 60, cavalry: 40, archer: 0 },  // garrison/wall mix (no archers)
   tier:  { t11: 1.17, tgPerLevel: 1.02, tg5: 1.10, tg8: 1.10 },
   gear:  { matchLv10: 1.15, mismatch: 1.00 },          // widget/exclusive gear, leader only
   skill: { damageUpPer25: 0.25, proc: 0.50 },          // op-code contributions
@@ -8078,7 +8167,12 @@ function bstatScore(row, weights){
   const w = weights || BSTAT_WEIGHTS_DEFAULT;
   const troops = row.troops || {};
   const t11 = row.t11 || {};
-  const ratioSum = (w.ratio.infantry + w.ratio.cavalry + w.ratio.archer) || 1;
+  // Two ratios: offense marches (e.g. 50/20/30), defense walls (e.g. 60/40/0, no archers).
+  // Fall back to legacy single `ratio` if an old weights object slips through unmigrated.
+  const rAtk = w.ratioAtk || w.ratio || { infantry:50, cavalry:20, archer:30 };
+  const rDef = w.ratioDef || w.ratio || { infantry:60, cavalry:40, archer:0 };
+  const sumAtk = (rAtk.infantry + rAtk.cavalry + rAtk.archer) || 1;
+  const sumDef = (rDef.infantry + rDef.cavalry + rDef.archer) || 1;
 
   let blendOff = 0, blendSurv = 0;
   ['infantry','cavalry','archer'].forEach(function(t){
@@ -8086,9 +8180,8 @@ function bstatScore(row, weights){
     const off  = (1 + bstatNum(s.atk)/100) * (1 + bstatNum(s.leth)/100);
     const surv = (1 + bstatNum(s.def)/100) * (1 + bstatNum(s.hp)/100);
     const tier = (t11[t] ? w.tier.t11 : 1) * bstatTgMult(row.tg, w);
-    const rShare = (bstatNum(w.ratio[t]) / ratioSum);
-    blendOff  += rShare * off  * tier;
-    blendSurv += rShare * surv * tier;
+    blendOff  += (bstatNum(rAtk[t]) / sumAtk) * off  * tier;  // offense mix
+    blendSurv += (bstatNum(rDef[t]) / sumDef) * surv * tier;  // defense mix
   });
 
   const skillsAtk = bstatSkillMult(row.heroes, 'atk', w);
@@ -8306,6 +8399,13 @@ export class KingdomState {
       // admin edits then overwrite them via the Weights tab.
       if (!this.st.bstatWeights || !this.st.bstatWeights.ver){
         this.st.bstatWeights = JSON.parse(JSON.stringify(BSTAT_WEIGHTS_DEFAULT));
+      } else if (this.st.bstatWeights.ver < 2 || !this.st.bstatWeights.ratioAtk){
+        // v1 → v2 migration: the old single `ratio` becomes the attack ratio; seed a default
+        // defense ratio (60/40/0 wall). Preserves any custom ratio the admin had set.
+        var oldR = this.st.bstatWeights.ratio || { infantry:50, cavalry:20, archer:30 };
+        this.st.bstatWeights.ratioAtk = oldR;
+        this.st.bstatWeights.ratioDef = this.st.bstatWeights.ratioDef || { infantry:60, cavalry:40, archer:0 };
+        this.st.bstatWeights.ver = 2;
       }
       this.ready = true;
     });
