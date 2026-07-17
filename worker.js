@@ -742,6 +742,13 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .bs-pet-label.on{color:#c084fc;}
 .bs-pet-label.warn{color:var(--gold);}
 .bs-pet-label.off{color:#ff7070;}
+/* Three-phase pet state — shared by Setup cards + Pet Activation Plan dots */
+.bs-pet-bar-fill.ready{background:#2ecc71;}
+.bs-pet-bar-fill.active{background:#e6b34a;}
+.bs-pet-bar-fill.cooldown{background:#e04545;}
+.bs-pet-label.ready{color:#48d17f;}
+.bs-pet-label.active{color:#e6b34a;}
+.bs-pet-label.cooldown{color:#ff7070;}
 .team-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;}
 .team-dot.free{background:var(--green);}
 .team-dot.rallying{background:#ff5555;box-shadow:0 0 6px rgba(255,85,85,.7);}
@@ -1099,7 +1106,7 @@ document.addEventListener('touchend',function(e){
 
       <!-- TURRETS -->
       <div class="bs4card">
-        <h3>&#128508; Turret Assignments</h3>
+        <h3 style="display:flex;align-items:center;gap:10px">&#128508; Turret Assignments<button class="btn btn-gold btn-sm" style="margin-left:auto;font-weight:600" onclick="bsCopyTurrets()">&#128203; Copy</button></h3>
         <div class="bs4desc">Place each leader on a turret with <b>+ Add leader</b>, or the &#8646; button on a card. Tap &#10005; to send them back to the pool.</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px" id="bsTurretGrid"></div>
       </div>
@@ -1161,7 +1168,7 @@ document.addEventListener('touchend',function(e){
 
       <!-- PET ACTIVATION PLAN -->
       <div class="bs4card">
-        <h3>&#128062; Pet Activation Plan</h3>
+        <h3 style="display:flex;align-items:center;gap:10px">&#128062; Pet Activation Plan<button class="btn btn-gold btn-sm" style="margin-left:auto;font-weight:600" onclick="bsCopyPetPlan()">&#128203; Copy</button></h3>
         <div class="bs4desc">Select leaders, pick a UTC time, and add a plan. At that time their 2.5h pet buff auto-activates for everyone in the plan.</div>
         <div id="bsPetSelChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
         <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:14px">
@@ -2565,6 +2572,29 @@ renderSetup();
 // ════════════ PET BUFFS ════════════
 const PET_DUR = 2.5 * 3600 * 1000; // 2.5h in ms
 const WARN_MS = 15 * 60 * 1000;    // warn at 15 min left
+const PET_COOLDOWN = 20 * 3600 * 1000; // 20h cooldown, begins the instant the 2.5h active window ends
+
+// Canonical pet state, derived ONLY from startMs so every synced client agrees without an
+// extra field on the wire. Three phases: ready (green) -> active 2.5h (yellow) -> cooldown 20h (red) -> ready.
+function petPhase(l){
+  const p = l && l.pet;
+  if(!p || !p.startMs) return { phase:'ready', remMs:0 };
+  let elapsed = nowSync() - p.startMs;
+  if(elapsed < 0) elapsed = 0;
+  if(elapsed < PET_DUR)                return { phase:'active',   remMs: PET_DUR - elapsed };
+  if(elapsed < PET_DUR + PET_COOLDOWN) return { phase:'cooldown', remMs: PET_DUR + PET_COOLDOWN - elapsed };
+  return { phase:'ready', remMs:0 };
+}
+function petPhaseText(ph, remMs){
+  if(ph==='active')   return 'Pets active · ' + fmtSec(Math.ceil(remMs/1000));
+  if(ph==='cooldown') return 'Pets on cooldown · ' + fmtSec(Math.ceil(remMs/1000));
+  return 'Pets ready: Tap to start';
+}
+function petPhaseColor(ph){ return ph==='active' ? '#e6b34a' : (ph==='cooldown' ? '#e04545' : '#2ecc71'); }
+// Small status dot shown next to each name in the Pet Activation Plan.
+function petDotHTML(l){
+  return '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;flex-shrink:0;background:'+petPhaseColor(petPhase(l).phase)+'"></span>';
+}
 
 function renderPetGrid(){
   const grid=document.getElementById('petGrid'); if(!grid) return;
@@ -2604,9 +2634,20 @@ function renderPetGrid(){
 function petToggle(leaderId){
   const l=S.leaders.find(x=>x.id===leaderId); if(!l) return;
   if(!l.pet) l.pet={active:false,startMs:null};
-  if(l.pet.active){ l.pet.active=false; l.pet.startMs=null; }
-  else { l.pet.active=true; l.pet.startMs=nowSync(); }
-  renderPetGrid();
+  const ph=petPhase(l).phase;
+  if(ph==='ready'){
+    // Green -> start the 2.5h buff.
+    l.pet.active=true; l.pet.startMs=nowSync();
+  } else {
+    // Yellow/red -> confirm before wiping, so an accidental tap can't reset a live
+    // countdown mid-battle. Clearing sends it straight back to ready (green).
+    const msg = ph==='active'
+      ? 'Reset '+l.name+"'s pet? This clears the active buff and the tracker goes back to ready."
+      : 'Clear '+l.name+"'s cooldown and set the pet back to ready?";
+    if(!confirm(msg)) return;
+    l.pet.active=false; l.pet.startMs=null;
+  }
+  if(typeof renderPetGrid==='function') renderPetGrid();
   syncQueuePush();
 }
 
@@ -2623,31 +2664,28 @@ function petResetAll(){
 
 function tickPets(){
   if(!S.leaders.length) return;
-  const now=nowSync();
-  let healed=false;
-  S.leaders.forEach(function(l){ if(l.pet&&l.pet.active&&!l.pet.startMs){ l.pet.active=false; healed=true; } });
-  if(healed){ if(typeof renderBattleStrategy==='function') renderBattleStrategy(); if(typeof syncQueuePush==='function') syncQueuePush(); }
   S.leaders.forEach(l=>{
-    if(!l.pet||!l.pet.active||!l.pet.startMs) return;
-    const rem=PET_DUR-(now-l.pet.startMs);
-    const expired=rem<=0;
-    if(expired){ l.pet.active=false; l.pet.startMs=null; }
-    const expiring=!expired&&rem<=WARN_MS;
-    const txt=expired?'EXPIRED':fmtSec(Math.ceil(rem/1000));
-    // Pet Planner card
+    if(!l.pet) return;
+    const ps=petPhase(l);
+    // Keep the wire flag roughly in step with the derived phase (the phase itself is
+    // computed from startMs, so this is only a hint — startMs is never nulled here, so a
+    // finished buff rolls into cooldown instead of vanishing back to ready).
+    l.pet.active=(ps.phase==='active');
+    // Pet Planner card (not in the current DOM, but harmless if it ever returns)
     const timerEl=document.getElementById('pettimer-'+l.id);
     if(timerEl){
       const cardEl=document.getElementById('petcard-'+l.id);
       const btnEl=cardEl?cardEl.querySelector('.pet-toggle'):null;
-      if(expired){ timerEl.textContent='EXPIRED'; timerEl.className='pet-timer expired'; if(cardEl)cardEl.className='pet-card expired'; if(btnEl){ btnEl.textContent='▶ Activate'; btnEl.className='pet-toggle off'; } }
-      else { timerEl.textContent=txt; timerEl.className='pet-timer '+(expiring?'expiring':'active'); if(cardEl)cardEl.className='pet-card '+(expiring?'expiring':'active'); }
+      if(ps.phase==='active'){ timerEl.textContent=fmtSec(Math.ceil(ps.remMs/1000)); timerEl.className='pet-timer active'; if(cardEl)cardEl.className='pet-card active'; if(btnEl){ btnEl.textContent='■ Stop'; btnEl.className='pet-toggle on'; } }
+      else { timerEl.textContent=(ps.phase==='cooldown'?'COOLDOWN':'—'); timerEl.className='pet-timer '+(ps.phase==='cooldown'?'expired':'idle'); if(cardEl)cardEl.className='pet-card '+(ps.phase==='cooldown'?'expired':''); if(btnEl){ btnEl.textContent='▶ Activate'; btnEl.className='pet-toggle off'; } }
     }
     // Battle Strategy card
     const bsFill=document.getElementById('bspetfill-'+l.id);
     const bsLabel=document.getElementById('bspetlabel-'+l.id);
     if(bsFill&&bsLabel){
-      if(expired){ bsFill.className='bs-pet-bar-fill off'; bsFill.style.width='0%'; bsLabel.className='bs-pet-label off'; bsLabel.textContent='No pet — tap to start'; }
-      else { const cls=expiring?'warn':'on'; bsFill.className='bs-pet-bar-fill '+cls; bsFill.style.width=Math.max(0,Math.min(100,rem/PET_DUR*100))+'%'; bsLabel.className='bs-pet-label '+cls; bsLabel.textContent=txt; }
+      if(ps.phase==='active'){ bsFill.className='bs-pet-bar-fill active'; bsFill.style.width=Math.max(0,Math.min(100,ps.remMs/PET_DUR*100))+'%'; bsLabel.className='bs-pet-label active'; bsLabel.textContent=petPhaseText('active',ps.remMs); }
+      else if(ps.phase==='cooldown'){ bsFill.className='bs-pet-bar-fill cooldown'; bsFill.style.width=Math.max(0,Math.min(100,ps.remMs/PET_COOLDOWN*100))+'%'; bsLabel.className='bs-pet-label cooldown'; bsLabel.textContent=petPhaseText('cooldown',ps.remMs); }
+      else { bsFill.className='bs-pet-bar-fill ready'; bsFill.style.width='0%'; bsLabel.className='bs-pet-label ready'; bsLabel.textContent='Pets ready: Tap to start'; }
     }
   });
 }
@@ -2697,7 +2735,7 @@ function renderPetPlanList(){
     let status;
     if(p.fired) status='<span style="color:#c084fc">✓ Activated</span>';
     else status='<span style="color:var(--gold)">in '+fmtSec(Math.ceil(Math.max(0,p.targetMs-now)/1000))+'</span>';
-    const names=p.leaderIds.map(function(id){ const l=S.leaders.find(function(x){return x.id===id;}); return l?l.name:'?'; }).join(', ');
+    const names=p.leaderIds.map(function(id){ const l=S.leaders.find(function(x){return x.id===id;}); const nm=l?l.name:'?'; const dot=l?petDotHTML(l):''; return '<span style="display:inline-flex;align-items:center;gap:5px;margin-right:12px;white-space:nowrap;color:var(--text2)">'+dot+nm+'</span>'; }).join('');
     return '<div style="padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;margin-bottom:6px">'+
       '<div style="display:flex;align-items:center;gap:10px">'+
         '<span style="font-family:var(--mono);color:var(--text);font-size:14px">'+hhmm+' UTC</span>'+
@@ -2706,11 +2744,57 @@ function renderPetPlanList(){
         '<span style="flex:1"></span>'+
         '<span onclick="bsRemovePetPlan('+"'"+p.id+"'"+')" style="cursor:pointer;color:var(--text3);font-size:14px;padding:6px 8px" title="Remove">✕</span>'+
       '</div>'+
-      '<div style="color:var(--text3);font-size:11px;margin-top:4px;line-height:1.5">'+names+'</div>'+
+      '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px 0;font-size:12px">'+names+'</div>'+
     '</div>';
   }).join('');
 }
 function renderPetPlans(){ renderPetPlanChips(); renderPetPlanList(); }
+
+// ── Copy-to-chat helpers ─────────────────────────────────────────────────────
+// Turret Assignments -> plain text for game/Discord chat.
+function bsCopyTurrets(){
+  bsEnsureAlliances();
+  var lines=['Turret Assignments'];
+  BS_TURRETS.forEach(function(t,i){
+    var occ=S.leaders.filter(function(l){ return l.bsSlot && l.bsSlot.slotType==='turret' && l.bsSlot.slotId===i; });
+    lines.push(t.name+' Turret: '+(occ.length?occ.map(function(l){return l.name;}).join(', '):'—'));
+  });
+  copyText(lines.join('\\n'));
+}
+// Alliance assignments -> grouped by alliance, then team, then the leaders on that team.
+function bsCopyAlliances(){
+  bsEnsureAlliances();
+  var blocks=[];
+  function teamLine(t){
+    var mem=S.leaders.filter(function(l){ return l.bsSlot && l.bsSlot.slotType==='team' && l.bsSlot.slotId===t.id; });
+    return mem.length ? (t.name+': '+mem.map(function(l){return l.name;}).join(', ')) : null;
+  }
+  S.alliances.forEach(function(a){
+    var lines=[];
+    S.teams.filter(function(t){ return t.alliance===a.id; }).forEach(function(t){ var tl=teamLine(t); if(tl) lines.push(tl); });
+    if(lines.length) blocks.push('Alliance: '+a.name+'\\n'+lines.join('\\n'));
+  });
+  var known={}; S.alliances.forEach(function(a){ known[a.id]=true; });
+  var unLines=[];
+  S.teams.filter(function(t){ return !t.alliance || !known[t.alliance]; }).forEach(function(t){ var tl=teamLine(t); if(tl) unLines.push(tl); });
+  if(unLines.length) blocks.push('Unassigned\\n'+unLines.join('\\n'));
+  if(!blocks.length){ toast('No alliance assignments yet'); return; }
+  copyText(blocks.join('\\n\\n'));
+}
+// Pet Activation Plan -> each UTC time and the leaders firing at it.
+function bsCopyPetPlan(){
+  if(typeof bsPetPlans==='undefined' || !bsPetPlans.length){ toast('No pet plans yet'); return; }
+  var plans=bsPetPlans.slice().sort(function(a,b){ return a.targetMs-b.targetMs; });
+  var lines=['Pet Activation Plan'];
+  plans.forEach(function(p){
+    var hhmm=String(p.hh).padStart(2,'0')+':'+String(p.mm).padStart(2,'0');
+    var names=p.leaderIds.map(function(id){ var l=S.leaders.find(function(x){return x.id===id;}); return l?l.name:'?'; }).join(', ');
+    lines.push('');
+    lines.push(hhmm+' UTC');
+    lines.push(names);
+  });
+  copyText(lines.join('\\n'));
+}
 setInterval(function(){ bsFirePetPlans(); renderPetPlanList(); },1000);
 renderPetGrid();
 
@@ -2730,12 +2814,11 @@ function bsRemoveFromSlot(leaderId){
 }
 
 function bsLeaderCardHTML(l){
-  const p=l.pet||{active:false,startMs:null};
-  let petCls='off',petTxt='No pet — tap to start',petPct=0;
-  if(p.active&&p.startMs){
-    const rem=PET_DUR-(nowSync()-p.startMs);
-    if(rem>0){ petCls=(rem<=WARN_MS)?'warn':'on'; petTxt=fmtSec(Math.ceil(rem/1000)); petPct=Math.max(0,Math.min(100,rem/PET_DUR*100)); }
-  }
+  const _ps=petPhase(l);
+  let petCls,petTxt,petPct;
+  if(_ps.phase==='active'){ petCls='active'; petTxt=petPhaseText('active',_ps.remMs); petPct=Math.max(0,Math.min(100,_ps.remMs/PET_DUR*100)); }
+  else if(_ps.phase==='cooldown'){ petCls='cooldown'; petTxt=petPhaseText('cooldown',_ps.remMs); petPct=Math.max(0,Math.min(100,_ps.remMs/PET_COOLDOWN*100)); }
+  else { petCls='ready'; petTxt='Pets ready: Tap to start'; petPct=0; }
   // Team color accent reflects the leader's ACTUAL current placement (bsSlot), not the
   // unused legacy l.teamId field — that's what was producing the always-wrong "No team" label.
   const inPool = !l.bsSlot || l.bsSlot.slotType==='pool';
@@ -2853,7 +2936,10 @@ function renderBsAllianceZones(){
   if(un.length){
     cards+='<div class="card bs4ally"><div class="card-title" style="color:var(--text3)">📦 Unassigned</div><div class="bs4teamgrid">'+un.map(teamBoxHTML).join('')+'</div></div>';
   }
-  el.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:0">'+cards+'</div>';
+  var _allyHdr='<div style="display:flex;align-items:center;margin-bottom:10px;padding:0 2px">'+
+    '<span style="font-family:var(--head);font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--text2)">ALLIANCE ASSIGNMENTS</span>'+
+    '<button class="btn btn-gold btn-sm" style="margin-left:auto;font-weight:600" onclick="bsCopyAlliances()">📋 Copy</button></div>';
+  el.innerHTML=_allyHdr+'<div style="display:flex;flex-wrap:wrap;gap:0">'+cards+'</div>';
 
   // Max 2 alliances — hide the "add alliance" row once both exist.
   var _row=document.getElementById('bsAddAllianceRow');
