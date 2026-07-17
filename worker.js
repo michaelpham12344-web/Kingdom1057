@@ -2591,9 +2591,17 @@ function petPhaseText(ph, remMs){
   return 'Pets ready: Tap to start';
 }
 function petPhaseColor(ph){ return ph==='active' ? '#e6b34a' : (ph==='cooldown' ? '#e04545' : '#2ecc71'); }
-// Small status dot shown next to each name in the Pet Activation Plan.
-function petDotHTML(l){
-  return '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;flex-shrink:0;background:'+petPhaseColor(petPhase(l).phase)+'"></span>';
+// Border/background/text colors for a name pill, by pet phase.
+// ready = has a plan (green), active = pets running (yellow), cooldown = 20h wait (red)
+function petPhasePill(ph){
+  if(ph==='active')   return { bd:'#e6b34a', bg:'rgba(230,179,74,.15)', cl:'#e6b34a' };
+  if(ph==='cooldown') return { bd:'#e04545', bg:'rgba(224,69,69,.14)',  cl:'#e04545' };
+  return               { bd:'var(--green)', bg:'rgba(124,200,121,.12)', cl:'var(--green)' };
+}
+// Name rendered as a colored pill (color = pet phase) for the Pet Activation Plan.
+function petNamePillHTML(l, nm){
+  const c = petPhasePill(petPhase(l).phase);
+  return '<span style="font-size:12px;padding:3px 9px;border-radius:12px;border:1px solid '+c.bd+';background:'+c.bg+';color:'+c.cl+';white-space:nowrap;line-height:1.7">'+nm+'</span>';
 }
 
 function renderPetGrid(){
@@ -2735,7 +2743,7 @@ function renderPetPlanList(){
     let status;
     if(p.fired) status='<span style="color:#c084fc">✓ Activated</span>';
     else status='<span style="color:var(--gold)">in '+fmtSec(Math.ceil(Math.max(0,p.targetMs-now)/1000))+'</span>';
-    const names=p.leaderIds.map(function(id){ const l=S.leaders.find(function(x){return x.id===id;}); const nm=l?l.name:'?'; const dot=l?petDotHTML(l):''; return '<span style="display:inline-flex;align-items:center;gap:5px;margin-right:12px;white-space:nowrap;color:var(--text2)">'+dot+nm+'</span>'; }).join('');
+    const names=p.leaderIds.map(function(id){ const l=S.leaders.find(function(x){return x.id===id;}); const nm=l?l.name:'?'; return l ? petNamePillHTML(l,nm) : '<span style="font-size:12px;padding:3px 9px;border-radius:12px;border:1px solid var(--border);background:var(--bg3);color:var(--text3);white-space:nowrap;line-height:1.7">'+nm+'</span>'; }).join('');
     return '<div style="padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;margin-bottom:6px">'+
       '<div style="display:flex;align-items:center;gap:10px">'+
         '<span style="font-family:var(--mono);color:var(--text);font-size:14px">'+hhmm+' UTC</span>'+
@@ -2744,7 +2752,7 @@ function renderPetPlanList(){
         '<span style="flex:1"></span>'+
         '<span onclick="bsRemovePetPlan('+"'"+p.id+"'"+')" style="cursor:pointer;color:var(--text3);font-size:14px;padding:6px 8px" title="Remove">✕</span>'+
       '</div>'+
-      '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px 0;font-size:12px">'+names+'</div>'+
+      '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;font-size:12px">'+names+'</div>'+
     '</div>';
   }).join('');
 }
