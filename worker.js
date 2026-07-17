@@ -7118,7 +7118,7 @@ document.addEventListener('DOMContentLoaded', initApp);
         <label for="bstatFile" id="bstatDrop" class="bstatDrop" style="display:block;cursor:pointer">
           <div class="bstatDropIcon">🖼️</div>
           <div class="bstatDropT">Upload your Battle Report screenshot</div>
-          <div class="bstatDropS">Mail → open the report → screenshot the Bonus Details panel</div>
+          <div class="bstatDropS">Use a BEAST attack report (no widgets) — the app adds widgets on top</div>
         </label>
         <input type="file" id="bstatFile" accept="image/*" style="display:none">
         <div id="bstatScanStatus" class="bstatNote" style="display:none;margin:14px 0 0"></div>
@@ -7135,48 +7135,47 @@ document.addEventListener('DOMContentLoaded', initApp);
       <div class="bstatCard">
         <div class="bstatCardT">Army</div>
         <div class="bstatGrid3">
-          <div><label>Truegold level</label>
-            <select id="bstatTg">
-              <option value="10">TG 10</option><option value="9">TG 9</option>
-              <option value="8" selected>TG 8</option><option value="7">TG 7</option>
-              <option value="6">TG 6</option><option value="5">TG 5</option>
-              <option value="0">TG 4 or below</option>
-            </select>
-          </div>
-          <div><label>March capacity</label><input type="number" id="bstatMarchCap" value="" placeholder="e.g. 415000"></div>
-          <div><label>Fearless Roar (pet)</label><select id="bstatPetRoar"></select></div>
-        </div>
-        <div class="bstatGrid3" style="margin-top:12px">
-          <div><label>Antler Impact (pet)</label><select id="bstatPetAntler"></select></div>
-          <div></div>
-          <div></div>
+          <div><label>Base march capacity</label><input type="number" id="bstatMarchCap" value="" placeholder="e.g. 415000" oninput="bstatRecalcPreview()"></div>
+          <div><label>Fearless Roar lv (Mighty Bison)</label><select id="bstatPetRoar" onchange="bstatRecalcPreview()"></select></div>
+          <div><label>Effective march</label><input type="text" id="bstatEffMarch" value="—" readonly style="opacity:.7"></div>
         </div>
         <div class="bstatWarn" style="margin:14px 0 0">
-          <b>Truegold counts as much as the tier badge.</b> A maxed T10 at TG8 out-fights a fresh T11 at TG5 most of the time — the extra troop skills outweigh the tier jump. Pets are recorded but not yet scored — the exact combat values aren't pinned down.
+          <b>Set each troop type's tier above</b> (T9 → T11 TG5) — Truegold is the decimal, e.g. T10 TG3. The base stats behind your percentages come straight from the tier.
         </div>
       </div>
 
       <div class="bstatCard">
         <div class="bstatCardT">Rally capacity</div>
-        <div class="bstatGrid3">
-          <div><label>Rally capacity</label><input type="number" id="bstatRallyCap" value="" placeholder="e.g. 1250000"></div>
-          <div></div>
-          <div></div>
+        <div class="bstatNote" style="margin:0 0 14px">
+          <b>Base rally capacity plus Antler Impact.</b> Great Moose (Antler Impact) raises the whole rally; the total feeds the √-capacity term (more troops = more kills, at diminishing returns). Fearless Roar is your <i>own</i> march, so it lives in the Army card above, not here.
         </div>
-        <div class="bstatNote" style="margin:14px 0 0">
-          <b>Total troops you can lead in a rally.</b> Feeds the capacity term — √ for attack (twice the troops ≈ 41% more damage), near-linear for defense.
+        <div class="bstatGrid3">
+          <div><label>Base rally capacity</label><input type="number" id="bstatRallyCap" value="" placeholder="e.g. 1250000" oninput="bstatRecalcPreview()"></div>
+          <div><label>Antler Impact lv (Great Moose)</label><select id="bstatPetAntler" onchange="bstatRecalcPreview()"></select></div>
+          <div><label>Effective rally capacity</label><input type="text" id="bstatEffCap" value="—" readonly style="opacity:.7"></div>
         </div>
       </div>
 
       <div class="bstatCard">
-        <div class="bstatCardT">Heroes</div>
+        <div class="bstatCardT">Offensive heroes <span class="bstatHint">feed the attack score</span></div>
         <div class="bstatNote" style="margin:0 0 14px">
-          <b>Pick the hero you lead each troop type with.</b> Their skills apply to the whole rally — that is your attack and defense skill layer. Their stat bonuses are already inside the Battle Report numbers above, so only skills and gear are counted here (no double-counting). ⚔ = offensive gear, 🛡 = defensive gear.
+          <b>Your rally lead-set.</b> Each hero's widget boosts one stat across the whole squad (Amadeus→attack, Rosa→lethality…). Since your Battle Report is <b>widget-free</b> (a beast attack strips widgets), the app adds the widget on top — no double-count. Enter each widget's in-game level, 1–10.
         </div>
         <div class="bstatHeroHead"><span></span><span>Hero</span><span>Widget lvl</span></div>
-        <div class="bstatHeroRow"><span class="bstatSlot inf">INF</span><select id="bstatHInf"></select><select id="bstatGearInf" class="bstatGear"></select></div>
-        <div class="bstatHeroRow"><span class="bstatSlot cav">CAV</span><select id="bstatHCav"></select><select id="bstatGearCav" class="bstatGear"></select></div>
-        <div class="bstatHeroRow"><span class="bstatSlot arc">ARC</span><select id="bstatHArc"></select><select id="bstatGearArc" class="bstatGear"></select></div>
+        <div class="bstatHeroRow"><span class="bstatSlot inf">INF</span><select id="bstatOffInf" onchange="bstatRecalcPreview()"></select><select id="bstatOffWInf" onchange="bstatRecalcPreview()"></select></div>
+        <div class="bstatHeroRow"><span class="bstatSlot cav">CAV</span><select id="bstatOffCav" onchange="bstatRecalcPreview()"></select><select id="bstatOffWCav" onchange="bstatRecalcPreview()"></select></div>
+        <div class="bstatHeroRow"><span class="bstatSlot arc">ARC</span><select id="bstatOffArc" onchange="bstatRecalcPreview()"></select><select id="bstatOffWArc" onchange="bstatRecalcPreview()"></select></div>
+      </div>
+
+      <div class="bstatCard">
+        <div class="bstatCardT">Defensive heroes <span class="bstatHint">feed the defense score</span></div>
+        <div class="bstatNote" style="margin:0 0 14px">
+          <b>Your garrison set.</b> Defensive widgets boost survival stats (Alcar→health, Triton→defense…). A defensive-set widget that boosts <i>lethality</i> (Margot, Jabel) won't lift the defense number — the defense factor is Defense × Health. That's the maths being honest, not a bug.
+        </div>
+        <div class="bstatHeroHead"><span></span><span>Hero</span><span>Widget lvl</span></div>
+        <div class="bstatHeroRow"><span class="bstatSlot inf">INF</span><select id="bstatDefInf" onchange="bstatRecalcPreview()"></select><select id="bstatDefWInf" onchange="bstatRecalcPreview()"></select></div>
+        <div class="bstatHeroRow"><span class="bstatSlot cav">CAV</span><select id="bstatDefCav" onchange="bstatRecalcPreview()"></select><select id="bstatDefWCav" onchange="bstatRecalcPreview()"></select></div>
+        <div class="bstatHeroRow"><span class="bstatSlot arc">ARC</span><select id="bstatDefArc" onchange="bstatRecalcPreview()"></select><select id="bstatDefWArc" onchange="bstatRecalcPreview()"></select></div>
       </div>
 
       <div class="bstatCard">
@@ -7185,6 +7184,7 @@ document.addEventListener('DOMContentLoaded', initApp);
           <div class="bstatBig atk"><div class="bstatBigL">Attack score</div><div class="bstatBigV" id="bstatPreviewAtk">—</div></div>
           <div class="bstatBig def"><div class="bstatBigL">Defense score</div><div class="bstatBigV" id="bstatPreviewDef">—</div></div>
         </div>
+        <div id="bstatPreviewDetail" style="margin:2px 0 14px"></div>
         <div class="bstatFoot">
           <span class="bstatShare">
             <span class="bstatSw on" id="bstatShareSw" onclick="this.classList.toggle('on')"></span>
@@ -7210,7 +7210,7 @@ document.addEventListener('DOMContentLoaded', initApp);
           </span>
         </div>
         <div class="bstatTblWrap"><table class="bstatTbl"><thead><tr>
-          <th></th><th>Leader</th><th id="bstatRankScoreH">Attack</th><th>Lead gear</th><th>T11</th><th>TG</th><th>Rally cap</th><th>Updated</th>
+          <th></th><th>Leader</th><th id="bstatRankScoreH">Attack</th><th>Lead hero</th><th>Tiers</th><th>Rally cap</th><th>Updated</th>
         </tr></thead><tbody id="bstatRankRows"></tbody></table></div>
         <div class="bstatNote" style="margin:16px 0 0">
           <b>Two lists, one toggle.</b> Attack ranks who hits hardest as a rally lead; Defense ranks who anchors a garrison. Composition and counters are still your call on the day; this ranks the leaders, not the battle.
@@ -7246,58 +7246,46 @@ document.addEventListener('DOMContentLoaded', initApp);
       <div class="bstatCard">
         <div class="bstatCardT">How the score is calculated</div>
         <div class="bstatNote" style="margin:0 0 16px">
-          Every number here is a <b>multiplier</b>, chained together — not a sum. This mirrors the game's actual damage formula, where the stats multiply each other. The whole point is that you can change your stats, re-upload, and watch the number move in a way that reflects real power.
+          This is the game's real kill formula, not a made-up scoring system. Every troop's power comes from an <b>Attack factor</b> and a <b>Defense factor</b> — exactly the two quantities the damage engine multiplies. Change your stats, re-upload, and the number moves the way real power does.
         </div>
 
-        <div class="bstatSecT">The two scores</div>
-        <p style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:14px">
-          You get an <span style="color:var(--accent2)">attack</span> score and a <span style="color:#6ab0ff">defense</span> score, and they are <b>not interchangeable</b>. A leader is geared for one role: an offensive widget (Amadeus, Ava…) pumps attack and does nothing on defense; a defensive widget (Charles, Triton…) does the reverse. So a pure rally leader will show a high attack and a low defense — that is correct, it is telling you what they are built for. Rank attackers by the attack score, garrison holders by the defense score.
-        </p>
-
-        <div class="bstatSecT">Step 1 — stats multiply, per troop type</div>
+        <div class="bstatSecT">The two factors</div>
         <div class="bstatFormula">
-offense_t  = (1 + Attack%) <span class="bstatK">×</span> (1 + Lethality%)
-survival_t = (1 + Defense%) <span class="bstatK">×</span> (1 + Health%)
+<span class="bstatA">A</span>  (attack factor)  = (1 + Attack%) <span class="bstatK">×</span> (1 + Lethality%)
+<span class="bstatD">D</span>  (defense factor) = (1 + Defense%) <span class="bstatK">×</span> (1 + Health%)
         </div>
         <p style="font-size:13px;color:var(--text2);line-height:1.7;margin:10px 0 14px">
-          Attack and Lethality multiply each other; Defense and Health multiply each other. This is why 1000 Attack / 300 Lethality is <b>weaker</b> than 650 / 650 — 11×4 is less than 7.5×7.5, even though both "add" to the same total. Adding the four stats would rank people wrong; multiplying them is the whole reason this tool exists.
+          In the kill formula, attack and lethality <b>always</b> travel together and multiply; so do defense and health. That's why 1000 Attack / 300 Lethality is weaker than 650 / 650 — 11×4 &lt; 7.5×7.5. Your attack score is built from A, your defense score from D. Both use all the stats they should — nothing is thrown away.
         </p>
 
-        <div class="bstatSecT">Step 2 — blend the three troop types, by ratio</div>
+        <div class="bstatSecT">Widgets — added on top of a widget-free report</div>
         <p style="font-size:13px;color:var(--text2);line-height:1.7;margin:0 0 10px">
-          Every rally marches a fixed mix, so the score blends all three types by that mix. <b>Attack uses the attack ratio</b> (e.g. 50/20/30). <b>Defense uses the defense ratio</b> (e.g. 60/40/0 — a wall, no archers). They are separate on purpose: scoring a garrison as if it carried 30% archers it would never bring is simply wrong. Both ratios are editable in Weights.
+          Upload a <b>beast-attack</b> Battle Report — beasts strip widgets, so those 12 percentages are widget-free. The app then multiplies the right stat by the widget bonus, squad-wide. Each hero's widget boosts one stat (Rosa→lethality, Alcar→health…) using the confirmed level curve: lv1=0, then 5, 5, 7.5, 7.5, 10, 10, 12.5, 12.5, <b>15% at lv10</b>. Because the report was widget-free, this is the only place the widget enters — no double-count.
         </p>
         <div class="bstatFormula">
-blendOff  = Σ ( attackRatio_t  <span class="bstatK">×</span> offense_t  <span class="bstatK">×</span> tier_t )
-blendSurv = Σ ( defenseRatio_t <span class="bstatK">×</span> survival_t <span class="bstatK">×</span> tier_t )
+effective (1 + stat%)  =  (1 + reportStat%) <span class="bstatK">×</span> (1 + widget%)
         </div>
 
-        <div class="bstatSecT">Step 3 — troop tier</div>
+        <div class="bstatSecT">Base stats make the troop types comparable</div>
         <p style="font-size:13px;color:var(--text2);line-height:1.7;margin:0 0 10px">
-          <b>tier_t</b> = T11 multiplier (×1.17 if you have T11 of that type) × Truegold. Truegold compounds per level and gets a step at TG5 and TG8, because those unlock troop skills — which is why a maxed T10-TG8 beats a fresh T11-TG5.
+          A "+900%" archer and a "+900%" infantry are <b>not</b> equal — an archer's base attack is ~4× an infantry's. So each type's factor is weighted by its real base stat for that tier (base_att for attack, base_hea for defense), taken from the authoritative table (T9 → T11, TrueGold 0–5). This is why you set a tier per troop type — the decimal is TrueGold (T10.3 = T10 TG3).
         </p>
 
-        <div class="bstatSecT">Step 4 — hero skills &amp; widget</div>
+        <div class="bstatSecT">Blend, capacity, done</div>
         <p style="font-size:13px;color:var(--text2);line-height:1.7;margin:0 0 10px">
-          Your leader's three heroes contribute their <b>skills</b> (not their stats — those are already in the Battle Report). Same skill type adds; different types multiply. The widget adds up to +15%, <b>but only on the matching side</b> — offensive widget → attack only, defensive → defense only. This is what makes a leader an attacker or a defender.
+          Each type's power is blended by the march ratio (attack uses the attack ratio; defense uses the wall ratio — no archers). Then the kill formula's <b>√ troops</b> term: double your rally ≈ 41% more, not double.
         </p>
-
-        <div class="bstatSecT">Step 5 — rally capacity</div>
-        <p style="font-size:13px;color:var(--text2);line-height:1.7;margin:0 0 10px">
-          <b>Attack</b> scales with the <b>square root</b> of capacity — double your troops, ~41% more damage, not double (that's how the game scales). <b>Defense</b> is near-linear — more bodies means more HP to grind through.
-        </p>
-
-        <div class="bstatSecT">Putting it together</div>
         <div class="bstatFormula">
-<span class="bstatA">Attack</span>  = blendOff  <span class="bstatK">×</span> heroSkills(attack)  <span class="bstatK">×</span> <span class="bstatK">√</span>(cap / median) <span class="bstatK">×</span> scale
-<span class="bstatD">Defense</span> = blendSurv <span class="bstatK">×</span> heroSkills(defense) <span class="bstatK">×</span> (cap / median)   <span class="bstatK">×</span> scale
+per type:  atkPower = base_att <span class="bstatK">×</span> <span class="bstatA">A</span>      defPower = base_hea <span class="bstatK">×</span> <span class="bstatD">D</span>
+<span class="bstatA">Attack</span>  = Σ(ratio<span class="bstatK">×</span>atkPower) <span class="bstatK">×</span> <span class="bstatK">√</span>(cap/median) <span class="bstatK">×</span> scale
+<span class="bstatD">Defense</span> = Σ(ratio<span class="bstatK">×</span>defPower) <span class="bstatK">×</span> <span class="bstatK">√</span>(cap/median) <span class="bstatK">×</span> scale
         </div>
         <p style="font-size:13px;color:var(--text2);line-height:1.7;margin:10px 0 0">
-          <b>scale</b> is cosmetic — it shrinks the raw number so a strong leader reads ~180 instead of ~4,800. It changes nobody's rank and re-bases every past score consistently, so your progress trend stays honest even if it's retuned.
+          The score card also shows your <b>per-type A and D factors</b>, so you can see exactly where you're strong. <b>scale</b> is cosmetic — it just makes a top leader read ~180 instead of thousands, and re-bases history consistently so your progress trend stays honest.
         </p>
 
         <div class="bstatWarn" style="margin-top:18px">
-          <b>What's solid vs. what's estimated.</b> The <i>shape</i> — multiplicative stats, √ capacity, role-gated widgets, separate ratios — is well-evidenced from the community's reverse-engineering of the damage formula. The <i>exact numbers</i> (1.17, 0.25, etc.) are starting estimates. Tune them in Weights against what actually happens on the field. And pets are recorded but not yet in the score — those values aren't pinned down.
+          <b>What's solid vs. what's still coming.</b> The stats engine — A/D factors, base-stat tables, widget curve, √ capacity — is straight from the documented kill formula, not guesswork. What's <i>not</i> in yet: hero/joiner <b>skills</b> (the biggest lever, but the community data is still being finalised) and <b>pets</b> (values unconfirmed). Both are recorded and will layer on top when the numbers firm up.
         </div>
       </div>
     </div>
@@ -7425,65 +7413,67 @@ function bstatPid(){
   return null;
 }
 
-// Meta hero subset — troop type, gear role (o/d), primary skill op family + magnitude.
-// Mirror of BSTAT_HEROES on the server. Keep the two in step when adding heroes.
+var BSTAT_BASE={infantry:{'1.0':[63,189],'1.1':[66,197],'1.2':[69,206],'1.3':[72,217],'1.4':[76,228],'1.5':[80,239],'2.0':[94,283],'2.1':[98,294],'2.2':[103,309],'2.3':[108,324],'2.4':[113,341],'2.5':[119,358],'3.0':[132,397],'3.1':[137,413],'3.2':[144,434],'3.3':[151,455],'3.4':[159,478],'3.5':[167,502],'4.0':[172,516],'4.1':[179,537],'4.2':[188,563],'4.3':[197,592],'4.4':[207,621],'4.5':[217,652],'5.0':[206,619],'5.1':[214,644],'5.2':[225,676],'5.3':[236,710],'5.4':[248,745],'5.5':[260,782],'6.0':[243,730],'6.1':[253,759],'6.2':[265,797],'6.3':[279,837],'6.4':[293,879],'6.5':[307,923],'7.0':[287,862],'7.1':[298,896],'7.2':[313,941],'7.3':[329,988],'7.4':[346,1038],'7.5':[363,1090],'8.0':[339,1017],'8.1':[353,1058],'8.2':[370,1111],'8.3':[389,1166],'8.4':[408,1224],'8.5':[429,1286],'9.0':[400,1200],'9.1':[416,1248],'9.2':[437,1310],'9.3':[459,1376],'9.4':[482,1445],'9.5':[506,1517],'10.0':[472,1416],'10.1':[491,1473],'10.2':[515,1546],'10.3':[541,1624],'10.4':[568,1705],'10.5':[597,1790],'11.0':[566,1699],'11.1':[589,1767],'11.2':[618,1855],'11.3':[649,1948],'11.4':[681,2045],'11.5':[716,2148]},cavalry:{'1.0':[189,63],'1.1':[197,66],'1.2':[206,69],'1.3':[217,72],'1.4':[228,76],'1.5':[239,80],'2.0':[283,94],'2.1':[294,98],'2.2':[309,103],'2.3':[324,108],'2.4':[341,113],'2.5':[358,119],'3.0':[397,132],'3.1':[413,137],'3.2':[434,144],'3.3':[455,151],'3.4':[478,159],'3.5':[502,167],'4.0':[516,172],'4.1':[537,179],'4.2':[563,188],'4.3':[592,197],'4.4':[621,207],'4.5':[652,217],'5.0':[619,206],'5.1':[644,214],'5.2':[676,225],'5.3':[710,236],'5.4':[745,248],'5.5':[782,260],'6.0':[730,243],'6.1':[759,253],'6.2':[797,265],'6.3':[837,279],'6.4':[879,293],'6.5':[923,307],'7.0':[862,287],'7.1':[896,298],'7.2':[941,313],'7.3':[988,329],'7.4':[1038,346],'7.5':[1090,363],'8.0':[1017,339],'8.1':[1058,353],'8.2':[1111,370],'8.3':[1166,389],'8.4':[1224,408],'8.5':[1286,429],'9.0':[1200,400],'9.1':[1248,416],'9.2':[1310,437],'9.3':[1376,459],'9.4':[1445,482],'9.5':[1517,506],'10.0':[1416,472],'10.1':[1473,491],'10.2':[1546,515],'10.3':[1624,541],'10.4':[1705,568],'10.5':[1790,597],'11.0':[1699,566],'11.1':[1767,589],'11.2':[1855,618],'11.3':[1948,649],'11.4':[2045,681],'11.5':[2148,716]},archer:{'1.0':[252,47],'1.1':[262,49],'1.2':[275,51],'1.3':[289,54],'1.4':[303,57],'1.5':[319,59],'2.0':[378,71],'2.1':[393,74],'2.2':[413,78],'2.3':[433,81],'2.4':[455,85],'2.5':[478,90],'3.0':[529,99],'3.1':[550,103],'3.2':[578,108],'3.3':[607,114],'3.4':[637,119],'3.5':[669,125],'4.0':[688,129],'4.1':[716,134],'4.2':[751,141],'4.3':[789,148],'4.4':[828,155],'4.5':[870,163],'5.0':[825,155],'5.1':[858,161],'5.2':[901,169],'5.3':[946,178],'5.4':[993,187],'5.5':[1043,196],'6.0':[974,183],'6.1':[1013,190],'6.2':[1064,200],'6.3':[1117,210],'6.4':[1173,220],'6.5':[1231,231],'7.0':[1149,215],'7.1':[1195,224],'7.2':[1255,235],'7.3':[1317,247],'7.4':[1383,259],'7.5':[1452,272],'8.0':[1356,254],'8.1':[1410,264],'8.2':[1481,277],'8.3':[1555,291],'8.4':[1633,306],'8.5':[1714,321],'9.0':[1600,300],'9.1':[1664,312],'9.2':[1747,328],'9.3':[1835,344],'9.4':[1926,361],'9.5':[2023,379],'10.0':[1888,354],'10.1':[1964,368],'10.2':[2062,387],'10.3':[2165,406],'10.4':[2273,426],'10.5':[2387,448],'11.0':[2266,390],'11.1':[2357,406],'11.2':[2474,426],'11.3':[2598,447],'11.4':[2728,470],'11.5':[2868,494]}};
+
+// Widget level 1-10 -> bonus %, confirmed in-game table.
+var BSTAT_WIDGET_PCT = {1:0,2:5,3:5,4:7.5,5:7.5,6:10,7:10,8:12.5,9:12.5,10:15};
+
+// Hero roster for the pickers: troop type, which SET (off/def), and the stat its widget boosts.
+// off = offensive widget (boosts atk or leth, feeds attack factor A);
+// def = defensive widget (boosts def or hea, feeds defense factor D).
 var BSTAT_HEROES = {
-  'Amadeus':{type:'infantry',gear:'o',op:101,mag:1.0}, 'Helga':{type:'infantry',gear:'o',op:101,mag:1.0},
-  'Alcar':{type:'infantry',gear:'d',op:113,mag:1.0}, 'Triton':{type:'infantry',gear:'d',op:112,mag:1.0},
-  'Charles':{type:'infantry',gear:'d',op:113,mag:1.0}, 'Long Fei':{type:'infantry',gear:'d',op:111,mag:1.0},
-  'Eric':{type:'infantry',gear:'d',op:202,mag:0.8}, 'Zoe':{type:'infantry',gear:'d',op:111,mag:0.5},
-  'Ava':{type:'cavalry',gear:'o',op:211,mag:1.0}, 'Thrud':{type:'cavalry',gear:'o',op:101,mag:0.6},
-  'Petra':{type:'cavalry',gear:'o',op:101,mag:0.5}, 'Margot':{type:'cavalry',gear:'d',op:102,mag:1.0},
-  'Sophia':{type:'cavalry',gear:'d',op:111,mag:0.5}, 'Hilde':{type:'cavalry',gear:'d',op:112,mag:1.0},
-  'Jabel':{type:'cavalry',gear:'d',op:113,mag:1.0},
-  'Wee & Woo':{type:'archer',gear:'d',op:101,mag:1.0}, 'Yang':{type:'archer',gear:'o',op:101,mag:0.6},
-  'Vivian':{type:'archer',gear:'d',op:101,mag:1.0}, 'Rosa':{type:'archer',gear:'o',op:101,mag:0.5},
-  'Marlin':{type:'archer',gear:'o',op:101,mag:0.5}, 'Jaeger':{type:'archer',gear:'d',op:111,mag:0.5},
-  'Saul':{type:'archer',gear:'d',op:113,mag:1.0}
+  'Amadeus':{type:'infantry',set:'off',stat:'atk'}, 'Helga':{type:'infantry',set:'off',stat:'leth'},
+  'Petra':{type:'cavalry',set:'off',stat:'atk'}, 'Thrud':{type:'cavalry',set:'off',stat:'leth'},
+  'Ava':{type:'cavalry',set:'off',stat:'leth'}, 'Marlin':{type:'archer',set:'off',stat:'leth'},
+  'Rosa':{type:'archer',set:'off',stat:'leth'}, 'Yang':{type:'archer',set:'off',stat:'leth'},
+  'Alcar':{type:'infantry',set:'def',stat:'hea'}, 'Charles':{type:'infantry',set:'def',stat:'hea'},
+  'Triton':{type:'infantry',set:'def',stat:'def'}, 'Hilde':{type:'cavalry',set:'def',stat:'hea'},
+  'Margot':{type:'cavalry',set:'def',stat:'leth'}, 'Jabel':{type:'cavalry',set:'def',stat:'leth'},
+  'Vivian':{type:'archer',set:'def',stat:'def'}, 'Jaeger':{type:'archer',set:'def',stat:'hea'}
 };
-var BSTAT_ATK_OPS = {101:1,102:1,103:1,201:1,202:1,211:1,212:1};
-var BSTAT_DEF_OPS = {111:1,112:1,113:1};
+var BSTAT_HERO_WIDGET = BSTAT_HEROES; // same map; stat field drives widget maths
 var BSTAT_TYPES = ['infantry','cavalry','archer'];
 
 function bstatN(v){ var n=Number(v); return isFinite(n)?n:0; }
 
-function bstatTgMult(tg,w){
-  var lvl=Math.max(0,bstatN(tg)); var m=Math.pow(w.tier.tgPerLevel,lvl);
-  if(lvl>=5) m*=w.tier.tg5; if(lvl>=8) m*=w.tier.tg8; return m;
+function bstatBase(type, tierStr){
+  var tbl=BSTAT_BASE[type]||{};
+  if(tbl[tierStr]) return tbl[tierStr];
+  var t=String(tierStr||'10.0').split('.')[0]+'.0';
+  return tbl[t]||tbl['10.0']||[472,1416];
 }
-function bstatSkillMult(heroes,side,w){
-  var wantDef=(side==='def'); var okOps=wantDef?BSTAT_DEF_OPS:BSTAT_ATK_OPS;
-  var sums={}, gearMult=1;
+function bstatWidgetMult(heroSet, stat){
+  var mult=1;
   BSTAT_TYPES.forEach(function(t){
-    var h=heroes&&heroes[t]; if(!h||!h.hero) return;
-    var meta=BSTAT_HEROES[h.hero]; if(!meta) return;
-    if(okOps[meta.op]) sums[meta.op]=(sums[meta.op]||0)+meta.mag;
-    var gearHelps=wantDef?(meta.gear==='d'):(meta.gear==='o');
-    if(gearHelps){ var lv=Math.max(0,Math.min(10,bstatN(h.gearLv))); if(lv>0) gearMult*=(1+(w.gear.matchLv10-1)*(lv/10)); }
+    var h=heroSet&&heroSet[t]; if(!h||!h.hero) return;
+    var meta=BSTAT_HERO_WIDGET[h.hero]; if(!meta||meta.stat!==stat) return;
+    var pct=BSTAT_WIDGET_PCT[Math.max(1,Math.min(10,bstatN(h.widgetLv)))]||0;
+    mult*=(1+pct/100);
   });
-  var skill=1; Object.keys(sums).forEach(function(op){ skill*=(1+sums[op]*w.skill.damageUpPer25); });
-  return skill*gearMult;
+  return mult;
 }
+// Client mirror of server bstatScore — MUST match exactly.
 function bstatScoreLocal(row,w){
-  var troops=row.troops||{}, t11=row.t11||{};
-  var rAtk=w.ratioAtk||w.ratio||{infantry:50,cavalry:20,archer:30};
-  var rDef=w.ratioDef||w.ratio||{infantry:60,cavalry:40,archer:0};
-  var sumAtk=(rAtk.infantry+rAtk.cavalry+rAtk.archer)||1;
-  var sumDef=(rDef.infantry+rDef.cavalry+rDef.archer)||1;
-  var blendOff=0, blendSurv=0;
+  var rAtk=w.ratioAtk||{infantry:50,cavalry:20,archer:30};
+  var rDef=w.ratioDef||{infantry:60,cavalry:40,archer:0};
+  var sumA=(rAtk.infantry+rAtk.cavalry+rAtk.archer)||1;
+  var sumD=(rDef.infantry+rDef.cavalry+rDef.archer)||1;
+  var wAtk=bstatWidgetMult(row.heroesOff,'atk'), wLeth=bstatWidgetMult(row.heroesOff,'leth');
+  var wDef=bstatWidgetMult(row.heroesDef,'def'), wHea=bstatWidgetMult(row.heroesDef,'hea');
+  var perType={}, blendA=0, blendD=0;
   BSTAT_TYPES.forEach(function(t){
-    var s=troops[t]||{};
-    var off=(1+bstatN(s.atk)/100)*(1+bstatN(s.leth)/100);
-    var surv=(1+bstatN(s.def)/100)*(1+bstatN(s.hp)/100);
-    var tier=(t11[t]?w.tier.t11:1)*bstatTgMult(row.tg,w);
-    blendOff+=(bstatN(rAtk[t])/sumAtk)*off*tier;
-    blendSurv+=(bstatN(rDef[t])/sumDef)*surv*tier;
+    var s=(row.troops&&row.troops[t])||{};
+    var base=bstatBase(t,(row.tiers&&row.tiers[t])||'10.0');
+    var A=(1+bstatN(s.atk)/100)*wAtk*(1+bstatN(s.leth)/100)*wLeth;
+    var D=(1+bstatN(s.def)/100)*wDef*(1+bstatN(s.hp)/100)*wHea;
+    perType[t]={A:Math.round(A*1000)/1000, D:Math.round(D*1000)/1000, atkPower:base[0]*A, defPower:base[1]*D};
+    blendA+=(bstatN(rAtk[t])/sumA)*base[0]*A;
+    blendD+=(bstatN(rDef[t])/sumD)*base[1]*D;
   });
   var cap=Math.max(1,bstatN(row.rallyCap));
-  var capAtk=Math.pow(cap/w.cap.median,w.cap.atkExp);
-  var capDef=Math.pow(cap/w.cap.median,w.cap.defExp);
-  return { atk:Math.round(blendOff*bstatSkillMult(row.heroes,'atk',w)*capAtk*w.scale),
-           def:Math.round(blendSurv*bstatSkillMult(row.heroes,'def',w)*capDef*w.scale) };
+  var capTerm=Math.sqrt(cap/(w.capMedian||1100000));
+  var scale=w.scale||0.0008;
+  return { perType:perType, atk:Math.round(blendA*capTerm*scale), def:Math.round(blendD*capTerm*scale) };
 }
 
 // ── sub-tab switching ──
@@ -7500,24 +7490,56 @@ function bstatTab(p){
 
 // ── hero pickers ──
 function bstatFillHeroes(){
-  BSTAT_TYPES.forEach(function(t){
-    var list=[]; Object.keys(BSTAT_HEROES).forEach(function(name){ if(BSTAT_HEROES[name].type===t) list.push(name); });
-    var sel=document.getElementById('bstatH'+t.charAt(0).toUpperCase()+t.slice(1,3));
-    if(!sel) return;
-    sel.innerHTML=list.map(function(n){ var tag=BSTAT_HEROES[n].gear==='o'?' ⚔':' 🛡'; return '<option value="'+n+'">'+n+tag+'</option>'; }).join('');
-  });
-  ['Inf','Cav','Arc'].forEach(function(sfx){
-    var g=document.getElementById('bstatGear'+sfx); if(!g) return;
-    g.innerHTML=bstatLevelOpts();
+  // Two sets: offensive (set==='off') and defensive (set==='def'), one hero per troop type.
+  ['off','def'].forEach(function(setKey){
+    BSTAT_TYPES.forEach(function(t){
+      var list=[]; Object.keys(BSTAT_HEROES).forEach(function(name){
+        var m=BSTAT_HEROES[name]; if(m.type===t && m.set===setKey) list.push(name);
+      });
+      var sfx=t.charAt(0).toUpperCase()+t.slice(1,3);
+      var id='bstat'+(setKey==='off'?'Off':'Def')+sfx;
+      var sel=document.getElementById(id); if(!sel) return;
+      var statTag={atk:'⚔ atk',leth:'⚔ leth',def:'🛡 def',hea:'🛡 hp'};
+      sel.innerHTML='<option value="">— none —</option>'+list.map(function(n){
+        return '<option value="'+n+'">'+n+' ('+(statTag[BSTAT_HEROES[n].stat]||'')+')</option>';
+      }).join('');
+      // widget level dropdown for this slot
+      var wid=document.getElementById('bstat'+(setKey==='off'?'Off':'Def')+'W'+sfx);
+      if(wid) wid.innerHTML=bstatLevelOpts();
+    });
   });
   ['Roar','Antler'].forEach(function(p){
-    var el=document.getElementById('bstatPet'+p); if(el) el.innerHTML=bstatLevelOpts();
+    var el=document.getElementById('bstatPet'+p); if(el) el.innerHTML=bstatLevelOptsN(10, 0);
   });
 }
-// Reusable 1–10 option list (widgets and pets share it), default selected = 10.
+// Reusable 1–10 option list (widgets share it), default selected = 10.
 function bstatLevelOpts(){
   var o=''; for(var i=1;i<=10;i++){ o+='<option value="'+i+'"'+(i===10?' selected':'')+'>'+i+'</option>'; }
   return o;
+}
+// Option list 0..max, default 0 shown as "—", for optional capacity skills.
+function bstatLevelOptsN(max, def){
+  var o='<option value="0"'+(def===0?' selected':'')+'>—</option>';
+  for(var i=1;i<=max;i++){ o+='<option value="'+i+'"'+(i===def?' selected':'')+'>Lv '+i+'</option>'; }
+  return o;
+}
+// Capacity contributions from rally-boosting pet skills, by level.
+// Great Moose "Antler Impact": +150,000 RALLY cap at max (whole rally). Per-level curve
+//   unconfirmed — treated as level/10 × 150,000 pro-rata until we have the table.
+// Mighty Bison "Fearless Roar": +15,000 to your OWN march/squad at max (same pro-rata caveat).
+function bstatAntlerCap(lv){ return Math.round(Math.max(0,Math.min(10,bstatN(lv)))/10*150000); }
+function bstatRoarCap(lv){ return Math.round(Math.max(0,Math.min(10,bstatN(lv)))/10*15000); }
+// Effective RALLY capacity = base rally + Antler (this feeds the √ term in the score).
+function bstatEffectiveCap(){
+  var base=bstatN((document.getElementById('bstatRallyCap')||{}).value);
+  var a=bstatAntlerCap((document.getElementById('bstatPetAntler')||{}).value);
+  return base+a;
+}
+// Effective MARCH size = base march + Fearless Roar (your own march, tracked separately).
+function bstatEffectiveMarch(){
+  var base=bstatN((document.getElementById('bstatMarchCap')||{}).value);
+  var r=bstatRoarCap((document.getElementById('bstatPetRoar')||{}).value);
+  return base+r;
 }
 
 // ── init (called by showPageDirect) ──
@@ -7545,19 +7567,25 @@ function bstatLoad(){
 function bstatHydrateMine(){
   if(!BSTAT.mine){ bstatRenderReview(null); return; }
   var m=BSTAT.mine;
-  bstatRenderReview(m.troops||null, m.t11||{});
-  if(m.rallyCap) document.getElementById('bstatRallyCap').value=m.rallyCap;
-  if(m.marchCap) document.getElementById('bstatMarchCap').value=m.marchCap;
-  if(m.tg!==undefined) document.getElementById('bstatTg').value=String(m.tg);
+  bstatRenderReview(m.troops||null, m.tiers||{});
+  if(m.rallyCapBase) document.getElementById('bstatRallyCap').value=m.rallyCapBase;
+  else if(m.rallyCap) document.getElementById('bstatRallyCap').value=m.rallyCap;
+  if(m.marchCapBase) document.getElementById('bstatMarchCap').value=m.marchCapBase;
+  else if(m.marchCap) document.getElementById('bstatMarchCap').value=m.marchCap;
   if(m.pets){
     if(m.pets.fearlessRoar && document.getElementById('bstatPetRoar')) document.getElementById('bstatPetRoar').value=String(m.pets.fearlessRoar);
     if(m.pets.antlerImpact && document.getElementById('bstatPetAntler')) document.getElementById('bstatPetAntler').value=String(m.pets.antlerImpact);
   }
-  if(m.heroes){ BSTAT_TYPES.forEach(function(t){ var h=m.heroes[t]; if(!h) return;
-    var sfx=t.charAt(0).toUpperCase()+t.slice(1,3);
-    if(h.hero) document.getElementById('bstatH'+sfx).value=h.hero;
-    if(h.gearLv!==undefined) document.getElementById('bstatGear'+sfx).value=String(h.gearLv);
-  }); }
+  function fillSet(setObj, pfx){
+    if(!setObj) return;
+    BSTAT_TYPES.forEach(function(t){ var h=setObj[t]; if(!h) return;
+      var sfx=t.charAt(0).toUpperCase()+t.slice(1,3);
+      var hs=document.getElementById(pfx+sfx); if(hs && h.hero) hs.value=h.hero;
+      var ws=document.getElementById(pfx+'W'+sfx); if(ws && h.widgetLv!==undefined) ws.value=String(h.widgetLv);
+    });
+  }
+  fillSet(m.heroesOff, 'bstatOff');
+  fillSet(m.heroesDef, 'bstatDef');
   if(m.shared===false) document.getElementById('bstatShareSw').classList.remove('on');
   bstatRecalcPreview();
 }
@@ -7575,11 +7603,7 @@ document.addEventListener('change', function(e){
     reader.readAsDataURL(f);
   }
 });
-// T11 toggles are delegated too (no fragile inline onclick inside a built HTML string).
-document.addEventListener('click', function(e){
-  var sw=e.target && e.target.closest ? e.target.closest('#bstatReview .bstatSw[data-t11]') : null;
-  if(sw){ sw.classList.toggle('on'); bstatRecalcPreview(); }
-});
+
 function bstatScan(dataUrl){
   var st=document.getElementById('bstatScanStatus');
   st.style.display='block'; st.textContent='🤖 Reading the report with AI…';
@@ -7589,7 +7613,7 @@ function bstatScan(dataUrl){
   }).then(function(r){ return r.json(); }).then(function(d){
     if(d && d.ok && d.values){
       st.textContent='✅ Scan complete — check every value below before saving';
-      bstatRenderReview(d.values, (BSTAT.mine&&BSTAT.mine.t11)||{}, true);
+      bstatRenderReview(d.values, (BSTAT.mine&&BSTAT.mine.tiers)||{}, true);
       bstatRecalcPreview();
     } else {
       st.textContent='⚠️ Could not read that screenshot — enter the values by hand below.';
@@ -7599,18 +7623,17 @@ function bstatScan(dataUrl){
 }
 
 // ── review grid ──
-function bstatRenderReview(troops, t11, fromScan){
-  t11=t11||{};
+function bstatRenderReview(troops, tiers, fromScan){
+  tiers=tiers||{};
   var colors={infantry:'var(--accent2)',cavalry:'#6ab0ff',archer:'var(--green)'};
   var html='';
   BSTAT_TYPES.forEach(function(t){
     var s=(troops&&troops[t])||{atk:'',def:'',leth:'',hp:''};
     var flag=fromScan?'<span class="bstatFlag"></span>':'';
-    var on=t11[t]?' on':'';
     html+='<div class="bstatTT"><div class="bstatTTHead">'
       +'<span class="bstatDot" style="background:'+colors[t]+'"></span>'
       +'<span class="bstatTTName" style="color:'+colors[t]+'">'+t+'</span>'
-      +'<span class="bstatT11">Tier 11 <span class="bstatSw'+on+'" data-t11="'+t+'"></span></span>'
+      +'<span class="bstatT11">Tier '+bstatTierSelect(t, tiers[t]||'10.0')+'</span>'
       +'</div><div class="bstatTTBody">'
       +bstatStatCell(t,'atk','Attack',s.atk,flag)
       +bstatStatCell(t,'def','Defense',s.def,flag)
@@ -7620,6 +7643,15 @@ function bstatRenderReview(troops, t11, fromScan){
   });
   document.getElementById('bstatReview').innerHTML=html;
 }
+// Per-type tier picker: T9 up to T11.5. Value is the "tier.tg" key the engine looks up.
+function bstatTierSelect(t, val){
+  var opts=[['9.0','T9']];
+  [10,11].forEach(function(tier){
+    for(var tg=0;tg<=5;tg++){ var k=tier+'.'+tg; opts.push([k, 'T'+tier+(tg?(' TG'+tg):'')]); }
+  });
+  var o=opts.map(function(p){ return '<option value="'+p[0]+'"'+(p[0]===val?' selected':'')+'>'+p[1]+'</option>'; }).join('');
+  return '<select data-tier="'+t+'" onchange="bstatRecalcPreview()" style="font-family:var(--body);font-size:11px;padding:3px 6px;width:auto">'+o+'</select>';
+}
 function bstatStatCell(t,key,label,val,flag){
   return '<div class="bstatStat"><div class="bstatStatL">'+flag+label+'</div>'
     +'<div style="display:flex;align-items:baseline;gap:3px">'
@@ -7627,29 +7659,33 @@ function bstatStatCell(t,key,label,val,flag){
     +'<span style="font-family:var(--mono);font-size:12px;color:var(--text3)">%</span></div></div>';
 }
 
-// ── gather the current form into a row object ──
+// ── gather the current form into a row object (new A/D-engine shape) ──
 function bstatGatherRow(){
-  var troops={}, t11={};
+  var troops={}, tiers={};
   BSTAT_TYPES.forEach(function(t){ troops[t]={}; });
   var cells=document.querySelectorAll('#bstatReview input[data-stat]');
   for(var i=0;i<cells.length;i++){ var parts=cells[i].getAttribute('data-stat').split('.'); troops[parts[0]][parts[1]]=bstatN(cells[i].value); }
-  var t11sw=document.querySelectorAll('#bstatReview .bstatSw[data-t11]');
-  for(var j=0;j<t11sw.length;j++){ t11[t11sw[j].getAttribute('data-t11')]=t11sw[j].classList.contains('on'); }
-  var heroes={};
+  var tsel=document.querySelectorAll('#bstatReview select[data-tier]');
+  for(var j=0;j<tsel.length;j++){ tiers[tsel[j].getAttribute('data-tier')]=tsel[j].value; }
+  // two hero sets, each 3 heroes with a widget level
+  var heroesOff={}, heroesDef={};
   BSTAT_TYPES.forEach(function(t){ var sfx=t.charAt(0).toUpperCase()+t.slice(1,3);
-    heroes[t]={ hero:document.getElementById('bstatH'+sfx).value,
-      gearLv:bstatN(document.getElementById('bstatGear'+sfx).value) };
+    heroesOff[t]={ hero:(document.getElementById('bstatOff'+sfx)||{}).value||'',
+                   widgetLv:bstatN((document.getElementById('bstatOffW'+sfx)||{}).value) };
+    heroesDef[t]={ hero:(document.getElementById('bstatDef'+sfx)||{}).value||'',
+                   widgetLv:bstatN((document.getElementById('bstatDefW'+sfx)||{}).value) };
   });
   return {
     pid: bstatPid() || null,
     ign: (verifiedPlayer&&verifiedPlayer.name)||AUTH.role||'',
-    troops: troops, t11: t11,
-    tg: bstatN(document.getElementById('bstatTg').value),
-    rallyCap: bstatN(document.getElementById('bstatRallyCap').value),
-    marchCap: bstatN(document.getElementById('bstatMarchCap').value),
-    heroes: heroes,
-    pets: { fearlessRoar: bstatN((document.getElementById('bstatPetRoar')||{}).value),
-            antlerImpact: bstatN((document.getElementById('bstatPetAntler')||{}).value) },
+    troops: troops, tiers: tiers,
+    rallyCapBase: bstatN(document.getElementById('bstatRallyCap').value),
+    rallyCap: bstatEffectiveCap(),   // base rally + Antler → feeds the √ term
+    marchCap: bstatEffectiveMarch(), // base march + Roar (your own march)
+    marchCapBase: bstatN(document.getElementById('bstatMarchCap').value),
+    heroesOff: heroesOff, heroesDef: heroesDef,
+    pets: { antlerImpact: bstatN((document.getElementById('bstatPetAntler')||{}).value),
+            fearlessRoar: bstatN((document.getElementById('bstatPetRoar')||{}).value) },
     shared: document.getElementById('bstatShareSw').classList.contains('on')
   };
 }
@@ -7657,10 +7693,27 @@ function bstatGatherRow(){
 // ── preview score (mirrors server) ──
 function bstatRecalcPreview(){
   var w=BSTAT.weights; if(!w){ return; }
+  var ec=document.getElementById('bstatEffCap');
+  if(ec){ var eff=bstatEffectiveCap(); ec.value=eff?eff.toLocaleString():'—'; }
+  var em=document.getElementById('bstatEffMarch');
+  if(em){ var effM=bstatEffectiveMarch(); em.value=effM?effM.toLocaleString():'—'; }
   var row=bstatGatherRow();
   var sc=bstatScoreLocal(row,w);
   document.getElementById('bstatPreviewAtk').textContent=sc.atk;
   document.getElementById('bstatPreviewDef').textContent=sc.def;
+  // per-type A/D detail
+  var det=document.getElementById('bstatPreviewDetail');
+  if(det && sc.perType){
+    var names={infantry:'INF',cavalry:'CAV',archer:'ARC'};
+    var rows=BSTAT_TYPES.map(function(t){
+      var p=sc.perType[t]||{A:0,D:0};
+      return '<div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;padding:2px 0">'
+        +'<span style="color:var(--text3)">'+names[t]+'</span>'
+        +'<span style="color:var(--accent2)">A '+p.A+'</span>'
+        +'<span style="color:#6ab0ff">D '+p.D+'</span></div>';
+    }).join('');
+    det.innerHTML='<div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:4px">Per-type factors</div>'+rows;
+  }
 }
 
 // ── save: PUT /state with only a bstatByPlayer patch (own row) ──
@@ -7707,9 +7760,9 @@ function bstatRenderRank(){
     meta.textContent = rows.length+' leader'+(rows.length===1?'':'s')+(hidden?(' · '+hidden+' opted out'):''); }
   if(!rows.length){ body.innerHTML='<tr><td colspan="8" style="color:var(--text3);padding:18px;text-align:center">No stats saved yet.</td></tr>'; return; }
   body.innerHTML = rows.map(function(r,i){
-    var leadGear = bstatLeadGear(r, mode);
+    var leadGear = bstatLeadHero(r, mode);
     var fd = bstatFreshDot(r.updatedAt);
-    var t11=r.t11||{};
+    var tiers=r.tiers||{};
     var chip=function(on,ltr){ return '<span class="bstatChip'+(on?' on':'')+'">'+ltr+'</span>'; };
     return '<tr>'
       +'<td class="bstatRk'+(i<3?' top':'')+'">'+(i+1<10?'0':'')+(i+1)+'</td>'
@@ -7717,8 +7770,7 @@ function bstatRenderRank(){
         +'<div style="font-size:11px;color:var(--text3)">'+bstatEsc(r.alliance||'')+'</div></td>'
       +'<td class="bstatNum '+mode+'">'+bstatN(r[scoreKey])+'</td>'
       +'<td>'+leadGear+'</td>'
-      +'<td>'+chip(t11.infantry,'I')+' '+chip(t11.cavalry,'C')+' '+chip(t11.archer,'A')+'</td>'
-      +'<td class="bstatNum">'+(r.tg!==undefined?('TG'+r.tg):'—')+'</td>'
+      +'<td class="bstatNum" style="font-size:11px">'+bstatTierSummary(tiers)+'</td>'
       +'<td class="bstatNum">'+bstatCap(r.rallyCap)+'</td>'
       +'<td><span class="bstatFresh"><span class="bstatFDot" style="background:'+fd[0]+'"></span>'+fd[1]+'</span></td>'
       +'</tr>';
@@ -7726,18 +7778,21 @@ function bstatRenderRank(){
 }
 // The lead whose gear matches the current mode (offensive gear for attack, defensive for
 // defense). This is informational — it shows WHY a leader ranks where they do on this side.
-function bstatLeadGear(r, mode){
-  var want = (mode==='def')?'d':'o';
+function bstatLeadHero(r, mode){
+  var setObj = (mode==='def') ? r.heroesDef : r.heroesOff;
   var found=null;
   BSTAT_TYPES.forEach(function(t){
-    var h=r.heroes&&r.heroes[t]; if(!h||!h.hero) return;
-    var meta=BSTAT_HEROES[h.hero]; if(!meta) return;
-    if(meta.gear===want && bstatN(h.gearLv)>0 && !found) found={name:h.hero,role:meta.gear};
+    var h=setObj&&setObj[t]; if(!h||!h.hero||found) return;
+    if(bstatN(h.widgetLv)>1) found={name:h.hero};
   });
-  if(!found) return '<span style="font-size:11px;color:var(--text3)">— none —</span>';
-  var col = found.role==='o'?'var(--accent2)':'#6ab0ff';
+  if(!found) return '<span style="font-size:11px;color:var(--text3)">—</span>';
+  var col = (mode==='def')?'#6ab0ff':'var(--accent2)';
   return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--text2)">'
     +'<span style="width:7px;height:7px;border-radius:50%;background:'+col+';flex-shrink:0"></span>'+bstatEsc(found.name)+'</span>';
+}
+// Compact tier readout for the rankings row, e.g. "11.3/11.3/11.0".
+function bstatTierSummary(tiers){
+  return BSTAT_TYPES.map(function(t){ return (tiers&&tiers[t])?String(tiers[t]).replace(/\.0$/,''):'—'; }).join('/');
 }
 function bstatCap(v){ v=bstatN(v); if(!v) return '—'; if(v>=1000000) return (v/1000000).toFixed(2)+'M'; if(v>=1000) return Math.round(v/1000)+'K'; return String(v); }
 function bstatEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -7758,7 +7813,7 @@ function bstatRenderProg(){
   // re-score each snapshot under current weights
   var reAtk=[], reDef=[];
   hist.forEach(function(h){
-    if(w){ var sc=bstatScoreLocal({troops:h.troops,t11:h.t11,tg:h.tg,rallyCap:h.rallyCap,heroes:h.heroes}, w); reAtk.push(sc.atk); reDef.push(sc.def); }
+    if(w){ var sc=bstatScoreLocal({troops:h.troops,tiers:h.tiers,rallyCap:h.rallyCap,heroesOff:h.heroesOff,heroesDef:h.heroesDef}, w); reAtk.push(sc.atk); reDef.push(sc.def); }
     else { reAtk.push(bstatN(h.scoreAtk)); reDef.push(bstatN(h.scoreDef)); }
   });
   var html='';
@@ -7768,13 +7823,13 @@ function bstatRenderProg(){
   html+='</div>';
   // table
   html+='<div class="bstatTblWrap"><table class="bstatTbl"><thead><tr>'
-    +'<th>Saved</th><th>Attack (now)</th><th>Defense (now)</th><th>Rally cap</th><th>TG</th><th>Weights then</th></tr></thead><tbody>';
+    +'<th>Saved</th><th>Attack (now)</th><th>Defense (now)</th><th>Rally cap</th><th>Tiers</th><th>Weights then</th></tr></thead><tbody>';
   for(var i=hist.length-1;i>=0;i--){ var h=hist[i];
     html+='<tr><td class="bstatNum">'+bstatDate(h.savedAt)+'</td>'
       +'<td class="bstatNum atk">'+reAtk[i]+'</td>'
       +'<td class="bstatNum def">'+reDef[i]+'</td>'
       +'<td class="bstatNum">'+bstatCap(h.rallyCap)+'</td>'
-      +'<td class="bstatNum">'+(h.tg!==undefined?('TG'+h.tg):'—')+'</td>'
+      +'<td class="bstatNum" style="font-size:11px">'+bstatTierSummary(h.tiers)+'</td>'
       +'<td><span class="bstatChip'+((BSTAT.weights&&h.weightsVer===BSTAT.weights.ver)?' on':'')+'">v'+bstatN(h.weightsVer)+'</span></td></tr>';
   }
   html+='</tbody></table></div>';
@@ -7831,23 +7886,15 @@ function bstatRenderWeights(){
   h+=row('ratioDef.infantry','Infantry %',rD.infantry,'Share of the wall')
     + row('ratioDef.cavalry','Cavalry %',rD.cavalry,'')
     + row('ratioDef.archer','Archer %',rD.archer,'Usually 0 on defense');
-  h+='<div class="bstatSecT">Troop tier</div>';
-  h+=row('tier.t11','Tier 11 multiplier',w.tier.t11,'≈15–20% over T10 (community-tested)')
-    + row('tier.tgPerLevel','Truegold, per level',w.tier.tgPerLevel,'Compounds — TG8 ≈ ×1.17')
-    + row('tier.tg5','TG5 skill step',w.tier.tg5,'First Truegold troop skill')
-    + row('tier.tg8','TG8 skill step',w.tier.tg8,'Why TG8 T10 beats TG5 T11');
-  h+='<div class="bstatSecT">Heroes &amp; gear</div>';
-  h+=row('gear.matchLv10','Gear lv10 — role matches',w.gear.matchLv10,'Max +15%, leader only, whole rally')
-    + row('gear.mismatch','Gear — role mismatch',w.gear.mismatch,'Offensive gear does nothing on defense')
-    + row('skill.damageUpPer25','Damage-up per +25%',w.skill.damageUpPer25,'Same op-code adds, different multiplies')
-    + row('skill.proc','Proc/chance skill',w.skill.proc,'Counted once — no per-copy stack');
+  h+='<div class="bstatSecT">Base stats &amp; widgets</div>';
+  h+='<div style="font-size:11.5px;color:var(--text3);margin-bottom:8px;line-height:1.6">'
+    +'Tier base stats come straight from the authoritative table (T9\u2013T11 \u00d7 TG0\u20135) and are not tunable \u2014 they are game data. '
+    +'Widget bonuses use the confirmed 1\u201310 curve (lv1=0 \u2026 lv10=15%). These are baked into the engine, not weights.</div>';
   h+='<div class="bstatSecT">Capacity</div>';
-  h+=row('cap.atkExp','Attack — exponent',w.cap.atkExp,'√ — twice the troops ≈ 41% more damage')
-    + row('cap.defExp','Defense — exponent',w.cap.defExp,'HP pool to grind through — ~linear')
-    + row('cap.median','Kingdom median rally',w.cap.median,'Puts a typical leader at ×1.00');
+  h+=row('capMedian','Median rally size',w.capMedian,'The \u221a-capacity baseline \u2014 a typical rally sits at \u00d71.00');
   h+='<div class="bstatSecT">Display</div>';
-  h+=row('scale','Score scale',w.scale,'Tuning constant → typical leader ~100–200');
-  h+='<div class="bstatWarn" style="margin-top:16px"><b>Starting values, not gospel.</b> The formula shape is well-evidenced; the exact figures are community estimates. Once real reports are in, tune them against what happened on the field.</div>';
+  h+=row('scale','Score scale',w.scale,'Cosmetic \u2014 shrinks the headline so a strong leader reads ~100\u2013200');
+  h+='<div class="bstatWarn" style="margin-top:16px"><b>Now backed by the real formula.</b> The engine uses the documented kill-formula factors (A = attack\u00d7lethality, D = defense\u00d7health) weighted by authoritative base stats. What is left to tune here is just the march ratios and the display scale \u2014 the heavy maths is no longer guesswork.</div>';
   host.innerHTML=h;
 }
 function bstatWtToggleEdit(){
@@ -8070,16 +8117,33 @@ function stripPw(s){ if (s && typeof s==='object'){ delete s.pw_rallyleader; del
 // multiply each other, and Defense and Health multiply on the defender's side. Adding the
 // four would rank a 1000/300 sheet equal to a 650/650 one, when the second is far deadlier.
 
+// ══ AUTHORITATIVE BASE-STAT TABLES (from Troop_Base_Stats.docx) ══
+// Per troop type, keyed "tier.tg" (e.g. "10.3" = T10 TrueGold 3, "11.5" = T11 TG5).
+// Each value is [base_att, base_hea]. base_let and base_def are both 10 game-wide and
+// cancel in the kill formula, so only these two survive. archer 11.5 is the one cell the
+// document left blank — estimated from the TG4->TG5 growth the other tiers follow.
+const BSTAT_BASE = {infantry:{'1.0':[63,189],'1.1':[66,197],'1.2':[69,206],'1.3':[72,217],'1.4':[76,228],'1.5':[80,239],'2.0':[94,283],'2.1':[98,294],'2.2':[103,309],'2.3':[108,324],'2.4':[113,341],'2.5':[119,358],'3.0':[132,397],'3.1':[137,413],'3.2':[144,434],'3.3':[151,455],'3.4':[159,478],'3.5':[167,502],'4.0':[172,516],'4.1':[179,537],'4.2':[188,563],'4.3':[197,592],'4.4':[207,621],'4.5':[217,652],'5.0':[206,619],'5.1':[214,644],'5.2':[225,676],'5.3':[236,710],'5.4':[248,745],'5.5':[260,782],'6.0':[243,730],'6.1':[253,759],'6.2':[265,797],'6.3':[279,837],'6.4':[293,879],'6.5':[307,923],'7.0':[287,862],'7.1':[298,896],'7.2':[313,941],'7.3':[329,988],'7.4':[346,1038],'7.5':[363,1090],'8.0':[339,1017],'8.1':[353,1058],'8.2':[370,1111],'8.3':[389,1166],'8.4':[408,1224],'8.5':[429,1286],'9.0':[400,1200],'9.1':[416,1248],'9.2':[437,1310],'9.3':[459,1376],'9.4':[482,1445],'9.5':[506,1517],'10.0':[472,1416],'10.1':[491,1473],'10.2':[515,1546],'10.3':[541,1624],'10.4':[568,1705],'10.5':[597,1790],'11.0':[566,1699],'11.1':[589,1767],'11.2':[618,1855],'11.3':[649,1948],'11.4':[681,2045],'11.5':[716,2148]},cavalry:{'1.0':[189,63],'1.1':[197,66],'1.2':[206,69],'1.3':[217,72],'1.4':[228,76],'1.5':[239,80],'2.0':[283,94],'2.1':[294,98],'2.2':[309,103],'2.3':[324,108],'2.4':[341,113],'2.5':[358,119],'3.0':[397,132],'3.1':[413,137],'3.2':[434,144],'3.3':[455,151],'3.4':[478,159],'3.5':[502,167],'4.0':[516,172],'4.1':[537,179],'4.2':[563,188],'4.3':[592,197],'4.4':[621,207],'4.5':[652,217],'5.0':[619,206],'5.1':[644,214],'5.2':[676,225],'5.3':[710,236],'5.4':[745,248],'5.5':[782,260],'6.0':[730,243],'6.1':[759,253],'6.2':[797,265],'6.3':[837,279],'6.4':[879,293],'6.5':[923,307],'7.0':[862,287],'7.1':[896,298],'7.2':[941,313],'7.3':[988,329],'7.4':[1038,346],'7.5':[1090,363],'8.0':[1017,339],'8.1':[1058,353],'8.2':[1111,370],'8.3':[1166,389],'8.4':[1224,408],'8.5':[1286,429],'9.0':[1200,400],'9.1':[1248,416],'9.2':[1310,437],'9.3':[1376,459],'9.4':[1445,482],'9.5':[1517,506],'10.0':[1416,472],'10.1':[1473,491],'10.2':[1546,515],'10.3':[1624,541],'10.4':[1705,568],'10.5':[1790,597],'11.0':[1699,566],'11.1':[1767,589],'11.2':[1855,618],'11.3':[1948,649],'11.4':[2045,681],'11.5':[2148,716]},archer:{'1.0':[252,47],'1.1':[262,49],'1.2':[275,51],'1.3':[289,54],'1.4':[303,57],'1.5':[319,59],'2.0':[378,71],'2.1':[393,74],'2.2':[413,78],'2.3':[433,81],'2.4':[455,85],'2.5':[478,90],'3.0':[529,99],'3.1':[550,103],'3.2':[578,108],'3.3':[607,114],'3.4':[637,119],'3.5':[669,125],'4.0':[688,129],'4.1':[716,134],'4.2':[751,141],'4.3':[789,148],'4.4':[828,155],'4.5':[870,163],'5.0':[825,155],'5.1':[858,161],'5.2':[901,169],'5.3':[946,178],'5.4':[993,187],'5.5':[1043,196],'6.0':[974,183],'6.1':[1013,190],'6.2':[1064,200],'6.3':[1117,210],'6.4':[1173,220],'6.5':[1231,231],'7.0':[1149,215],'7.1':[1195,224],'7.2':[1255,235],'7.3':[1317,247],'7.4':[1383,259],'7.5':[1452,272],'8.0':[1356,254],'8.1':[1410,264],'8.2':[1481,277],'8.3':[1555,291],'8.4':[1633,306],'8.5':[1714,321],'9.0':[1600,300],'9.1':[1664,312],'9.2':[1747,328],'9.3':[1835,344],'9.4':[1926,361],'9.5':[2023,379],'10.0':[1888,354],'10.1':[1964,368],'10.2':[2062,387],'10.3':[2165,406],'10.4':[2273,426],'10.5':[2387,448],'11.0':[2266,390],'11.1':[2357,406],'11.2':[2474,426],'11.3':[2598,447],'11.4':[2728,470],'11.5':[2868,494]}};
+
+// Widget level (1-10, in-game) -> attack/defense-factor bonus %. Confirmed in-game table.
+const BSTAT_WIDGET_PCT = {1:0,2:5,3:5,4:7.5,5:7.5,6:10,7:10,8:12.5,9:12.5,10:15};
+
+// Hero -> the ONE stat its exclusive-gear (widget) expedition skill boosts, squad-wide.
+// Offensive widgets boost atk/leth (help attack factor A); defensive boost def/hea (help D).
+// Source: kingshotguide.com per-hero Expedition gear skill. Extend as needed.
+const BSTAT_HERO_WIDGET = {
+  Amadeus:{stat:'atk'}, Helga:{stat:'leth'}, Petra:{stat:'atk'}, Thrud:{stat:'leth'},
+  Ava:{stat:'leth'}, Marlin:{stat:'leth'}, Rosa:{stat:'leth'}, Yang:{stat:'leth'},
+  Alcar:{stat:'hea'}, Charles:{stat:'hea'}, Triton:{stat:'def'}, Hilde:{stat:'hea'},
+  Margot:{stat:'leth'}, Jabel:{stat:'leth'}, Vivian:{stat:'def'}, Jaeger:{stat:'hea'}
+};
+
 // Defaults seeded on first use. Admin edits these in the Weights tab (key: bstatWeights).
 const BSTAT_WEIGHTS_DEFAULT = {
-  ver: 2,   // v2: split single march ratio into ratioAtk + ratioDef (defense walls with no archers)
+  ver: 3,   // v3: real A/D-factor engine with authoritative base stats (widgets multiply factors)
   ratioAtk: { infantry: 50, cavalry: 20, archer: 30 }, // offense march mix
   ratioDef: { infantry: 60, cavalry: 40, archer: 0 },  // garrison/wall mix (no archers)
-  tier:  { t11: 1.17, tgPerLevel: 1.02, tg5: 1.10, tg8: 1.10 },
-  gear:  { matchLv10: 1.15, mismatch: 1.00 },          // widget/exclusive gear, leader only
-  skill: { damageUpPer25: 0.25, proc: 0.50 },          // op-code contributions
-  cap:   { atkExp: 0.50, defExp: 1.00, median: 1100000 },
-  scale: 0.45                                          // tuning constant → typical leader ~100-200
+  capMedian: 1100000,   // rally size that sits at the √-capacity baseline (×1.00)
+  scale: 0.0008         // headline display scale → typical leader reads ~100-200
 };
 
 // Compact hero reference: which troop type a hero leads, whether their exclusive gear is
@@ -8121,79 +8185,70 @@ const BSTAT_DEF_OPS = { 111:1, 112:1, 113:1 };                            // fam
 
 function bstatNum(v){ const n = Number(v); return isFinite(n) ? n : 0; }
 
-// Truegold multiplier: a compounding per-level stat bump plus the two skill-unlock steps
-// (TG5, TG8). This is why a maxed T10-TG8 can out-fight a fresh T11-TG5.
-function bstatTgMult(tg, w){
-  const lvl = Math.max(0, bstatNum(tg));
-  let m = Math.pow(w.tier.tgPerLevel, lvl);
-  if (lvl >= 5) m *= w.tier.tg5;
-  if (lvl >= 8) m *= w.tier.tg8;
-  return m;
+// Base stats [base_att, base_hea] for a troop type at a tier string ("9.0","10.3","11.5").
+function bstatBase(type, tierStr){
+  const tbl = BSTAT_BASE[type] || {};
+  if (tbl[tierStr]) return tbl[tierStr];
+  const t = String(tierStr || '10.0').split('.')[0] + '.0';
+  return tbl[t] || tbl['10.0'] || [472, 1416];
 }
 
-// Fold the leader's three heroes into a single attack- or defense-side skill multiplier.
-// Same op family sums, different families multiply. Gear adds its matchLv10 bonus (scaled by
-// gear level /10) only when the hero's gear role matches the side (offense gear → attack).
-function bstatSkillMult(heroes, side, w){
-  const wantDef = (side === 'def');
-  const okOps = wantDef ? BSTAT_DEF_OPS : BSTAT_ATK_OPS;
-  const sums = {};          // op family -> summed magnitude (in +25% units)
-  let gearMult = 1;
+// Squad-wide widget multiplier for ONE stat, from a hero set. Each hero's widget boosts a
+// single stat (atk/leth/def/hea) across all troop types; we multiply in the ones matching.
+function bstatWidgetMult(heroSet, stat){
+  let mult = 1;
   ['infantry','cavalry','archer'].forEach(function(t){
-    const h = heroes && heroes[t];
+    const h = heroSet && heroSet[t];
     if (!h || !h.hero) return;
-    const meta = BSTAT_HEROES[h.hero];
-    if (!meta) return;
-    // Skill side match
-    if (okOps[meta.op]){
-      sums[meta.op] = (sums[meta.op] || 0) + meta.mag;
-    }
-    // Gear side + level match (offense gear helps attack, defensive gear helps defense)
-    const gearHelps = wantDef ? (meta.gear === 'd') : (meta.gear === 'o');
-    if (gearHelps){
-      const lv = Math.max(0, Math.min(10, bstatNum(h.gearLv)));
-      if (lv > 0) gearMult *= (1 + (w.gear.matchLv10 - 1) * (lv / 10));
-    }
+    const meta = BSTAT_HERO_WIDGET[h.hero];
+    if (!meta || meta.stat !== stat) return;
+    const pct = BSTAT_WIDGET_PCT[Math.max(1, Math.min(10, bstatNum(h.widgetLv)))] || 0;
+    mult *= (1 + pct / 100);
   });
-  let skill = 1;
-  Object.keys(sums).forEach(function(op){
-    skill *= (1 + sums[op] * w.skill.damageUpPer25);   // different families multiply
-  });
-  return skill * gearMult;
+  return mult;
 }
 
-// The whole model. Returns { atk, def } as rounded integers.
+// The real engine, from Troop_Base_Stats.docx.
+//   A = (1+atk/100)(1+leth/100)   attack factor  |  D = (1+def/100)(1+hea/100)  defense factor
+// Widgets multiply the relevant stat term (report is widget-free — beast attack). Per-type
+// "power" weights the factor by the tier's base stat (base_att for attack, base_hea for
+// defense), which is what makes the three troop types comparable. Then blend by ratio and
+// apply the √-capacity term. Returns per-type detail AND blended headline numbers.
 function bstatScore(row, weights){
   const w = weights || BSTAT_WEIGHTS_DEFAULT;
-  const troops = row.troops || {};
-  const t11 = row.t11 || {};
-  // Two ratios: offense marches (e.g. 50/20/30), defense walls (e.g. 60/40/0, no archers).
-  // Fall back to legacy single `ratio` if an old weights object slips through unmigrated.
-  const rAtk = w.ratioAtk || w.ratio || { infantry:50, cavalry:20, archer:30 };
-  const rDef = w.ratioDef || w.ratio || { infantry:60, cavalry:40, archer:0 };
-  const sumAtk = (rAtk.infantry + rAtk.cavalry + rAtk.archer) || 1;
-  const sumDef = (rDef.infantry + rDef.cavalry + rDef.archer) || 1;
+  const types = ['infantry','cavalry','archer'];
+  const rAtk = w.ratioAtk || { infantry:50, cavalry:20, archer:30 };
+  const rDef = w.ratioDef || { infantry:60, cavalry:40, archer:0 };
+  const sumA = (rAtk.infantry + rAtk.cavalry + rAtk.archer) || 1;
+  const sumD = (rDef.infantry + rDef.cavalry + rDef.archer) || 1;
 
-  let blendOff = 0, blendSurv = 0;
-  ['infantry','cavalry','archer'].forEach(function(t){
-    const s = troops[t] || {};
-    const off  = (1 + bstatNum(s.atk)/100) * (1 + bstatNum(s.leth)/100);
-    const surv = (1 + bstatNum(s.def)/100) * (1 + bstatNum(s.hp)/100);
-    const tier = (t11[t] ? w.tier.t11 : 1) * bstatTgMult(row.tg, w);
-    blendOff  += (bstatNum(rAtk[t]) / sumAtk) * off  * tier;  // offense mix
-    blendSurv += (bstatNum(rDef[t]) / sumDef) * surv * tier;  // defense mix
+  const wAtk  = bstatWidgetMult(row.heroesOff, 'atk');
+  const wLeth = bstatWidgetMult(row.heroesOff, 'leth');
+  const wDef  = bstatWidgetMult(row.heroesDef, 'def');
+  const wHea  = bstatWidgetMult(row.heroesDef, 'hea');
+
+  const perType = {};
+  let blendA = 0, blendD = 0;
+  types.forEach(function(t){
+    const s = (row.troops && row.troops[t]) || {};
+    const base = bstatBase(t, (row.tiers && row.tiers[t]) || '10.0');
+    const A = (1 + bstatNum(s.atk)/100) * wAtk * (1 + bstatNum(s.leth)/100) * wLeth;
+    const D = (1 + bstatNum(s.def)/100) * wDef * (1 + bstatNum(s.hp)/100)  * wHea;
+    const atkPower = base[0] * A;   // scales with base_att
+    const defPower = base[1] * D;   // scales with base_hea
+    perType[t] = { A: Math.round(A*1000)/1000, D: Math.round(D*1000)/1000, atkPower: atkPower, defPower: defPower };
+    blendA += (bstatNum(rAtk[t]) / sumA) * atkPower;
+    blendD += (bstatNum(rDef[t]) / sumD) * defPower;
   });
 
-  const skillsAtk = bstatSkillMult(row.heroes, 'atk', w);
-  const skillsDef = bstatSkillMult(row.heroes, 'def', w);
-
   const cap = Math.max(1, bstatNum(row.rallyCap));
-  const capAtk = Math.pow(cap / w.cap.median, w.cap.atkExp);
-  const capDef = Math.pow(cap / w.cap.median, w.cap.defExp);
-
-  const atk = blendOff  * skillsAtk * capAtk * w.scale;
-  const def = blendSurv * skillsDef * capDef * w.scale;
-  return { atk: Math.round(atk), def: Math.round(def) };
+  const capTerm = Math.sqrt(cap / (w.capMedian || 1100000));
+  const scale = w.scale || 0.02;
+  return {
+    perType: perType,
+    atk: Math.round(blendA * capTerm * scale),
+    def: Math.round(blendD * capTerm * scale)
+  };
 }
 
 function bearer(request){ return (request.headers.get('Authorization')||'').replace(/^Bearer\s+/,''); }
@@ -8578,8 +8633,8 @@ export class KingdomState {
           // it can be re-scored under future weights for a like-for-like progress trend.
           const prev = (this.st.bstatByPlayer && this.st.bstatByPlayer[key]) ? this.st.bstatByPlayer[key] : null;
           const hist = (prev && Array.isArray(prev.history)) ? prev.history.slice() : [];
-          hist.push({ savedAt: nowMs, cycle: cycle, troops: v.troops, t11: v.t11, tg: v.tg,
-                      rallyCap: v.rallyCap, heroes: v.heroes, scoreAtk: sc.atk, scoreDef: sc.def, weightsVer: bw.ver });
+          hist.push({ savedAt: nowMs, cycle: cycle, troops: v.troops, tiers: v.tiers,
+                      rallyCap: v.rallyCap, heroesOff: v.heroesOff, heroesDef: v.heroesDef, scoreAtk: sc.atk, scoreDef: sc.def, weightsVer: bw.ver });
           v.history = hist.slice(-20);
         }
       }
