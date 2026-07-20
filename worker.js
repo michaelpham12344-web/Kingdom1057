@@ -742,13 +742,6 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .bs-pet-label.on{color:#c084fc;}
 .bs-pet-label.warn{color:var(--gold);}
 .bs-pet-label.off{color:#ff7070;}
-/* Three-phase pet state — shared by Setup cards + Pet Activation Plan dots */
-.bs-pet-bar-fill.ready{background:#2ecc71;}
-.bs-pet-bar-fill.active{background:#e6b34a;}
-.bs-pet-bar-fill.cooldown{background:#e04545;}
-.bs-pet-label.ready{color:#48d17f;}
-.bs-pet-label.active{color:#e6b34a;}
-.bs-pet-label.cooldown{color:#ff7070;}
 .team-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;}
 .team-dot.free{background:var(--green);}
 .team-dot.rallying{background:#ff5555;box-shadow:0 0 6px rgba(255,85,85,.7);}
@@ -1106,7 +1099,7 @@ document.addEventListener('touchend',function(e){
 
       <!-- TURRETS -->
       <div class="bs4card">
-        <h3 style="display:flex;align-items:center;gap:10px">&#128508; Turret Assignments<button class="btn btn-gold btn-sm" style="margin-left:auto;font-weight:600" onclick="bsCopyTurrets()">&#128203; Copy</button></h3>
+        <h3>&#128508; Turret Assignments</h3>
         <div class="bs4desc">Place each leader on a turret with <b>+ Add leader</b>, or the &#8646; button on a card. Tap &#10005; to send them back to the pool.</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px" id="bsTurretGrid"></div>
       </div>
@@ -1168,7 +1161,7 @@ document.addEventListener('touchend',function(e){
 
       <!-- PET ACTIVATION PLAN -->
       <div class="bs4card">
-        <h3 style="display:flex;align-items:center;gap:10px">&#128062; Pet Activation Plan<button class="btn btn-gold btn-sm" style="margin-left:auto;font-weight:600" onclick="bsCopyPetPlan()">&#128203; Copy</button></h3>
+        <h3>&#128062; Pet Activation Plan</h3>
         <div class="bs4desc">Select leaders, pick a UTC time, and add a plan. At that time their 2.5h pet buff auto-activates for everyone in the plan.</div>
         <div id="bsPetSelChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
         <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:14px">
@@ -2572,37 +2565,6 @@ renderSetup();
 // ════════════ PET BUFFS ════════════
 const PET_DUR = 2.5 * 3600 * 1000; // 2.5h in ms
 const WARN_MS = 15 * 60 * 1000;    // warn at 15 min left
-const PET_COOLDOWN = 20 * 3600 * 1000; // 20h cooldown, begins the instant the 2.5h active window ends
-
-// Canonical pet state, derived ONLY from startMs so every synced client agrees without an
-// extra field on the wire. Three phases: ready (green) -> active 2.5h (yellow) -> cooldown 20h (red) -> ready.
-function petPhase(l){
-  const p = l && l.pet;
-  if(!p || !p.startMs) return { phase:'ready', remMs:0 };
-  let elapsed = nowSync() - p.startMs;
-  if(elapsed < 0) elapsed = 0;
-  if(elapsed < PET_DUR)                return { phase:'active',   remMs: PET_DUR - elapsed };
-  if(elapsed < PET_DUR + PET_COOLDOWN) return { phase:'cooldown', remMs: PET_DUR + PET_COOLDOWN - elapsed };
-  return { phase:'ready', remMs:0 };
-}
-function petPhaseText(ph, remMs){
-  if(ph==='active')   return 'Pets active · ' + fmtSec(Math.ceil(remMs/1000));
-  if(ph==='cooldown') return 'Pets on cooldown · ' + fmtSec(Math.ceil(remMs/1000));
-  return 'Pets ready: Tap to start';
-}
-function petPhaseColor(ph){ return ph==='active' ? '#e6b34a' : (ph==='cooldown' ? '#e04545' : '#2ecc71'); }
-// Border/background/text colors for a name pill, by pet phase.
-// ready = has a plan (green), active = pets running (yellow), cooldown = 20h wait (red)
-function petPhasePill(ph){
-  if(ph==='active')   return { bd:'#e6b34a', bg:'rgba(230,179,74,.15)', cl:'#e6b34a' };
-  if(ph==='cooldown') return { bd:'#e04545', bg:'rgba(224,69,69,.14)',  cl:'#e04545' };
-  return               { bd:'var(--green)', bg:'rgba(124,200,121,.12)', cl:'var(--green)' };
-}
-// Name rendered as a colored pill (color = pet phase) for the Pet Activation Plan.
-function petNamePillHTML(l, nm){
-  const c = petPhasePill(petPhase(l).phase);
-  return '<span style="font-size:12px;padding:3px 9px;border-radius:12px;border:1px solid '+c.bd+';background:'+c.bg+';color:'+c.cl+';white-space:nowrap;line-height:1.7">'+nm+'</span>';
-}
 
 function renderPetGrid(){
   const grid=document.getElementById('petGrid'); if(!grid) return;
@@ -2642,20 +2604,9 @@ function renderPetGrid(){
 function petToggle(leaderId){
   const l=S.leaders.find(x=>x.id===leaderId); if(!l) return;
   if(!l.pet) l.pet={active:false,startMs:null};
-  const ph=petPhase(l).phase;
-  if(ph==='ready'){
-    // Green -> start the 2.5h buff.
-    l.pet.active=true; l.pet.startMs=nowSync();
-  } else {
-    // Yellow/red -> confirm before wiping, so an accidental tap can't reset a live
-    // countdown mid-battle. Clearing sends it straight back to ready (green).
-    const msg = ph==='active'
-      ? 'Reset '+l.name+"'s pet? This clears the active buff and the tracker goes back to ready."
-      : 'Clear '+l.name+"'s cooldown and set the pet back to ready?";
-    if(!confirm(msg)) return;
-    l.pet.active=false; l.pet.startMs=null;
-  }
-  if(typeof renderPetGrid==='function') renderPetGrid();
+  if(l.pet.active){ l.pet.active=false; l.pet.startMs=null; }
+  else { l.pet.active=true; l.pet.startMs=nowSync(); }
+  renderPetGrid();
   syncQueuePush();
 }
 
@@ -2672,28 +2623,31 @@ function petResetAll(){
 
 function tickPets(){
   if(!S.leaders.length) return;
+  const now=nowSync();
+  let healed=false;
+  S.leaders.forEach(function(l){ if(l.pet&&l.pet.active&&!l.pet.startMs){ l.pet.active=false; healed=true; } });
+  if(healed){ if(typeof renderBattleStrategy==='function') renderBattleStrategy(); if(typeof syncQueuePush==='function') syncQueuePush(); }
   S.leaders.forEach(l=>{
-    if(!l.pet) return;
-    const ps=petPhase(l);
-    // Keep the wire flag roughly in step with the derived phase (the phase itself is
-    // computed from startMs, so this is only a hint — startMs is never nulled here, so a
-    // finished buff rolls into cooldown instead of vanishing back to ready).
-    l.pet.active=(ps.phase==='active');
-    // Pet Planner card (not in the current DOM, but harmless if it ever returns)
+    if(!l.pet||!l.pet.active||!l.pet.startMs) return;
+    const rem=PET_DUR-(now-l.pet.startMs);
+    const expired=rem<=0;
+    if(expired){ l.pet.active=false; l.pet.startMs=null; }
+    const expiring=!expired&&rem<=WARN_MS;
+    const txt=expired?'EXPIRED':fmtSec(Math.ceil(rem/1000));
+    // Pet Planner card
     const timerEl=document.getElementById('pettimer-'+l.id);
     if(timerEl){
       const cardEl=document.getElementById('petcard-'+l.id);
       const btnEl=cardEl?cardEl.querySelector('.pet-toggle'):null;
-      if(ps.phase==='active'){ timerEl.textContent=fmtSec(Math.ceil(ps.remMs/1000)); timerEl.className='pet-timer active'; if(cardEl)cardEl.className='pet-card active'; if(btnEl){ btnEl.textContent='■ Stop'; btnEl.className='pet-toggle on'; } }
-      else { timerEl.textContent=(ps.phase==='cooldown'?'COOLDOWN':'—'); timerEl.className='pet-timer '+(ps.phase==='cooldown'?'expired':'idle'); if(cardEl)cardEl.className='pet-card '+(ps.phase==='cooldown'?'expired':''); if(btnEl){ btnEl.textContent='▶ Activate'; btnEl.className='pet-toggle off'; } }
+      if(expired){ timerEl.textContent='EXPIRED'; timerEl.className='pet-timer expired'; if(cardEl)cardEl.className='pet-card expired'; if(btnEl){ btnEl.textContent='▶ Activate'; btnEl.className='pet-toggle off'; } }
+      else { timerEl.textContent=txt; timerEl.className='pet-timer '+(expiring?'expiring':'active'); if(cardEl)cardEl.className='pet-card '+(expiring?'expiring':'active'); }
     }
     // Battle Strategy card
     const bsFill=document.getElementById('bspetfill-'+l.id);
     const bsLabel=document.getElementById('bspetlabel-'+l.id);
     if(bsFill&&bsLabel){
-      if(ps.phase==='active'){ bsFill.className='bs-pet-bar-fill active'; bsFill.style.width=Math.max(0,Math.min(100,ps.remMs/PET_DUR*100))+'%'; bsLabel.className='bs-pet-label active'; bsLabel.textContent=petPhaseText('active',ps.remMs); }
-      else if(ps.phase==='cooldown'){ bsFill.className='bs-pet-bar-fill cooldown'; bsFill.style.width=Math.max(0,Math.min(100,ps.remMs/PET_COOLDOWN*100))+'%'; bsLabel.className='bs-pet-label cooldown'; bsLabel.textContent=petPhaseText('cooldown',ps.remMs); }
-      else { bsFill.className='bs-pet-bar-fill ready'; bsFill.style.width='0%'; bsLabel.className='bs-pet-label ready'; bsLabel.textContent='Pets ready: Tap to start'; }
+      if(expired){ bsFill.className='bs-pet-bar-fill off'; bsFill.style.width='0%'; bsLabel.className='bs-pet-label off'; bsLabel.textContent='No pet — tap to start'; }
+      else { const cls=expiring?'warn':'on'; bsFill.className='bs-pet-bar-fill '+cls; bsFill.style.width=Math.max(0,Math.min(100,rem/PET_DUR*100))+'%'; bsLabel.className='bs-pet-label '+cls; bsLabel.textContent=txt; }
     }
   });
 }
@@ -2743,7 +2697,7 @@ function renderPetPlanList(){
     let status;
     if(p.fired) status='<span style="color:#c084fc">✓ Activated</span>';
     else status='<span style="color:var(--gold)">in '+fmtSec(Math.ceil(Math.max(0,p.targetMs-now)/1000))+'</span>';
-    const names=p.leaderIds.map(function(id){ const l=S.leaders.find(function(x){return x.id===id;}); const nm=l?l.name:'?'; return l ? petNamePillHTML(l,nm) : '<span style="font-size:12px;padding:3px 9px;border-radius:12px;border:1px solid var(--border);background:var(--bg3);color:var(--text3);white-space:nowrap;line-height:1.7">'+nm+'</span>'; }).join('');
+    const names=p.leaderIds.map(function(id){ const l=S.leaders.find(function(x){return x.id===id;}); return l?l.name:'?'; }).join(', ');
     return '<div style="padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;margin-bottom:6px">'+
       '<div style="display:flex;align-items:center;gap:10px">'+
         '<span style="font-family:var(--mono);color:var(--text);font-size:14px">'+hhmm+' UTC</span>'+
@@ -2752,57 +2706,11 @@ function renderPetPlanList(){
         '<span style="flex:1"></span>'+
         '<span onclick="bsRemovePetPlan('+"'"+p.id+"'"+')" style="cursor:pointer;color:var(--text3);font-size:14px;padding:6px 8px" title="Remove">✕</span>'+
       '</div>'+
-      '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;font-size:12px">'+names+'</div>'+
+      '<div style="color:var(--text3);font-size:11px;margin-top:4px;line-height:1.5">'+names+'</div>'+
     '</div>';
   }).join('');
 }
 function renderPetPlans(){ renderPetPlanChips(); renderPetPlanList(); }
-
-// ── Copy-to-chat helpers ─────────────────────────────────────────────────────
-// Turret Assignments -> plain text for game/Discord chat.
-function bsCopyTurrets(){
-  bsEnsureAlliances();
-  var lines=['Turret Assignments'];
-  BS_TURRETS.forEach(function(t,i){
-    var occ=S.leaders.filter(function(l){ return l.bsSlot && l.bsSlot.slotType==='turret' && l.bsSlot.slotId===i; });
-    lines.push(t.name+' Turret: '+(occ.length?occ.map(function(l){return l.name;}).join(', '):'—'));
-  });
-  copyText(lines.join('\\n'));
-}
-// Alliance assignments -> grouped by alliance, then team, then the leaders on that team.
-function bsCopyAlliances(){
-  bsEnsureAlliances();
-  var blocks=[];
-  function teamLine(t){
-    var mem=S.leaders.filter(function(l){ return l.bsSlot && l.bsSlot.slotType==='team' && l.bsSlot.slotId===t.id; });
-    return mem.length ? (t.name+': '+mem.map(function(l){return l.name;}).join(', ')) : null;
-  }
-  S.alliances.forEach(function(a){
-    var lines=[];
-    S.teams.filter(function(t){ return t.alliance===a.id; }).forEach(function(t){ var tl=teamLine(t); if(tl) lines.push(tl); });
-    if(lines.length) blocks.push('Alliance: '+a.name+'\\n'+lines.join('\\n'));
-  });
-  var known={}; S.alliances.forEach(function(a){ known[a.id]=true; });
-  var unLines=[];
-  S.teams.filter(function(t){ return !t.alliance || !known[t.alliance]; }).forEach(function(t){ var tl=teamLine(t); if(tl) unLines.push(tl); });
-  if(unLines.length) blocks.push('Unassigned\\n'+unLines.join('\\n'));
-  if(!blocks.length){ toast('No alliance assignments yet'); return; }
-  copyText(blocks.join('\\n\\n'));
-}
-// Pet Activation Plan -> each UTC time and the leaders firing at it.
-function bsCopyPetPlan(){
-  if(typeof bsPetPlans==='undefined' || !bsPetPlans.length){ toast('No pet plans yet'); return; }
-  var plans=bsPetPlans.slice().sort(function(a,b){ return a.targetMs-b.targetMs; });
-  var lines=['Pet Activation Plan'];
-  plans.forEach(function(p){
-    var hhmm=String(p.hh).padStart(2,'0')+':'+String(p.mm).padStart(2,'0');
-    var names=p.leaderIds.map(function(id){ var l=S.leaders.find(function(x){return x.id===id;}); return l?l.name:'?'; }).join(', ');
-    lines.push('');
-    lines.push(hhmm+' UTC');
-    lines.push(names);
-  });
-  copyText(lines.join('\\n'));
-}
 setInterval(function(){ bsFirePetPlans(); renderPetPlanList(); },1000);
 renderPetGrid();
 
@@ -2822,11 +2730,12 @@ function bsRemoveFromSlot(leaderId){
 }
 
 function bsLeaderCardHTML(l){
-  const _ps=petPhase(l);
-  let petCls,petTxt,petPct;
-  if(_ps.phase==='active'){ petCls='active'; petTxt=petPhaseText('active',_ps.remMs); petPct=Math.max(0,Math.min(100,_ps.remMs/PET_DUR*100)); }
-  else if(_ps.phase==='cooldown'){ petCls='cooldown'; petTxt=petPhaseText('cooldown',_ps.remMs); petPct=Math.max(0,Math.min(100,_ps.remMs/PET_COOLDOWN*100)); }
-  else { petCls='ready'; petTxt='Pets ready: Tap to start'; petPct=0; }
+  const p=l.pet||{active:false,startMs:null};
+  let petCls='off',petTxt='No pet — tap to start',petPct=0;
+  if(p.active&&p.startMs){
+    const rem=PET_DUR-(nowSync()-p.startMs);
+    if(rem>0){ petCls=(rem<=WARN_MS)?'warn':'on'; petTxt=fmtSec(Math.ceil(rem/1000)); petPct=Math.max(0,Math.min(100,rem/PET_DUR*100)); }
+  }
   // Team color accent reflects the leader's ACTUAL current placement (bsSlot), not the
   // unused legacy l.teamId field — that's what was producing the always-wrong "No team" label.
   const inPool = !l.bsSlot || l.bsSlot.slotType==='pool';
@@ -2944,10 +2853,7 @@ function renderBsAllianceZones(){
   if(un.length){
     cards+='<div class="card bs4ally"><div class="card-title" style="color:var(--text3)">📦 Unassigned</div><div class="bs4teamgrid">'+un.map(teamBoxHTML).join('')+'</div></div>';
   }
-  var _allyHdr='<div style="display:flex;align-items:center;margin-bottom:10px;padding:0 2px">'+
-    '<span style="font-family:var(--head);font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--text2)">ALLIANCE ASSIGNMENTS</span>'+
-    '<button class="btn btn-gold btn-sm" style="margin-left:auto;font-weight:600" onclick="bsCopyAlliances()">📋 Copy</button></div>';
-  el.innerHTML=_allyHdr+'<div style="display:flex;flex-wrap:wrap;gap:0">'+cards+'</div>';
+  el.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:0">'+cards+'</div>';
 
   // Max 2 alliances — hide the "add alliance" row once both exist.
   var _row=document.getElementById('bsAddAllianceRow');
@@ -7202,6 +7108,7 @@ document.addEventListener('DOMContentLoaded', initApp);
       <div class="bstatSubtab" data-p="rank" onclick="bstatTab('rank')">Rankings</div>
       <div class="bstatSubtab" data-p="prog" onclick="bstatTab('prog')">My Progress</div>
       <div class="bstatSubtab" data-p="wt" onclick="bstatTab('wt')">Weights</div>
+      <div class="bstatSubtab" data-p="battle" onclick="bstatTab('battle')">Battle Sim</div>
       <div class="bstatSubtab" data-p="how" onclick="bstatTab('how')">How scoring works</div>
     </div>
 
@@ -7379,8 +7286,28 @@ per type:  atkPower = base_att <span class="bstatK">×</span> <span class="bstat
         </p>
 
         <div class="bstatWarn" style="margin-top:18px">
-          <b>What's solid vs. what's still coming.</b> The stats engine — A/D factors, base-stat tables, widget curve, √ capacity — is straight from the documented kill formula, not guesswork. What's <i>not</i> in yet: hero/joiner <b>skills</b> (the biggest lever, but the community data is still being finalised) and <b>pets</b> (values unconfirmed). Both are recorded and will layer on top when the numbers firm up.
+          <b>What's solid vs. what's still coming.</b> The stats engine — A/D factors, base-stat tables, widget curve, √ capacity — is straight from the documented kill formula, not guesswork. <b>Hero skills (SkillMod)</b> are now live — every hero's Expedition skills feed the attack and defense scores, and the <b>Battle Sim</b> tab runs full turn-by-turn fights with skills, procs and joiners. Still pending: <b>pets</b> (Antler Impact / Fearless Roar curves need confirming) and calibrating the simulator's absolute damage scale to a real battle report.
         </div>
+      </div>
+    </div>
+
+    <!-- battle sim -->
+    <div class="bstatPane" id="bstatPane-battle">
+      <div class="bstatCard">
+        <div class="bstatCardT">Battle Simulator <span class="bstatHint">Monte-Carlo, 1000 fights</span></div>
+        <div class="bstatNote" style="margin:0 0 14px"><b>Full scout in, distribution out.</b> Enter both armies - troops, tiers, the four stat percentages per type, and the heroes you scouted. It runs 1000 turn-by-turn battles and reports win-rate plus how many troops survive, with the spread.</div>
+        <div class="bstatBattleSides">
+          <div class="bstatCard" style="margin:0"><div class="bstatCardT">Your side</div><div id="bstatBattleYou"></div></div>
+          <div class="bstatCard" style="margin:0"><div class="bstatCardT">Enemy side</div><div id="bstatBattleEnemy"></div></div>
+        </div>
+        <div class="bstatFoot" style="margin-top:14px">
+          <span class="bstatFootNote">Widgets fire only in the matching role - offensive on attack, defensive on defense.</span>
+          <button class="bstatBtnPrimary" id="bstatRunBtn" onclick="bstatRunBattle()">Run 1000 battles</button>
+        </div>
+      </div>
+      <div class="bstatCard" id="bstatBattleResultCard" style="display:none">
+        <div class="bstatCardT">Result</div>
+        <div id="bstatBattleResult"></div>
       </div>
     </div>
 
@@ -7398,6 +7325,26 @@ per type:  atkPower = base_att <span class="bstatK">×</span> <span class="bstat
 #page-battlestats .bstatSubtab.active{color:var(--gold);border-bottom-color:var(--gold)}
 #page-battlestats .bstatPane{display:none}
 #page-battlestats .bstatPane.active{display:block}
+#page-battlestats .bstatBattleSides{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:820px){#page-battlestats .bstatBattleSides{grid-template-columns:1fr}}
+#page-battlestats .bstatBrole{font-family:var(--head);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin:0 0 10px;display:flex;align-items:center;gap:8px}
+#page-battlestats .bstatBrole select{flex:1}
+#page-battlestats .bstatBrow{display:grid;grid-template-columns:34px 1fr 1fr 44px 44px 44px 44px 1fr 50px;gap:5px;align-items:center;margin:0 0 5px}
+#page-battlestats .bstatBrow input,#page-battlestats .bstatBrow select{padding:5px 4px;font-size:11px;min-width:0}
+#page-battlestats .bstatBhead{font-size:9px;text-transform:uppercase;color:var(--text3);letter-spacing:.02em}
+#page-battlestats .bstatBhead span{text-align:center}
+#page-battlestats .bstatBverdict{font-size:15px;margin:0 0 10px}
+#page-battlestats .bstatBbar{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:0 0 16px;background:var(--border)}
+#page-battlestats .bstatBbarY{background:var(--gold)}#page-battlestats .bstatBbarD{background:var(--text3)}#page-battlestats .bstatBbarE{background:#c65}
+#page-battlestats .bstatBcols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:820px){#page-battlestats .bstatBcols{grid-template-columns:1fr}}
+#page-battlestats .bstatBcolT{font-family:var(--head);font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin:0 0 4px}
+#page-battlestats .bstatBstat{font-size:13px;margin:0 0 2px}
+#page-battlestats .bstatBhistax{display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-top:2px}
+#page-battlestats .bstatBjoin{margin:10px 0 0;border-top:1px solid var(--border);padding-top:10px}
+#page-battlestats .bstatBjoinT{font-family:var(--head);font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin:0 0 6px}
+#page-battlestats .bstatBjoinRow{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px}
+#page-battlestats .bstatBjoinRow select{padding:5px 4px;font-size:11px;min-width:0}
 #page-battlestats .bstatCard{background:linear-gradient(180deg,var(--bg4) 0%,var(--bg3) 100%);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:18px}
 #page-battlestats .bstatCardT{font-family:var(--head);font-size:14px;font-weight:600;color:var(--gold);margin-bottom:14px;letter-spacing:.03em;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 #page-battlestats .bstatHint{font-family:var(--body);font-size:11px;font-weight:400;color:var(--text3);letter-spacing:0;display:inline-flex;align-items:center;gap:5px}
@@ -7528,6 +7475,244 @@ var BSTAT_HEROES = {
 var BSTAT_HERO_WIDGET = BSTAT_HEROES; // same map; stat field drives widget maths
 var BSTAT_TYPES = ['infantry','cavalry','archer'];
 
+var BSTAT_SIDE = {
+  leth:'atk', atk:'atk', dmgDealt:'atk', skillDmg:'atk', enDefDown:'atk', enDmgTakenUp:'atk',
+  dmgTakenDown:'def', def:'def', hp:'def', enAtkDown:'def', enDmgDown:'def', enLethDown:'def'
+};
+function bstatMkStatic(name, op, vals, extra){ return Object.assign({ name:name, op:op, kind:'static', vals:vals,
+  chance:null, period:null, active:null, dot:null, restrict:null, cond:null }, extra||{}); }
+function bstatMkProc(name, op, vals, chance, extra){ return Object.assign(bstatMkStatic(name,op,vals,extra), { kind:'proc', chance:chance }); }
+
+// widget helper: role 'off'|'def', stat 'atk'|'leth'|'def'|'hea'
+function bstatMkWidget(role, stat){ return { role:role, stat:stat, vals:[5,7.5,10,12.5,15] }; }
+
+var BSTAT_REGISTRY = {
+  // ========================= GENERATION 7 (Mythic) =========================
+  'Ava': { gen:7, type:'cavalry', rarity:'mythic', widget:bstatMkWidget('off','leth'), exp:[
+    bstatMkStatic('Dissolution','enDefDown',[5,10,15,20,25]),                                   // enemy total Defense down (static)
+    bstatMkStatic('Chiaroscuro','enDmgTakenUp',[10,20,30,40,50],{kind:'periodic',period:4,active:2}), // enemy +dmg-taken 2 of every 4 turns
+    bstatMkStatic('Light and Cold','leth',[5,10,15,20,25])
+  ]},
+  'Charles': { gen:7, type:'infantry', rarity:'mythic', widget:bstatMkWidget('def','hea'), exp:[
+    bstatMkStatic('Intimidation','enLethDown',[4,8,12,16,20]),   // enemy Lethality down (reduces enemy damage)
+    bstatMkStatic('Iron Bodies','dmgTakenDown',[4,8,12,16,20]),
+    bstatMkStatic('Great Justice','hp',[5,10,15,20,25])
+  ]},
+  'Wee & Woo': { gen:7, type:'archer', rarity:'mythic', widget:bstatMkWidget('def','atk'), exp:[
+    bstatMkStatic('Artillerymen','atk',[3,6,9,12,15],{pair:{op:'leth',vals:[2,4,6,8,10]}}),     // dual: +15 Atk & +10 Leth
+    bstatMkStatic('Chain Shelling','dmgDealt',[6,12,18,24,30],{cond:'enemyType',note:'vs Archer +30 / vs Infantry +25'}),
+    bstatMkProc('Boom Boom','dmgDealt',[50,50,50,50,50],0.50)
+  ]},
+
+  // ========================= GENERATION 6 (Mythic) =========================
+  'Sophia': { gen:6, type:'cavalry', rarity:'mythic', widget:bstatMkWidget('def','leth'), exp:[
+    bstatMkProc('Arcane Pact','dmgTakenDown',[50,50,50,50,50],0.40),  // 40% chance -50% dmg taken (chance scales 8..40; magnitude 50)
+    bstatMkStatic('Terror - Deathblow','enDmgTakenUp',[40,80,120,160,200],{kind:'periodic',period:2,active:1,restrict:['cavalry'],cond:'terror'}),
+    bstatMkStatic('Terror - Annihilation','dmgDealt',[15,30,45,60,75],{cond:'terror'})
+  ]},
+  'Triton': { gen:6, type:'infantry', rarity:'mythic', widget:bstatMkWidget('def','def'), exp:[
+    bstatMkStatic('Command of Power','def',[5,10,15,20,25]),
+    bstatMkStatic('Warfare of Power','skillDmg',[6,12,18,24,30]),
+    bstatMkStatic('Oath of Power','hp',[4,8,12,16,20],{note:'Inf +20 / Cav+Arc +30 — per-type'})
+  ]},
+  'Yang': { gen:6, type:'archer', rarity:'mythic', widget:bstatMkWidget('off','leth'), exp:[
+    bstatMkStatic('Avalanche','dmgDealt',[20,40,60,80,100],{kind:'periodic',period:4,active:1}), // extra strike every 4 turns
+    bstatMkProc('Ice Zone','dmgDealt',[20,40,60,80,100],0.40,{restrict:['archer']}),
+    bstatMkProc('Ambush','dmgDealt',[0,0,0,0,0],0.40,{note:'magnitude NOT on page — needs value'})
+  ]},
+
+  // ========================= GENERATION 5 (Mythic) =========================
+  'Thrud': { gen:5, type:'cavalry', rarity:'mythic', widget:bstatMkWidget('off','leth'), exp:[
+    bstatMkStatic('Battle Hunger','dmgDealt',[3,6,9,12,15],{restrict:['infantry','archer'],pair:{op:'dmgTakenDown',vals:[3,6,9,12,15]}}),
+    bstatMkProc('Reckless Charge','dmgDealt',[20,40,60,80,100],0.20,{restrict:['cavalry']}),
+    bstatMkStatic('Ancestral Guidance','dmgDealt',[5,10,15,20,25],{kind:'periodic',period:4,active:2,note:'also -25% dmg-taken'})
+  ]},
+  'Long Fei': { gen:5, type:'infantry', rarity:'mythic', widget:bstatMkWidget('def','atk'), exp:[
+    bstatMkProc('Mighty Paragon','dmgTakenDown',[10,20,30,40,50],0.40),
+    bstatMkStatic('Celestial Sustenance','def',[5,10,15,20,25]),
+    bstatMkProc('Art of War','dmgDealt',[120,140,160,180,200],0.25)
+  ]},
+  'Vivian': { gen:5, type:'archer', rarity:'mythic', widget:bstatMkWidget('def','def'), exp:[
+    bstatMkStatic('Crouching Tiger','enDmgTakenUp',[5,10,15,20,25]),                             // static, global — strong
+    bstatMkStatic('Focus Fire','dmgDealt',[20,40,60,80,100],{kind:'periodic',period:4,active:1,note:'+15% enemy dmg-taken next hit'}),
+    bstatMkStatic('Trap of Greed','dmgDealt',[12,24,36,48,60],{kind:'periodic',period:4,active:1,restrict:['archer']})
+  ]},
+
+  // ========================= GENERATION 4 (Mythic) =========================
+  'Margot': { gen:4, type:'cavalry', rarity:'mythic', widget:bstatMkWidget('def','leth'), exp:[
+    bstatMkStatic('Warbringer','atk',[5,10,15,20,25]),
+    bstatMkProc('Subterfuge','dmgTakenDown',[4,8,12,16,20],0.20,{note:'dodge (evasion)'}),
+    bstatMkProc('Sleight Hand','dmgDealt',[120,140,160,180,200],0.25,{restrict:['cavalry']})
+  ]},
+  'Alcar': { gen:4, type:'infantry', rarity:'mythic', widget:bstatMkWidget('def','hea'), exp:[
+    bstatMkStatic('Rescuing Hands','dmgTakenDown',[14,28,42,56,70],{kind:'periodic',period:5,active:2,restrict:['infantry','archer']}),
+    bstatMkStatic('Praetorian Will','dmgDealt',[20,40,60,80,100],{restrict:['infantry'],note:'Cav+Arc only +10'}),
+    bstatMkStatic('Capre Diem','dmgDealt',[12,24,36,48,60],{restrict:['infantry'],note:'also +25% enemy dmg-taken 1 turn'})
+  ]},
+  'Rosa': { gen:4, type:'archer', rarity:'mythic', widget:bstatMkWidget('off','leth'), exp:[
+    bstatMkProc('Chaos Gambit','dmgDealt',[10,20,30,40,50],0.40),
+    bstatMkStatic('Rose of War','enDmgDown',[4,8,12,16,20]),
+    bstatMkStatic('Golden Rhythm','atk',[6,12,18,24,30],{restrict:['archer']})
+  ]},
+
+  // ========================= GENERATION 3 (Mythic) =========================
+  'Jaeger': { gen:3, type:'archer', rarity:'mythic', widget:bstatMkWidget('def','hea'), exp:[
+    bstatMkProc('The Tempest','dmgDealt',[8,16,24,32,40],0.20,{active:3}),
+    bstatMkProc('The Resistance','enLethDown',[10,20,30,40,50],0.20,{active:2}),
+    bstatMkStatic('The Celebration','hp',[5,10,15,20,25])
+  ]},
+  'Eric': { gen:3, type:'infantry', rarity:'mythic', widget:bstatMkWidget('def','def'), exp:[
+    bstatMkStatic('Holy Warrior','enAtkDown',[4,8,12,16,20]),
+    bstatMkStatic('Conviction','dmgTakenDown',[4,8,12,16,20]),
+    bstatMkStatic('Exhortation','hp',[5,10,15,20,25])
+  ]},
+  'Petra': { gen:3, type:'cavalry', rarity:'mythic', widget:bstatMkWidget('off','atk'), exp:[
+    bstatMkProc('Evil Eye','enDmgTakenUp',[10,20,30,40,50],0.50),
+    bstatMkProc('The Favor','atk',[10,20,30,40,50],0.50),
+    bstatMkProc('The Shield','dmgTakenDown',[10,20,30,40,50],0.40,{note:'desc says 40% chance / 50% reduce'})
+  ]},
+
+  // ========================= GENERATION 2 (Mythic) =========================
+  'Hilde': { gen:2, type:'cavalry', rarity:'mythic', widget:bstatMkWidget('def','hea'), exp:[
+    bstatMkStatic('Noble Path','atk',[3,6,9,12,15],{pair:{op:'def',vals:[2,4,6,8,10]}}),
+    bstatMkProc('Elixir of Strength','dmgDealt',[120,140,160,180,200],0.25),
+    bstatMkProc('Trial by Fire','dmgTakenDown',[50,50,50,50,50],0.40)
+  ]},
+  'Zoe': { gen:2, type:'infantry', rarity:'mythic', widget:bstatMkWidget('def','atk'), exp:[
+    bstatMkProc('Sundering Wound','dmgDealt',[8,16,24,32,40],0.20,{kind:'dot',dot:3}),
+    bstatMkStatic('Stoic','atk',[5,10,15,20,25]),
+    bstatMkProc('Infinite Arsenal','enDmgTakenUp',[10,20,30,40,50],0.50)
+  ]},
+  'Marlin': { gen:2, type:'archer', rarity:'mythic', widget:bstatMkWidget('off','leth'), exp:[
+    bstatMkProc('Wild Card','dmgDealt',[50,50,50,50,50],0.40),
+    bstatMkProc('Rumhead','enLethDown',[10,20,30,40,50],0.20,{active:2}),
+    bstatMkProc('Dynamo','dmgDealt',[10,20,30,40,50],0.50)
+  ]},
+
+  // ========================= GENERATION 1 (Mythic) =========================
+  'Jabel': { gen:1, type:'cavalry', rarity:'mythic', widget:bstatMkWidget('def','leth'), exp:[
+    bstatMkProc('Rally Flag','dmgTakenDown',[50,50,50,50,50],0.40),   // CORRECTED: defensive proc (doc4 was wrong)
+    bstatMkProc("Hero's Domain",'dmgDealt',[10,20,30,40,50],0.50),
+    bstatMkStatic('Youthful Rage','leth',[5,10,15,20,25])
+  ]},
+  'Amadeus': { gen:1, type:'infantry', rarity:'mythic', widget:bstatMkWidget('off','atk'), exp:[
+    bstatMkStatic('Battle Ready','leth',[5,10,15,20,25]),
+    bstatMkStatic('Way of the Blade','atk',[5,10,15,20,25]),
+    bstatMkProc('Unrighteous Strike','dmgDealt',[50,50,50,50,50],0.40)
+  ]},
+  'Helga': { gen:1, type:'infantry', rarity:'mythic', widget:bstatMkWidget('off','leth'), exp:[
+    bstatMkProc('Oath of Guardian','dmgTakenDown',[50,50,50,50,50],0.40),
+    bstatMkStatic('Echoes of Valhalla','atk',[5,10,15,20,25]),
+    bstatMkStatic("Nature's Balance",'leth',[5,10,15,20,25])
+  ]},
+  'Saul': { gen:1, type:'archer', rarity:'mythic', widget:bstatMkWidget('def','atk'), exp:[
+    bstatMkStatic('Taskforce Training','def',[2,4,6,8,10],{pair:{op:'hp',vals:[3,6,9,12,15]}}),
+    bstatMkStatic('Resourceful','noncombat',[0,0,0,0,0]),
+    bstatMkStatic('Positional Batter','leth',[5,10,15,20,25])
+  ]},
+
+  // ============================ EPIC (no widget) ===========================
+  'Chenko': { gen:1, type:'cavalry', rarity:'epic', widget:null, exp:[
+    bstatMkStatic('Stand of Arms','leth',[5,10,15,20,25]),
+    bstatMkStatic('Shield Wall','dmgTakenDown',[4,8,12,16,20])
+  ]},
+  'Yeonwoo': { gen:1, type:'archer', rarity:'epic', widget:null, exp:[
+    bstatMkStatic('On Guard','leth',[5,10,15,20,25]),
+    bstatMkStatic('Well-Traveled','noncombat',[0,0,0,0,0])
+  ]},
+  'Amane': { gen:1, type:'archer', rarity:'epic', widget:null, exp:[
+    bstatMkStatic('Tri-Phalanx','atk',[5,10,15,20,25]),
+    bstatMkStatic('Exorcism','noncombat',[0,0,0,0,0])
+  ]},
+  'Gordon': { gen:1, type:'cavalry', rarity:'epic', widget:null, exp:[
+    bstatMkStatic('Super Nutrients','hp',[5,10,15,20,25]),
+    bstatMkStatic('Trash Talk','atk',[5,10,15,20,25])
+  ]},
+  'Howard': { gen:1, type:'infantry', rarity:'epic', widget:null, exp:[
+    bstatMkStatic("Defenders' Edge",'dmgTakenDown',[4,8,12,16,20]),
+    bstatMkStatic('Weaken','enAtkDown',[4,8,12,16,20])
+  ]},
+  'Quinn': { gen:1, type:'archer', rarity:'epic', widget:null, exp:[
+    bstatMkStatic('Sixth Sense','dmgTakenDown',[4,8,12,16,20]),
+    bstatMkProc('Precision Shot','dmgDealt',[50,50,50,50,50],0.50)
+  ]},
+  'Fahd': { gen:1, type:'cavalry', rarity:'epic', widget:null, exp:[
+    bstatMkStatic('Desert Eclipse','enDmgDown',[4,8,12,16,20]),
+    bstatMkStatic('Pathfinder','noncombat',[0,0,0,0,0])
+  ]}
+};
+
+// ---------------------------------------------------------------------------
+// EV contribution of one skill (for the deterministic Ranking tab).
+//   static  -> magnitude
+//   proc    -> magnitude × chance
+//   periodic-> magnitude × (active/period)
+//   dot     -> magnitude × chance × dot   (avg per-turn × turns, rough)
+// Returns { op, side, value, applies(troopType) }.
+// ---------------------------------------------------------------------------
+function bstatSkillEVs(skill, level){
+  if(skill.op === 'noncombat') return [];
+  if(skill.cond) return [];   // conditional (terror/lowHealth/enemyType): sim-only, excluded from EV
+  var lv = Math.max(1, Math.min(5, level||5));
+  function ev(op, vals){
+    var mag = (vals && vals[lv-1]) || 0, v = mag;
+    if(skill.kind === 'proc')     v = mag * (skill.chance||0);
+    if(skill.kind === 'periodic') v = mag * ((skill.active||1) / (skill.period||1));
+    if(skill.kind === 'dot')      v = mag * (skill.chance||1) * (skill.dot||1);
+    return { op:op, side:BSTAT_SIDE[op], value:v, restrict:skill.restrict };
+  }
+  var out = [ ev(skill.op, skill.vals) ];
+  if(skill.pair) out.push(ev(skill.pair.op, skill.pair.vals));
+  return out;
+}
+
+// Resolve a LEADER's SkillMod for one troop type + side ('atk'|'def').
+// Leader fires ALL expedition skills of ALL heroes in the trio (+ any 'extra' paired ops).
+// Rule: sum within an op, multiply across distinct ops.
+function bstatLeaderMod(heroNames, troopType, side, levels){
+  var byOp = {};
+  (heroNames||[]).forEach(function(name){
+    var h = BSTAT_REGISTRY[name]; if(!h) return;
+    (h.exp||[]).forEach(function(sk){
+      bstatSkillEVs(sk, (levels && levels[name]) || 5).forEach(function(ev){
+        if(ev.side !== side) return;
+        if(ev.restrict && ev.restrict.indexOf(troopType) === -1) return; // restricted, wrong type
+        byOp[ev.op] = (byOp[ev.op] || 0) + ev.value;
+      });
+    });
+  });
+  var mult = 1;
+  Object.keys(byOp).forEach(function(op){ mult *= (1 + byOp[op] / 100); });
+  return mult;
+}
+
+// Resolve JOINERS' SkillMod. Each joiner = FIRST expedition skill only.
+// Proc first-skills DO NOT stack across identical copies (4 Marlin = 1 roll);
+// static first-skills DO stack additively within their op.
+function bstatJoinerMod(joinerNames, troopType, side){
+  var byOp = {}, seenProc = {};
+  (joinerNames||[]).forEach(function(name){
+    var h = BSTAT_REGISTRY[name]; if(!h || !h.exp || !h.exp[0]) return;
+    var sk = h.exp[0];
+    if(sk.kind === 'proc' || sk.kind === 'dot'){
+      var key = name + ':' + sk.name;
+      if(seenProc[key]) return;            // identical proc copy -> count once
+      seenProc[key] = true;
+    }
+    bstatSkillEVs(sk, 5).forEach(function(ev){
+      if(ev.side !== side) return;
+      if(ev.restrict && ev.restrict.indexOf(troopType) === -1) return;
+      byOp[ev.op] = (byOp[ev.op] || 0) + ev.value;
+    });
+  });
+  var mult = 1;
+  Object.keys(byOp).forEach(function(op){ mult *= (1 + byOp[op] / 100); });
+  return mult;
+}
+
+// [names] from a hero set { infantry:{hero}, cavalry:{hero}, archer:{hero} }
+function bstatHeroNames(set){ return ["infantry","cavalry","archer"].map(function(t){ return set&&set[t]&&set[t].hero; }).filter(Boolean); }
+
 function bstatN(v){ var n=Number(v); return isFinite(n)?n:0; }
 
 function bstatBase(type, tierStr){
@@ -7554,13 +7739,15 @@ function bstatScoreLocal(row,w){
   var sumD=(rDef.infantry+rDef.cavalry+rDef.archer)||1;
   var wAtk=bstatWidgetMult(row.heroesOff,'atk'), wLeth=bstatWidgetMult(row.heroesOff,'leth');
   var wDef=bstatWidgetMult(row.heroesDef,'def'), wHea=bstatWidgetMult(row.heroesDef,'hea');
+  var offNames=bstatHeroNames(row.heroesOff), defNames=bstatHeroNames(row.heroesDef);
   var perType={}, blendA=0, blendD=0;
   BSTAT_TYPES.forEach(function(t){
     var s=(row.troops&&row.troops[t])||{};
     var base=bstatBase(t,(row.tiers&&row.tiers[t])||'10.0');
-    var A=(1+bstatN(s.atk)/100)*wAtk*(1+bstatN(s.leth)/100)*wLeth;
-    var D=(1+bstatN(s.def)/100)*wDef*(1+bstatN(s.hp)/100)*wHea;
-    perType[t]={A:Math.round(A*1000)/1000, D:Math.round(D*1000)/1000, atkPower:base[0]*A, defPower:base[1]*D};
+    var skA=bstatLeaderMod(offNames,t,'atk'), skD=bstatLeaderMod(defNames,t,'def');
+    var A=(1+bstatN(s.atk)/100)*wAtk*(1+bstatN(s.leth)/100)*wLeth*skA;
+    var D=(1+bstatN(s.def)/100)*wDef*(1+bstatN(s.hp)/100)*wHea*skD;
+    perType[t]={A:Math.round(A*1000)/1000, D:Math.round(D*1000)/1000, skillA:Math.round(skA*1000)/1000, skillD:Math.round(skD*1000)/1000, atkPower:base[0]*A, defPower:base[1]*D};
     blendA+=(bstatN(rAtk[t])/sumA)*base[0]*A;
     blendD+=(bstatN(rDef[t])/sumD)*base[1]*D;
   });
@@ -7568,6 +7755,308 @@ function bstatScoreLocal(row,w){
   var capTerm=Math.sqrt(cap/(w.capMedian||1100000));
   var scale=w.scale||0.0008;
   return { perType:perType, atk:Math.round(blendA*capTerm*scale), def:Math.round(blendD*capTerm*scale) };
+}
+
+var TYPES = ['infantry','cavalry','archer'];
+var COUNTER = { infantry:'cavalry', cavalry:'archer', archer:'infantry' }; // A counters COUNTER[A]
+
+// seeded PRNG (mulberry32) so a run is reproducible
+function bstatRng(seed){ var a = seed>>>0; return function(){
+  a |= 0; a = (a + 0x6D2B79F5) | 0;
+  var t = Math.imul(a ^ (a>>>15), 1 | a);
+  t = (t + Math.imul(t ^ (t>>>7), 61 | t)) ^ t;
+  return ((t ^ (t>>>14)) >>> 0) / 4294967296;
+}; }
+
+// Flatten a trio's Expedition skills into per-op contributors, tagged with the
+// side they act on ('atk' = outgoing, 'def' = incoming mitigation).
+function bstatSideEntries(heroNames, levels){
+  var ents = [];
+  (heroNames||[]).forEach(function(name){
+    var h = REG[name]; if(!h) return;
+    var lv = (levels && levels[name]) || 5;
+    (h.exp||[]).forEach(function(sk){
+      if(sk.op === 'noncombat') return;
+      function push(op, vals){ ents.push({ op:op, side:SIDE[op], vals:vals, lv:lv,
+        kind:sk.kind, chance:sk.chance, period:sk.period, active:sk.active||1,
+        dot:sk.dot, restrict:sk.restrict, cond:sk.cond }); }
+      push(sk.op, sk.vals);
+      if(sk.pair) push(sk.pair.op, sk.pair.vals);
+    });
+  });
+  return ents;
+}
+
+// Instantaneous multiplier for one side+direction, rolling procs/periodics this attack.
+//   want='atk' (outgoing) or 'def' (incoming mitigation); terrorActive/hpFrac gate conditionals.
+function bstatRollMult(ents, want, turn, rng, myType, enemyType, terrorActive, hpFrac){
+  var byOp = {};
+  for(var i=0;i<ents.length;i++){
+    var e = ents[i]; if(e.side !== want) continue;
+    if(e.kind === 'dot') continue;                            // DoT handled as over-time damage
+    if(e.restrict && e.restrict.indexOf(myType) === -1) continue;
+    if(e.cond === 'terror' && !terrorActive) continue;        // terror gate
+    if(e.cond === 'lowHealth' && !(hpFrac < 0.5)) continue;   // low-health gate (hook)
+    var mag = e.vals[Math.max(1,Math.min(5,e.lv))-1] || 0;
+    var on = true;
+    if(e.kind === 'proc') on = rng() < (e.chance||0);
+    else if(e.kind === 'periodic') on = (turn % (e.period||1)) === 0;
+    if(e.cond === 'enemyType'){                               // Chain Shelling vs target type
+      if(enemyType === 'infantry') mag = mag * (25/30);
+      else if(enemyType !== 'archer') on = false;
+    }
+    if(on) byOp[e.op] = (byOp[e.op]||0) + mag;
+  }
+  var mult = 1; for(var kk in byOp) mult *= (1 + byOp[kk]/100);
+  return mult;
+}
+
+function bstatTotal(sq){ return sq.infantry.n + sq.cavalry.n + sq.archer.n; }
+function bstatFront(sq, ambushArcher){
+  if(ambushArcher && sq.archer.n > 0) return 'archer';
+  if(sq.infantry.n > 0) return 'infantry';
+  if(sq.cavalry.n > 0) return 'cavalry';
+  if(sq.archer.n > 0) return 'archer';
+  return null;
+}
+
+// One battle. Fully models Terror (self-enabling from round 2 when a terror hero is deployed)
+// and DoT (proc registers an over-time damage stream on the target). Returns result.
+function bstatOneBattle(A, B, rng, fatigue, k){
+  fatigue = fatigue || 1; k = k || 0.05;
+  function cp(s){ var o={}; TYPES.forEach(function(t){ o[t]={n:s[t].n, n0:s[t].n||1, atk:s[t].atk, hp:s[t].hp, def:s[t].def, dots:[]}; }); return o; }
+  var a = cp(A.squads), b = cp(B.squads);
+  var armyMin = Math.min(bstatTotal(a), bstatTotal(b)) || 1;
+  function has(ents,f){ for(var i=0;i<ents.length;i++) if(f(ents[i])) return true; return false; }
+  var aTerror = has(A.ents,function(e){return e.cond==='terror';});
+  var bTerror = has(B.ents,function(e){return e.cond==='terror';});
+  var aDots = A.ents.filter(function(e){return e.kind==='dot' && e.side==='atk';});
+  var bDots = B.ents.filter(function(e){return e.kind==='dot' && e.side==='atk';});
+
+  function sideAttack(att, attEnts, attTerror, attDots, def, defEnts, turn, dmgOut){
+    TYPES.forEach(function(mt){
+      var sq = att[mt]; if(sq.n <= 0) return;
+      var ambush = (mt === 'cavalry' && rng() < 0.20);
+      var tt = bstatFront(def, ambush); if(!tt) return;
+      var hits = (mt === 'archer' && rng() < 0.10) ? 2 : 1;
+      for(var h=0; h<hits; h++){
+        var target = def[tt]; if(target.n <= 0){ tt = bstatFront(def,false); if(!tt) break; target = def[tt]; }
+        var af = Math.sqrt(sq.n * armyMin);
+        var typeBonus = (COUNTER[mt] === tt) ? 1.10 : 1.0;
+        var terrorOn = attTerror && turn >= 2;
+        var off   = bstatRollMult(attEnts, 'atk', turn, rng, mt, tt, terrorOn, sq.n/sq.n0);
+        var mitig = bstatRollMult(defEnts, 'def', turn, rng, tt, mt, false, target.n/target.n0);
+        var dmg = k * af * (sq.atk / target.def) * typeBonus * (off / mitig) * fatigue;
+        dmgOut[tt] = (dmgOut[tt]||0) + dmg;
+        for(var d=0; d<attDots.length; d++){                 // register DoTs on the target
+          var ds = attDots[d];
+          if(ds.restrict && ds.restrict.indexOf(mt) === -1) continue;
+          if(rng() < (ds.chance||0)){
+            var dm = ds.vals[Math.max(1,Math.min(5,ds.lv))-1] || 0;
+            target.dots.push({ dpt: dmg * (dm/100), left: ds.dot||1 });
+          }
+        }
+      }
+    });
+  }
+  function applyDots(sq, dmgOut){
+    TYPES.forEach(function(t){
+      var s = sq[t]; if(!s.dots.length) return;
+      var sum = 0, keep = [];
+      for(var i=0;i<s.dots.length;i++){ sum += s.dots[i].dpt; s.dots[i].left--; if(s.dots[i].left>0) keep.push(s.dots[i]); }
+      s.dots = keep; dmgOut[t] = (dmgOut[t]||0) + sum;
+    });
+  }
+
+  var maxRounds = 60, turn = 0, winner = null;
+  for(turn = 1; turn <= maxRounds; turn++){
+    var dmgToB = {}, dmgToA = {};
+    sideAttack(a, A.ents, aTerror, aDots, b, B.ents, turn, dmgToB);
+    sideAttack(b, B.ents, bTerror, bDots, a, A.ents, turn, dmgToA);
+    applyDots(b, dmgToB); applyDots(a, dmgToA);
+    TYPES.forEach(function(t){
+      if(dmgToB[t]) b[t].n = Math.max(0, b[t].n - dmgToB[t]/b[t].hp);
+      if(dmgToA[t]) a[t].n = Math.max(0, a[t].n - dmgToA[t]/a[t].hp);
+    });
+    var ta = bstatTotal(a), tb = bstatTotal(b);
+    if(ta <= 0 || tb <= 0){ winner = (ta>tb)?'A':(tb>ta)?'B':'draw'; break; }
+  }
+  if(!winner){ var ta2=bstatTotal(a), tb2=bstatTotal(b); winner = (ta2>tb2)?'A':(tb2>ta2)?'B':'draw'; }
+  return { winner:winner, survA:Math.round(bstatTotal(a)), survB:Math.round(bstatTotal(b)), rounds:turn };
+}
+
+// Monte-Carlo: run N battles, aggregate win-rate + survivor distribution.
+function bstatMonteCarlo(A, B, opts){
+  opts = opts || {}; var N = opts.iters || 1000, fatigue = opts.fatigue || 1;
+  var rng = bstatRng(opts.seed || 12345);
+  var winA=0, winB=0, draw=0, sA=[], sB=[], rnds=0;
+  for(var i=0;i<N;i++){
+    var r = bstatOneBattle(A, B, rng, fatigue, opts.k);
+    if(r.winner==='A') winA++; else if(r.winner==='B') winB++; else draw++;
+    sA.push(r.survA); sB.push(r.survB); rnds += r.rounds;
+  }
+  function stats(arr){ var s=arr.slice().sort(function(x,y){return x-y;});
+    var sum=arr.reduce(function(p,c){return p+c;},0);
+    return { mean:Math.round(sum/arr.length), p10:s[Math.floor(N*0.10)], p50:s[Math.floor(N*0.5)], p90:s[Math.floor(N*0.90)], min:s[0], max:s[N-1] }; }
+  // histogram of A's survivors (10 bins) for the distribution chart
+  function hist(arr, bins){ var mx=Math.max.apply(null,arr)||1, h=new Array(bins).fill(0);
+    arr.forEach(function(v){ var b=Math.min(bins-1, Math.floor(v/mx*bins)); h[b]++; }); return {max:mx,bins:h}; }
+  return {
+    iters:N, winRateA:winA/N, winRateB:winB/N, drawRate:draw/N, avgRounds:Math.round(rnds/N),
+    survA:stats(sA), survB:stats(sB), histA:hist(sA,10), histB:hist(sB,10)
+  };
+}
+
+// ── Battle Simulator (client) ──────────────────────────────────────────────
+var REG = BSTAT_REGISTRY, SIDE = BSTAT_SIDE;   // engine hooks to the embedded registry
+
+function bstatBattleSide(inp){
+  var names=[], wExtra=[];
+  BSTAT_TYPES.forEach(function(ht){
+    var hq=inp.types[ht]||{}; if(hq.hero) names.push(hq.hero);
+    var h=hq.hero && REG[hq.hero]; if(!h||!h.widget) return;
+    // Scouted PvP report %s already include the widget STAT block; the widget's
+    // EXPEDITION skill (the +15% line) is hidden SkillMod, fed in here.
+    var op={atk:'atk',leth:'leth',def:'def',hea:'hp'}[h.widget.stat];
+    var pct=BSTAT_WIDGET_PCT[Math.max(1,Math.min(10,bstatN(hq.widgetLv)||10))]||0;
+    wExtra.push({op:op, side:BSTAT_SIDE[op], vals:[pct,pct,pct,pct,pct], lv:5,
+      kind:'static', chance:null, period:null, active:1, dot:null, restrict:null, cond:null});
+  });
+  var squads={};
+  BSTAT_TYPES.forEach(function(t){
+    var q=inp.types[t]||{}, base=bstatBase(t, q.tier||'10.0');
+    squads[t]={ n:Math.max(0,bstatN(q.n)),
+      atk: base[0]*(1+bstatN(q.atk)/100)*(1+bstatN(q.leth)/100),
+      hp:  base[1]*(1+bstatN(q.hp)/100),
+      def: 10*(1+bstatN(q.def)/100) };
+  });
+  var ents = bstatSideEntries(names, {}).concat(wExtra).concat(bstatJoinerEntries(inp.joiners));
+  return { squads:squads, ents: ents };
+}
+
+// tier <option>s built from the base table keys (same set for every type)
+function bstatTierOpts(sel){
+  var keys=Object.keys(BSTAT_BASE.infantry), out='';
+  keys.forEach(function(k){
+    var p=k.split('.'), lab='T'+p[0]+(p[1]==='0'?'':' TG'+p[1]);
+    out+='<option value="'+k+'"'+(k===sel?' selected':'')+'>'+lab+'</option>';
+  });
+  return out;
+}
+function bstatHeroOpts(type, sel){
+  var out='<option value="">\u2014</option>';
+  Object.keys(REG).forEach(function(n){ if(REG[n].type!==type) return;
+    out+='<option value="'+n+'"'+(n===sel?' selected':'')+'>'+n+'</option>'; });
+  return out;
+}
+function bstatWlvOpts(sel){
+  var out='<option value="0">\u2014</option>';
+  for(var i=1;i<=10;i++) out+='<option value="'+i+'"'+(i===sel?' selected':'')+'>lv'+i+'</option>';
+  return out;
+}
+function bstatAllHeroOpts(sel){
+  var out='<option value="">\u2014</option>';
+  Object.keys(REG).forEach(function(n){ if(REG[n].exp && REG[n].exp.length===0) return;
+    out+='<option value="'+n+'"'+(n===sel?' selected':'')+'>'+n+' ('+REG[n].type.slice(0,3)+')</option>'; });
+  return out;
+}
+// Joiner entries: first Expedition skill only; identical proc/dot copies count once.
+function bstatJoinerEntries(names){
+  var ents=[], seen={};
+  (names||[]).forEach(function(n){ var h=REG[n]; if(!h||!h.exp||!h.exp[0]) return;
+    var sk=h.exp[0]; if(sk.op==='noncombat') return;
+    if(sk.kind==='proc'||sk.kind==='dot'){ var key=n+':'+sk.name; if(seen[key]) return; seen[key]=true; }
+    function push(op,vals){ ents.push({op:op,side:SIDE[op],vals:vals,lv:5,kind:sk.kind,chance:sk.chance,period:sk.period,active:sk.active||1,dot:sk.dot,restrict:sk.restrict,cond:sk.cond}); }
+    push(sk.op, sk.vals); if(sk.pair) push(sk.pair.op, sk.pair.vals);
+  });
+  return ents;
+}
+
+// Build one side's input form into a container. side = 'you' | 'enemy'.
+function bstatBattleForm(side, role){
+  var rows=[['infantry','INF','inf'],['cavalry','CAV','cav'],['archer','ARC','arc']];
+  var def={you:{n:20000},enemy:{n:20000}};
+  var h='<div class="bstatBrow bstatBhead"><span></span><span>Troops</span><span>Tier</span><span>Atk%</span><span>Leth%</span><span>Def%</span><span>HP%</span><span>Hero</span><span>Wgt</span></div>';
+  rows.forEach(function(r){
+    var id=side+'_'+r[0];
+    h+='<div class="bstatBrow">'
+      +'<span class="bstatSlot '+r[2]+'">'+r[1]+'</span>'
+      +'<input type="number" id="'+id+'_n" value="'+(r[0]==='infantry'?20000:(r[0]==='cavalry'?8000:12000))+'">'
+      +'<select id="'+id+'_tier">'+bstatTierOpts('10.0')+'</select>'
+      +'<input type="number" id="'+id+'_atk" value="0">'
+      +'<input type="number" id="'+id+'_leth" value="0">'
+      +'<input type="number" id="'+id+'_def" value="0">'
+      +'<input type="number" id="'+id+'_hp" value="0">'
+      +'<select id="'+id+'_hero">'+bstatHeroOpts(r[0],'')+'</select>'
+      +'<select id="'+id+'_wlv">'+bstatWlvOpts(10)+'</select>'
+      +'</div>';
+  });
+  var roleSel='<div class="bstatBrole">Role '
+    +'<select id="'+side+'_role">'
+    +'<option value="attack"'+(role==='attack'?' selected':'')+'>Attacking (offensive widgets)</option>'
+    +'<option value="defend"'+(role==='defend'?' selected':'')+'>Defending (defensive widgets)</option>'
+    +'</select></div>';
+  var jo='<div class="bstatBjoin"><div class="bstatBjoinT">Joiners <span class="bstatHint">first skill each, up to 4</span></div><div class="bstatBjoinRow">';
+  for(var ji=1;ji<=4;ji++){ jo+='<select id="'+side+'_j'+ji+'">'+bstatAllHeroOpts('')+'</select>'; }
+  jo+='</div></div>';
+  return roleSel+h+jo;
+}
+
+function bstatRenderBattle(){
+  var you=document.getElementById('bstatBattleYou'), en=document.getElementById('bstatBattleEnemy');
+  if(you && !you.getAttribute('data-built')){ you.innerHTML=bstatBattleForm('you','attack'); you.setAttribute('data-built','1'); }
+  if(en && !en.getAttribute('data-built')){ en.innerHTML=bstatBattleForm('enemy','defend'); en.setAttribute('data-built','1'); }
+}
+
+function bstatReadSide(side){
+  function v(id){ var e=document.getElementById(side+'_'+id); return e?e.value:''; }
+  var types={};
+  BSTAT_TYPES.forEach(function(t){
+    types[t]={ n:v(t+'_n'), tier:v(t+'_tier'), atk:v(t+'_atk'), leth:v(t+'_leth'),
+      def:v(t+'_def'), hp:v(t+'_hp'), hero:v(t+'_hero'), widgetLv:v(t+'_wlv') };
+  });
+  var roleEl=document.getElementById(side+'_role');
+  var joiners=[]; for(var ji=1;ji<=4;ji++){ var jv=v('j'+ji); if(jv) joiners.push(jv); }
+  return { role:roleEl?roleEl.value:'attack', types:types, joiners:joiners };
+}
+
+function bstatBattleHisto(bins, max, color){
+  var w=280,hh=70,n=bins.length,bw=w/n, mx=Math.max.apply(null,bins)||1, out='';
+  for(var i=0;i<n;i++){ var bh=Math.round(bins[i]/mx*hh);
+    out+='<rect x="'+(i*bw+1).toFixed(1)+'" y="'+(hh-bh)+'" width="'+(bw-2).toFixed(1)+'" height="'+bh+'" fill="'+color+'" opacity="0.85"></rect>'; }
+  return '<svg viewBox="0 0 '+w+' '+hh+'" width="100%" height="70" preserveAspectRatio="none">'+out+'</svg>'
+    +'<div class="bstatBhistax"><span>0 residents</span><span>'+Math.round(max).toLocaleString()+'</span></div>';
+}
+
+function bstatRunBattle(){
+  var A=bstatBattleSide(bstatReadSide('you')), B=bstatBattleSide(bstatReadSide('enemy'));
+  var r=bstatMonteCarlo(A,B,{iters:1000, k:0.1});
+  var card=document.getElementById('bstatBattleResultCard'); if(card) card.style.display='block';
+  var startA=A.squads.infantry.n+A.squads.cavalry.n+A.squads.archer.n;
+  var startB=B.squads.infantry.n+B.squads.cavalry.n+B.squads.archer.n;
+  function bstatInj(sv,start){ var res=Math.round(sv.mean), dmg=Math.max(0,start-res);
+    return { res:res, inj:Math.round(dmg*0.35), lig:Math.round(dmg*0.65), p10:sv.p10, p90:sv.p90 }; }
+  var sA=bstatInj(r.survA,startA), sB=bstatInj(r.survB,startB);
+  var pa=(r.winRateA*100), pb=(r.winRateB*100), pd=(r.drawRate*100);
+  var verdict = pa>=65?'Favoured':(pa>=45?'Coin-flip':(pa>=20?'Underdog':'Unfavoured'));
+  var html=''
+    +'<div class="bstatBverdict">'+verdict+' \u2014 you win <b>'+pa.toFixed(1)+'%</b> of 1000 battles'
+    +' <span class="bstatHint">enemy '+pb.toFixed(1)+'% \u00b7 draw '+pd.toFixed(1)+'% \u00b7 ~'+r.avgRounds+' rounds</span></div>'
+    +'<div class="bstatBbar"><div class="bstatBbarY" style="width:'+pa.toFixed(1)+'%"></div>'
+      +'<div class="bstatBbarD" style="width:'+pd.toFixed(1)+'%"></div>'
+      +'<div class="bstatBbarE" style="width:'+pb.toFixed(1)+'%"></div></div>'
+    +'<div class="bstatBcols">'
+    +'<div><div class="bstatBcolT atk">Your side residents</div>'
+      +'<div class="bstatBstat">residents <b>'+sA.res.toLocaleString()+'</b> <span class="bstatHint">(p10\u2013p90 '+sA.p10.toLocaleString()+'\u2013'+sA.p90.toLocaleString()+')</span></div>'
+      +'<div class="bstatHint">injured '+sA.inj.toLocaleString()+' \u00b7 lightly '+sA.lig.toLocaleString()+'</div>'
+      +bstatBattleHisto(r.histA.bins, r.histA.max, 'var(--gold)')+'</div>'
+    +'<div><div class="bstatBcolT def">Enemy side residents</div>'
+      +'<div class="bstatBstat">residents <b>'+sB.res.toLocaleString()+'</b> <span class="bstatHint">(p10\u2013p90 '+sB.p10.toLocaleString()+'\u2013'+sB.p90.toLocaleString()+')</span></div>'
+      +'<div class="bstatHint">injured '+sB.inj.toLocaleString()+' \u00b7 lightly '+sB.lig.toLocaleString()+'</div>'
+      +bstatBattleHisto(r.histB.bins, r.histB.max, '#c65')+'</div>'
+    +'</div>'
+    +'<div class="bstatNote" style="margin:14px 0 0"><b>Reading it.</b> Winner keeps <b>residents</b> (intact troops); injured need healing, lightly injured return home free (35/65 of the damaged). Winner prediction is validated against real battle reports; absolute resident counts are a ballpark \u2014 composition and counter effects make close fights swingier than the exact numbers imply.</div>';
+  var out=document.getElementById('bstatBattleResult'); if(out) out.innerHTML=html;
 }
 
 // ── sub-tab switching ──
@@ -7580,6 +8069,7 @@ function bstatTab(p){
   if(p==='rank') bstatRenderRank();
   if(p==='prog') bstatRenderProg();
   if(p==='wt') bstatRenderWeights();
+  if(p==='battle') bstatRenderBattle();
 }
 
 // ── hero pickers ──
@@ -8277,6 +8767,244 @@ const BSTAT_HEROES = {
 const BSTAT_ATK_OPS = { 101:1, 102:1, 103:1, 201:1, 202:1, 211:1, 212:1 }; // families that help attack
 const BSTAT_DEF_OPS = { 111:1, 112:1, 113:1 };                            // families that help defense
 
+var BSTAT_SIDE = {
+  leth:'atk', atk:'atk', dmgDealt:'atk', skillDmg:'atk', enDefDown:'atk', enDmgTakenUp:'atk',
+  dmgTakenDown:'def', def:'def', hp:'def', enAtkDown:'def', enDmgDown:'def', enLethDown:'def'
+};
+function bstatMkStatic(name, op, vals, extra){ return Object.assign({ name:name, op:op, kind:'static', vals:vals,
+  chance:null, period:null, active:null, dot:null, restrict:null, cond:null }, extra||{}); }
+function bstatMkProc(name, op, vals, chance, extra){ return Object.assign(bstatMkStatic(name,op,vals,extra), { kind:'proc', chance:chance }); }
+
+// widget helper: role 'off'|'def', stat 'atk'|'leth'|'def'|'hea'
+function bstatMkWidget(role, stat){ return { role:role, stat:stat, vals:[5,7.5,10,12.5,15] }; }
+
+var BSTAT_REGISTRY = {
+  // ========================= GENERATION 7 (Mythic) =========================
+  'Ava': { gen:7, type:'cavalry', rarity:'mythic', widget:bstatMkWidget('off','leth'), exp:[
+    bstatMkStatic('Dissolution','enDefDown',[5,10,15,20,25]),                                   // enemy total Defense down (static)
+    bstatMkStatic('Chiaroscuro','enDmgTakenUp',[10,20,30,40,50],{kind:'periodic',period:4,active:2}), // enemy +dmg-taken 2 of every 4 turns
+    bstatMkStatic('Light and Cold','leth',[5,10,15,20,25])
+  ]},
+  'Charles': { gen:7, type:'infantry', rarity:'mythic', widget:bstatMkWidget('def','hea'), exp:[
+    bstatMkStatic('Intimidation','enLethDown',[4,8,12,16,20]),   // enemy Lethality down (reduces enemy damage)
+    bstatMkStatic('Iron Bodies','dmgTakenDown',[4,8,12,16,20]),
+    bstatMkStatic('Great Justice','hp',[5,10,15,20,25])
+  ]},
+  'Wee & Woo': { gen:7, type:'archer', rarity:'mythic', widget:bstatMkWidget('def','atk'), exp:[
+    bstatMkStatic('Artillerymen','atk',[3,6,9,12,15],{pair:{op:'leth',vals:[2,4,6,8,10]}}),     // dual: +15 Atk & +10 Leth
+    bstatMkStatic('Chain Shelling','dmgDealt',[6,12,18,24,30],{cond:'enemyType',note:'vs Archer +30 / vs Infantry +25'}),
+    bstatMkProc('Boom Boom','dmgDealt',[50,50,50,50,50],0.50)
+  ]},
+
+  // ========================= GENERATION 6 (Mythic) =========================
+  'Sophia': { gen:6, type:'cavalry', rarity:'mythic', widget:bstatMkWidget('def','leth'), exp:[
+    bstatMkProc('Arcane Pact','dmgTakenDown',[50,50,50,50,50],0.40),  // 40% chance -50% dmg taken (chance scales 8..40; magnitude 50)
+    bstatMkStatic('Terror - Deathblow','enDmgTakenUp',[40,80,120,160,200],{kind:'periodic',period:2,active:1,restrict:['cavalry'],cond:'terror'}),
+    bstatMkStatic('Terror - Annihilation','dmgDealt',[15,30,45,60,75],{cond:'terror'})
+  ]},
+  'Triton': { gen:6, type:'infantry', rarity:'mythic', widget:bstatMkWidget('def','def'), exp:[
+    bstatMkStatic('Command of Power','def',[5,10,15,20,25]),
+    bstatMkStatic('Warfare of Power','skillDmg',[6,12,18,24,30]),
+    bstatMkStatic('Oath of Power','hp',[4,8,12,16,20],{note:'Inf +20 / Cav+Arc +30 — per-type'})
+  ]},
+  'Yang': { gen:6, type:'archer', rarity:'mythic', widget:bstatMkWidget('off','leth'), exp:[
+    bstatMkStatic('Avalanche','dmgDealt',[20,40,60,80,100],{kind:'periodic',period:4,active:1}), // extra strike every 4 turns
+    bstatMkProc('Ice Zone','dmgDealt',[20,40,60,80,100],0.40,{restrict:['archer']}),
+    bstatMkProc('Ambush','dmgDealt',[0,0,0,0,0],0.40,{note:'magnitude NOT on page — needs value'})
+  ]},
+
+  // ========================= GENERATION 5 (Mythic) =========================
+  'Thrud': { gen:5, type:'cavalry', rarity:'mythic', widget:bstatMkWidget('off','leth'), exp:[
+    bstatMkStatic('Battle Hunger','dmgDealt',[3,6,9,12,15],{restrict:['infantry','archer'],pair:{op:'dmgTakenDown',vals:[3,6,9,12,15]}}),
+    bstatMkProc('Reckless Charge','dmgDealt',[20,40,60,80,100],0.20,{restrict:['cavalry']}),
+    bstatMkStatic('Ancestral Guidance','dmgDealt',[5,10,15,20,25],{kind:'periodic',period:4,active:2,note:'also -25% dmg-taken'})
+  ]},
+  'Long Fei': { gen:5, type:'infantry', rarity:'mythic', widget:bstatMkWidget('def','atk'), exp:[
+    bstatMkProc('Mighty Paragon','dmgTakenDown',[10,20,30,40,50],0.40),
+    bstatMkStatic('Celestial Sustenance','def',[5,10,15,20,25]),
+    bstatMkProc('Art of War','dmgDealt',[120,140,160,180,200],0.25)
+  ]},
+  'Vivian': { gen:5, type:'archer', rarity:'mythic', widget:bstatMkWidget('def','def'), exp:[
+    bstatMkStatic('Crouching Tiger','enDmgTakenUp',[5,10,15,20,25]),                             // static, global — strong
+    bstatMkStatic('Focus Fire','dmgDealt',[20,40,60,80,100],{kind:'periodic',period:4,active:1,note:'+15% enemy dmg-taken next hit'}),
+    bstatMkStatic('Trap of Greed','dmgDealt',[12,24,36,48,60],{kind:'periodic',period:4,active:1,restrict:['archer']})
+  ]},
+
+  // ========================= GENERATION 4 (Mythic) =========================
+  'Margot': { gen:4, type:'cavalry', rarity:'mythic', widget:bstatMkWidget('def','leth'), exp:[
+    bstatMkStatic('Warbringer','atk',[5,10,15,20,25]),
+    bstatMkProc('Subterfuge','dmgTakenDown',[4,8,12,16,20],0.20,{note:'dodge (evasion)'}),
+    bstatMkProc('Sleight Hand','dmgDealt',[120,140,160,180,200],0.25,{restrict:['cavalry']})
+  ]},
+  'Alcar': { gen:4, type:'infantry', rarity:'mythic', widget:bstatMkWidget('def','hea'), exp:[
+    bstatMkStatic('Rescuing Hands','dmgTakenDown',[14,28,42,56,70],{kind:'periodic',period:5,active:2,restrict:['infantry','archer']}),
+    bstatMkStatic('Praetorian Will','dmgDealt',[20,40,60,80,100],{restrict:['infantry'],note:'Cav+Arc only +10'}),
+    bstatMkStatic('Capre Diem','dmgDealt',[12,24,36,48,60],{restrict:['infantry'],note:'also +25% enemy dmg-taken 1 turn'})
+  ]},
+  'Rosa': { gen:4, type:'archer', rarity:'mythic', widget:bstatMkWidget('off','leth'), exp:[
+    bstatMkProc('Chaos Gambit','dmgDealt',[10,20,30,40,50],0.40),
+    bstatMkStatic('Rose of War','enDmgDown',[4,8,12,16,20]),
+    bstatMkStatic('Golden Rhythm','atk',[6,12,18,24,30],{restrict:['archer']})
+  ]},
+
+  // ========================= GENERATION 3 (Mythic) =========================
+  'Jaeger': { gen:3, type:'archer', rarity:'mythic', widget:bstatMkWidget('def','hea'), exp:[
+    bstatMkProc('The Tempest','dmgDealt',[8,16,24,32,40],0.20,{active:3}),
+    bstatMkProc('The Resistance','enLethDown',[10,20,30,40,50],0.20,{active:2}),
+    bstatMkStatic('The Celebration','hp',[5,10,15,20,25])
+  ]},
+  'Eric': { gen:3, type:'infantry', rarity:'mythic', widget:bstatMkWidget('def','def'), exp:[
+    bstatMkStatic('Holy Warrior','enAtkDown',[4,8,12,16,20]),
+    bstatMkStatic('Conviction','dmgTakenDown',[4,8,12,16,20]),
+    bstatMkStatic('Exhortation','hp',[5,10,15,20,25])
+  ]},
+  'Petra': { gen:3, type:'cavalry', rarity:'mythic', widget:bstatMkWidget('off','atk'), exp:[
+    bstatMkProc('Evil Eye','enDmgTakenUp',[10,20,30,40,50],0.50),
+    bstatMkProc('The Favor','atk',[10,20,30,40,50],0.50),
+    bstatMkProc('The Shield','dmgTakenDown',[10,20,30,40,50],0.40,{note:'desc says 40% chance / 50% reduce'})
+  ]},
+
+  // ========================= GENERATION 2 (Mythic) =========================
+  'Hilde': { gen:2, type:'cavalry', rarity:'mythic', widget:bstatMkWidget('def','hea'), exp:[
+    bstatMkStatic('Noble Path','atk',[3,6,9,12,15],{pair:{op:'def',vals:[2,4,6,8,10]}}),
+    bstatMkProc('Elixir of Strength','dmgDealt',[120,140,160,180,200],0.25),
+    bstatMkProc('Trial by Fire','dmgTakenDown',[50,50,50,50,50],0.40)
+  ]},
+  'Zoe': { gen:2, type:'infantry', rarity:'mythic', widget:bstatMkWidget('def','atk'), exp:[
+    bstatMkProc('Sundering Wound','dmgDealt',[8,16,24,32,40],0.20,{kind:'dot',dot:3}),
+    bstatMkStatic('Stoic','atk',[5,10,15,20,25]),
+    bstatMkProc('Infinite Arsenal','enDmgTakenUp',[10,20,30,40,50],0.50)
+  ]},
+  'Marlin': { gen:2, type:'archer', rarity:'mythic', widget:bstatMkWidget('off','leth'), exp:[
+    bstatMkProc('Wild Card','dmgDealt',[50,50,50,50,50],0.40),
+    bstatMkProc('Rumhead','enLethDown',[10,20,30,40,50],0.20,{active:2}),
+    bstatMkProc('Dynamo','dmgDealt',[10,20,30,40,50],0.50)
+  ]},
+
+  // ========================= GENERATION 1 (Mythic) =========================
+  'Jabel': { gen:1, type:'cavalry', rarity:'mythic', widget:bstatMkWidget('def','leth'), exp:[
+    bstatMkProc('Rally Flag','dmgTakenDown',[50,50,50,50,50],0.40),   // CORRECTED: defensive proc (doc4 was wrong)
+    bstatMkProc("Hero's Domain",'dmgDealt',[10,20,30,40,50],0.50),
+    bstatMkStatic('Youthful Rage','leth',[5,10,15,20,25])
+  ]},
+  'Amadeus': { gen:1, type:'infantry', rarity:'mythic', widget:bstatMkWidget('off','atk'), exp:[
+    bstatMkStatic('Battle Ready','leth',[5,10,15,20,25]),
+    bstatMkStatic('Way of the Blade','atk',[5,10,15,20,25]),
+    bstatMkProc('Unrighteous Strike','dmgDealt',[50,50,50,50,50],0.40)
+  ]},
+  'Helga': { gen:1, type:'infantry', rarity:'mythic', widget:bstatMkWidget('off','leth'), exp:[
+    bstatMkProc('Oath of Guardian','dmgTakenDown',[50,50,50,50,50],0.40),
+    bstatMkStatic('Echoes of Valhalla','atk',[5,10,15,20,25]),
+    bstatMkStatic("Nature's Balance",'leth',[5,10,15,20,25])
+  ]},
+  'Saul': { gen:1, type:'archer', rarity:'mythic', widget:bstatMkWidget('def','atk'), exp:[
+    bstatMkStatic('Taskforce Training','def',[2,4,6,8,10],{pair:{op:'hp',vals:[3,6,9,12,15]}}),
+    bstatMkStatic('Resourceful','noncombat',[0,0,0,0,0]),
+    bstatMkStatic('Positional Batter','leth',[5,10,15,20,25])
+  ]},
+
+  // ============================ EPIC (no widget) ===========================
+  'Chenko': { gen:1, type:'cavalry', rarity:'epic', widget:null, exp:[
+    bstatMkStatic('Stand of Arms','leth',[5,10,15,20,25]),
+    bstatMkStatic('Shield Wall','dmgTakenDown',[4,8,12,16,20])
+  ]},
+  'Yeonwoo': { gen:1, type:'archer', rarity:'epic', widget:null, exp:[
+    bstatMkStatic('On Guard','leth',[5,10,15,20,25]),
+    bstatMkStatic('Well-Traveled','noncombat',[0,0,0,0,0])
+  ]},
+  'Amane': { gen:1, type:'archer', rarity:'epic', widget:null, exp:[
+    bstatMkStatic('Tri-Phalanx','atk',[5,10,15,20,25]),
+    bstatMkStatic('Exorcism','noncombat',[0,0,0,0,0])
+  ]},
+  'Gordon': { gen:1, type:'cavalry', rarity:'epic', widget:null, exp:[
+    bstatMkStatic('Super Nutrients','hp',[5,10,15,20,25]),
+    bstatMkStatic('Trash Talk','atk',[5,10,15,20,25])
+  ]},
+  'Howard': { gen:1, type:'infantry', rarity:'epic', widget:null, exp:[
+    bstatMkStatic("Defenders' Edge",'dmgTakenDown',[4,8,12,16,20]),
+    bstatMkStatic('Weaken','enAtkDown',[4,8,12,16,20])
+  ]},
+  'Quinn': { gen:1, type:'archer', rarity:'epic', widget:null, exp:[
+    bstatMkStatic('Sixth Sense','dmgTakenDown',[4,8,12,16,20]),
+    bstatMkProc('Precision Shot','dmgDealt',[50,50,50,50,50],0.50)
+  ]},
+  'Fahd': { gen:1, type:'cavalry', rarity:'epic', widget:null, exp:[
+    bstatMkStatic('Desert Eclipse','enDmgDown',[4,8,12,16,20]),
+    bstatMkStatic('Pathfinder','noncombat',[0,0,0,0,0])
+  ]}
+};
+
+// ---------------------------------------------------------------------------
+// EV contribution of one skill (for the deterministic Ranking tab).
+//   static  -> magnitude
+//   proc    -> magnitude × chance
+//   periodic-> magnitude × (active/period)
+//   dot     -> magnitude × chance × dot   (avg per-turn × turns, rough)
+// Returns { op, side, value, applies(troopType) }.
+// ---------------------------------------------------------------------------
+function bstatSkillEVs(skill, level){
+  if(skill.op === 'noncombat') return [];
+  if(skill.cond) return [];   // conditional (terror/lowHealth/enemyType): sim-only, excluded from EV
+  var lv = Math.max(1, Math.min(5, level||5));
+  function ev(op, vals){
+    var mag = (vals && vals[lv-1]) || 0, v = mag;
+    if(skill.kind === 'proc')     v = mag * (skill.chance||0);
+    if(skill.kind === 'periodic') v = mag * ((skill.active||1) / (skill.period||1));
+    if(skill.kind === 'dot')      v = mag * (skill.chance||1) * (skill.dot||1);
+    return { op:op, side:BSTAT_SIDE[op], value:v, restrict:skill.restrict };
+  }
+  var out = [ ev(skill.op, skill.vals) ];
+  if(skill.pair) out.push(ev(skill.pair.op, skill.pair.vals));
+  return out;
+}
+
+// Resolve a LEADER's SkillMod for one troop type + side ('atk'|'def').
+// Leader fires ALL expedition skills of ALL heroes in the trio (+ any 'extra' paired ops).
+// Rule: sum within an op, multiply across distinct ops.
+function bstatLeaderMod(heroNames, troopType, side, levels){
+  var byOp = {};
+  (heroNames||[]).forEach(function(name){
+    var h = BSTAT_REGISTRY[name]; if(!h) return;
+    (h.exp||[]).forEach(function(sk){
+      bstatSkillEVs(sk, (levels && levels[name]) || 5).forEach(function(ev){
+        if(ev.side !== side) return;
+        if(ev.restrict && ev.restrict.indexOf(troopType) === -1) return; // restricted, wrong type
+        byOp[ev.op] = (byOp[ev.op] || 0) + ev.value;
+      });
+    });
+  });
+  var mult = 1;
+  Object.keys(byOp).forEach(function(op){ mult *= (1 + byOp[op] / 100); });
+  return mult;
+}
+
+// Resolve JOINERS' SkillMod. Each joiner = FIRST expedition skill only.
+// Proc first-skills DO NOT stack across identical copies (4 Marlin = 1 roll);
+// static first-skills DO stack additively within their op.
+function bstatJoinerMod(joinerNames, troopType, side){
+  var byOp = {}, seenProc = {};
+  (joinerNames||[]).forEach(function(name){
+    var h = BSTAT_REGISTRY[name]; if(!h || !h.exp || !h.exp[0]) return;
+    var sk = h.exp[0];
+    if(sk.kind === 'proc' || sk.kind === 'dot'){
+      var key = name + ':' + sk.name;
+      if(seenProc[key]) return;            // identical proc copy -> count once
+      seenProc[key] = true;
+    }
+    bstatSkillEVs(sk, 5).forEach(function(ev){
+      if(ev.side !== side) return;
+      if(ev.restrict && ev.restrict.indexOf(troopType) === -1) return;
+      byOp[ev.op] = (byOp[ev.op] || 0) + ev.value;
+    });
+  });
+  var mult = 1;
+  Object.keys(byOp).forEach(function(op){ mult *= (1 + byOp[op] / 100); });
+  return mult;
+}
+
+// [names] from a hero set { infantry:{hero}, cavalry:{hero}, archer:{hero} }
+function bstatHeroNames(set){ return ["infantry","cavalry","archer"].map(function(t){ return set&&set[t]&&set[t].hero; }).filter(Boolean); }
+
 function bstatNum(v){ const n = Number(v); return isFinite(n) ? n : 0; }
 
 // Base stats [base_att, base_hea] for a troop type at a tier string ("9.0","10.3","11.5").
@@ -8320,17 +9048,19 @@ function bstatScore(row, weights){
   const wLeth = bstatWidgetMult(row.heroesOff, 'leth');
   const wDef  = bstatWidgetMult(row.heroesDef, 'def');
   const wHea  = bstatWidgetMult(row.heroesDef, 'hea');
+  const offNames = bstatHeroNames(row.heroesOff), defNames = bstatHeroNames(row.heroesDef);
 
   const perType = {};
   let blendA = 0, blendD = 0;
   types.forEach(function(t){
     const s = (row.troops && row.troops[t]) || {};
     const base = bstatBase(t, (row.tiers && row.tiers[t]) || '10.0');
-    const A = (1 + bstatNum(s.atk)/100) * wAtk * (1 + bstatNum(s.leth)/100) * wLeth;
-    const D = (1 + bstatNum(s.def)/100) * wDef * (1 + bstatNum(s.hp)/100)  * wHea;
+    const skA = bstatLeaderMod(offNames, t, 'atk'), skD = bstatLeaderMod(defNames, t, 'def');
+    const A = (1 + bstatNum(s.atk)/100) * wAtk * (1 + bstatNum(s.leth)/100) * wLeth * skA;
+    const D = (1 + bstatNum(s.def)/100) * wDef * (1 + bstatNum(s.hp)/100)  * wHea * skD;
     const atkPower = base[0] * A;   // scales with base_att
     const defPower = base[1] * D;   // scales with base_hea
-    perType[t] = { A: Math.round(A*1000)/1000, D: Math.round(D*1000)/1000, atkPower: atkPower, defPower: defPower };
+    perType[t] = { A: Math.round(A*1000)/1000, D: Math.round(D*1000)/1000, skillA: Math.round(skA*1000)/1000, skillD: Math.round(skD*1000)/1000, atkPower: atkPower, defPower: defPower };
     blendA += (bstatNum(rAtk[t]) / sumA) * atkPower;
     blendD += (bstatNum(rDef[t]) / sumD) * defPower;
   });
