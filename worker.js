@@ -981,6 +981,7 @@ document.addEventListener('touchend',function(e){
   <div class="tab active" onclick="showPage('strategy')">Battle Strategy</div>
   <div class="tab" onclick="showPage('minister')">Minister Spots</div>
   <div class="tab" id="tabBattleStats" onclick="showPage('battlestats')" style="display:none">Battle Stats</div>
+  <div class="tab" id="tabBattleSim" onclick="showPage('battlesim')" style="display:none">Battle Sim</div>
   <div class="tab" id="tabSwordland" onclick="showPage('swordland')" style="display:none">Swordland</div>
   <div class="tab" id="tabTrialliance" onclick="showPage('trialliance')" style="display:none">Tri Alliance</div>
   <div class="tab" id="tabAdmin" onclick="showPage('admin')" style="display:none">⚙️ Admin</div>
@@ -2071,6 +2072,13 @@ function showPage(p) {
   if(p==='setup') renderSetup();
   if(p==='coordinator') renderLeaderTable();
   if(p==='minister') msInit();
+  if(p==='battlesim'){
+    if(!(typeof isAdmin==='function' && isAdmin())){
+      if(typeof toast==='function') toast('Battle Simulator is admin-only for now.');
+      return;
+    }
+    bsimTab('start');
+  }
 }
 
 // UTC clock
@@ -6159,9 +6167,9 @@ function enterApp(role) {
   const adminTab = document.getElementById('tabAdmin');
   if(adminTab) adminTab.style.display = isAdm ? '' : 'none';
 
-  // Battle Sim sub-tab (deterministic engine preview) — ADMIN ONLY
-  const bsimSub = document.getElementById('bstatSubtabBattle');
-  if(bsimSub) bsimSub.style.display = isAdm ? '' : 'none';
+  // Battle Sim top-level tab (deterministic engine preview) — ADMIN ONLY
+  const bsimTabEl = document.getElementById('tabBattleSim');
+  if(bsimTabEl) bsimTabEl.style.display = isAdm ? '' : 'none';
 
   // Battle Stats — admin only for now. To open to rally leaders later, change this to
   // (isRally || isR4 || isAdm) AND relax the server /battle-stats + KEY_MIN_ROLE gates.
@@ -7137,7 +7145,6 @@ document.addEventListener('DOMContentLoaded', initApp);
       <div class="bstatSubtab" data-p="rank" onclick="bstatTab('rank')">Rankings</div>
       <div class="bstatSubtab" data-p="prog" onclick="bstatTab('prog')">My Progress</div>
       <div class="bstatSubtab" data-p="wt" onclick="bstatTab('wt')">Weights</div>
-      <div class="bstatSubtab" data-p="battle" id="bstatSubtabBattle" style="display:none" onclick="bstatTab('battle')">Battle Sim</div>
       <div class="bstatSubtab" data-p="how" onclick="bstatTab('how')">How scoring works</div>
     </div>
 
@@ -7320,27 +7327,6 @@ per type:  atkPower = base_att <span class="bstatK">×</span> <span class="bstat
       </div>
     </div>
 
-    <!-- battle sim -->
-    <div class="bstatPane" id="bstatPane-battle">
-      <div class="bstatCard">
-        <div class="bstatCardT">Battle Simulator <span class="bstatHint">Monte-Carlo, 1000 fights</span></div>
-        <div class="bstatNote" style="margin:0 0 14px"><b>Full scout in, distribution out.</b> Enter both armies - troops, tiers, the four stat percentages per type, and the heroes you scouted. It runs 1000 turn-by-turn battles and reports win-rate plus how many troops survive, with the spread.</div>
-        <div class="bstatBattleSides">
-          <div class="bstatCard" style="margin:0"><div class="bstatCardT">Your side</div><div id="bstatBattleYou"></div></div>
-          <div class="bstatCard" style="margin:0"><div class="bstatCardT">Enemy side</div><div id="bstatBattleEnemy"></div></div>
-        </div>
-        <div class="bstatFoot" style="margin-top:14px">
-          <span class="bstatFootNote">Widgets fire only in the matching role - offensive on attack, defensive on defense.</span>
-          <button class="bstatBtnPrimary" id="bstatRunBtn" onclick="bstatRunBattle()">Run Simulator</button>
-          <button class="bstatBtn" id="bstatRunMcBtn" onclick="bstatRunBattleMC()" title="Monte-Carlo spread — optional uncertainty view">Uncertainty (1000 MC)</button>
-        </div>
-      </div>
-      <div class="bstatCard" id="bstatBattleResultCard" style="display:none">
-        <div class="bstatCardT">Result</div>
-        <div id="bstatBattleResult"></div>
-      </div>
-    </div>
-
   </div>
 </div>
 
@@ -7455,6 +7441,131 @@ per type:  atkPower = base_att <span class="bstatK">×</span> <span class="bstat
   #page-battlestats .bstatTTBody{grid-template-columns:repeat(2,1fr)}
   #page-battlestats .bstatGrid3{grid-template-columns:1fr}
 }
+
+/* ── Battle Sim page: reuses the bstat rules above, plus its own ── */
+/* ── Battle Stats (bstat*) ── scoped to #page-battlestats to avoid clashing with app CSS */
+#page-battlesim .bstatWrap{max-width:1140px;margin:0 auto;padding:22px 4px 60px}
+#page-battlesim .bstatSubtabs{display:flex;gap:6px;margin-bottom:20px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+#page-battlesim .bstatSubtab{font-family:var(--head);font-size:11.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:10px 16px;cursor:pointer;color:var(--text3);border-bottom:2px solid transparent}
+#page-battlesim .bstatSubtab:hover{color:var(--text2)}
+#page-battlesim .bstatSubtab.active{color:var(--gold);border-bottom-color:var(--gold)}
+#page-battlesim .bstatPane{display:none}
+#page-battlesim .bstatPane.active{display:block}
+#page-battlesim .bstatBattleSides{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:820px){#page-battlesim .bstatBattleSides{grid-template-columns:1fr}}
+#page-battlesim .bstatBrole{font-family:var(--head);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin:0 0 10px;display:flex;align-items:center;gap:8px}
+#page-battlesim .bstatBrole select{flex:1}
+#page-battlesim .bstatBrow{display:grid;grid-template-columns:34px 1fr 1fr 44px 44px 44px 44px 1fr 50px;gap:5px;align-items:center;margin:0 0 5px}
+#page-battlesim .bstatBrow input,#page-battlesim .bstatBrow select{padding:5px 4px;font-size:11px;min-width:0}
+#page-battlesim .bstatBhead{font-size:9px;text-transform:uppercase;color:var(--text3);letter-spacing:.02em}
+#page-battlesim .bstatBhead span{text-align:center}
+#page-battlesim .bstatBverdict{font-size:15px;margin:0 0 10px}
+#page-battlesim .bstatBbar{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:0 0 16px;background:var(--border)}
+#page-battlesim .bstatBbarY{background:var(--gold)}#page-battlesim .bstatBbarD{background:var(--text3)}#page-battlesim .bstatBbarE{background:#c65}
+#page-battlesim .bstatBcols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:820px){#page-battlesim .bstatBcols{grid-template-columns:1fr}}
+#page-battlesim .bstatBcolT{font-family:var(--head);font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin:0 0 4px}
+#page-battlesim .bstatBstat{font-size:13px;margin:0 0 2px}
+#page-battlesim .bstatBhistax{display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-top:2px}
+#page-battlesim .bstatBjoin{margin:10px 0 0;border-top:1px solid var(--border);padding-top:10px}
+#page-battlesim .bstatBjoinT{font-family:var(--head);font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin:0 0 6px}
+#page-battlesim .bstatBjoinRow{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px}
+#page-battlesim .bstatBjoinRow select{padding:5px 4px;font-size:11px;min-width:0}
+#page-battlesim .bstatCard{background:linear-gradient(180deg,var(--bg4) 0%,var(--bg3) 100%);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:18px}
+#page-battlesim .bstatCardT{font-family:var(--head);font-size:14px;font-weight:600;color:var(--gold);margin-bottom:14px;letter-spacing:.03em;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+#page-battlesim .bstatHint{font-family:var(--body);font-size:11px;font-weight:400;color:var(--text3);letter-spacing:0;display:inline-flex;align-items:center;gap:5px}
+#page-battlestats label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px}
+#page-battlestats input,#page-battlestats select{background:var(--bg4);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-family:var(--body);font-size:13px;padding:7px 10px;outline:none;width:100%}
+#page-battlestats input:focus,#page-battlestats select:focus{border-color:var(--gold)}
+#page-battlesim .bstatBtnPrimary{background:var(--accent);color:#fff;border:1px solid var(--accent);font-family:var(--head);font-weight:600;font-size:12px;border-radius:6px;padding:9px 16px;cursor:pointer}
+#page-battlesim .bstatBtnGhost{background:transparent;color:var(--text2);border:1px solid var(--border2);font-family:var(--head);font-weight:600;font-size:12px;border-radius:6px;padding:9px 16px;cursor:pointer}
+#page-battlesim .bstatBtnGold{background:rgba(217,166,72,.15);color:var(--gold);border:1px solid rgba(217,166,72,.35);font-family:var(--head);font-weight:600;font-size:11px;border-radius:6px;padding:6px 14px;cursor:pointer}
+#page-battlesim .bstatDrop{border:1.5px dashed var(--border2);border-radius:10px;padding:34px 20px;text-align:center;background:rgba(47,36,26,.35);cursor:pointer}
+#page-battlesim .bstatDrop:hover{border-color:var(--gold);background:rgba(217,166,72,.06)}
+#page-battlesim .bstatDropIcon{font-size:32px;margin-bottom:9px;opacity:.55}
+#page-battlesim .bstatDropT{font-family:var(--head);font-size:14px;color:var(--text);margin-bottom:5px}
+#page-battlesim .bstatDropS{font-size:12px;color:var(--text3)}
+#page-battlesim .bstatFlag{width:5px;height:5px;border-radius:50%;background:var(--gold);box-shadow:0 0 5px var(--gold);flex-shrink:0;display:inline-block}
+#page-battlesim .bstatTT{border:1px solid var(--border);border-radius:9px;margin-bottom:12px;overflow:hidden}
+#page-battlesim .bstatTTHead{display:flex;align-items:center;gap:9px;padding:10px 14px;background:var(--bg4);border-bottom:1px solid var(--border)}
+#page-battlesim .bstatDot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+#page-battlesim .bstatTTName{font-family:var(--head);font-size:12.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+#page-battlesim .bstatT11{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:11px;color:var(--text2)}
+#page-battlesim .bstatTTBody{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border)}
+#page-battlesim .bstatStat{background:var(--bg3);padding:11px 13px}
+#page-battlesim .bstatStatL{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:5px;display:flex;align-items:center;gap:5px}
+#page-battlesim .bstatStat input{border:none;background:transparent;font-family:var(--mono);font-size:15px;font-weight:600;color:var(--text);padding:0}
+#page-battlesim .bstatStat input:focus{color:var(--gold)}
+#page-battlesim .bstatSw{position:relative;width:36px;height:19px;background:var(--bg);border:1px solid var(--border2);border-radius:10px;cursor:pointer;flex-shrink:0;transition:all .2s}
+#page-battlesim .bstatSw::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:var(--text3);transition:all .2s}
+#page-battlesim .bstatSw.on{background:rgba(46,204,113,.2);border-color:var(--green)}
+#page-battlesim .bstatSw.on::after{left:18px;background:var(--green)}
+#page-battlesim .bstatGrid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+#page-battlesim .bstatHeroHead{display:grid;grid-template-columns:44px 1.7fr .9fr;gap:10px;margin-bottom:6px;font-size:12px;color:var(--text2)}
+#page-battlesim .bstatHeroRow{display:grid;grid-template-columns:44px 1.7fr .9fr;gap:10px;align-items:center;margin-bottom:9px}
+#page-battlesim .bstatSlot{font-family:var(--mono);font-size:11px;text-align:center}
+#page-battlesim .bstatSlot.inf{color:var(--accent2)}
+#page-battlesim .bstatSlot.cav{color:#6ab0ff}
+#page-battlesim .bstatSlot.arc{color:var(--green)}
+#page-battlesim .bstatDual{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+#page-battlesim .bstatBig{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:18px 20px;position:relative;overflow:hidden}
+#page-battlesim .bstatBig::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+#page-battlesim .bstatBig.atk::before{background:var(--accent)}
+#page-battlesim .bstatBig.def::before{background:#6ab0ff}
+#page-battlesim .bstatBigL{font-family:var(--head);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
+#page-battlesim .bstatBigV{font-family:var(--mono);font-size:38px;font-weight:600;line-height:1}
+#page-battlesim .bstatBig.atk .bstatBigV{color:var(--accent2)}
+#page-battlesim .bstatBig.def .bstatBigV{color:#6ab0ff}
+#page-battlesim .bstatFoot{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:6px;padding-top:16px;border-top:1px solid var(--border);flex-wrap:wrap}
+#page-battlesim .bstatShare{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--text2)}
+#page-battlesim .bstatFootNote{font-size:11.5px;color:var(--text3);margin-top:10px;text-align:right}
+#page-battlesim .bstatNote{background:rgba(106,176,255,.07);border:1px solid rgba(106,176,255,.22);border-left:3px solid #6ab0ff;border-radius:6px;padding:11px 14px;font-size:12.5px;color:var(--text2)}
+#page-battlesim .bstatNote b{color:#6ab0ff;font-weight:600}
+#page-battlesim .bstatWarn{background:rgba(217,166,72,.07);border:1px solid rgba(217,166,72,.22);border-left:3px solid var(--gold);border-radius:6px;padding:11px 14px;font-size:12.5px;color:var(--text2)}
+#page-battlesim .bstatWarn b{color:var(--gold);font-weight:600}
+#page-battlesim .bstatTblWrap{overflow-x:auto}
+#page-battlesim .bstatTbl{width:100%;border-collapse:collapse}
+#page-battlesim .bstatTbl th{font-family:var(--head);font-size:10.5px;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;padding:9px 11px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+#page-battlesim .bstatTbl td{padding:10px 11px;border-bottom:1px solid var(--border);font-size:13px;white-space:nowrap}
+#page-battlesim .bstatTbl tbody tr:hover{background:rgba(217,166,72,.04)}
+#page-battlesim .bstatRk{font-family:var(--mono);font-size:12px;color:var(--text3)}
+#page-battlesim .bstatRk.top{color:var(--gold);font-weight:600}
+#page-battlesim .bstatNum{font-family:var(--mono);font-size:13px;font-weight:600}
+#page-battlesim .bstatNum.atk{color:var(--accent2)}
+#page-battlesim .bstatNum.def{color:#6ab0ff}
+#page-battlesim .bstatChip{font-family:var(--mono);font-size:9.5px;font-weight:600;padding:2px 5px;border-radius:3px;border:1px solid var(--border);color:var(--text3);background:var(--bg4)}
+#page-battlesim .bstatChip.on{color:var(--gold);border-color:rgba(217,166,72,.4);background:rgba(217,166,72,.12)}
+#page-battlesim .bstatFresh{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text3)}
+#page-battlesim .bstatFDot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+#page-battlesim .bstatWtRow{display:grid;grid-template-columns:1.3fr 90px 2fr;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:12.5px}
+#page-battlesim .bstatWtRow .bstatWtL{color:var(--text2)}
+#page-battlesim .bstatWtRow .bstatWtD{font-size:11.5px;color:var(--text3)}
+#page-battlesim .bstatWtRow input{font-family:var(--mono);text-align:right}
+#page-battlesim .bstatSecT{font-family:var(--head);font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text2);margin:18px 0 8px;border-left:3px solid var(--gold);padding-left:10px}
+#page-battlesim .bstatFormula{background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:13px 15px;font-family:var(--mono);font-size:12px;color:var(--text2);line-height:1.9;white-space:pre-wrap;overflow-x:auto}
+#page-battlesim .bstatFormula .bstatK{color:var(--gold)}
+#page-battlesim .bstatFormula .bstatA{color:var(--accent2)}
+#page-battlesim .bstatFormula .bstatD{color:#6ab0ff}
+@media(max-width:860px){
+  #page-battlesim .bstatDual{grid-template-columns:1fr}
+  #page-battlesim .bstatTTBody{grid-template-columns:repeat(2,1fr)}
+  #page-battlesim .bstatGrid3{grid-template-columns:1fr}
+}
+
+#page-battlesim .bsimGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:860px){#page-battlesim .bsimGrid{grid-template-columns:1fr}}
+#page-battlesim .bsimTile{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px}
+#page-battlesim .bsimTileT{font-family:var(--head);font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--gold);margin-bottom:7px}
+#page-battlesim .bsimTileB{font-size:12.5px;line-height:1.6;color:var(--text2)}
+#page-battlesim .bsimProse{font-size:13px;line-height:1.7;color:var(--text2);max-width:780px}
+#page-battlesim .bsimProse h4{font-family:var(--head);font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--gold);margin:20px 0 7px}
+#page-battlesim .bsimProse h4:first-child{margin-top:0}
+#page-battlesim .bsimProse p{margin:0 0 10px}
+#page-battlesim .bsimProse ul{margin:0 0 10px;padding-left:18px}
+#page-battlesim .bsimProse li{margin-bottom:7px}
+#page-battlesim .bsimTable{width:100%;border-collapse:collapse;font-size:12.5px}
+#page-battlesim .bsimTable th{font-family:var(--head);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--text3);text-align:left;padding:7px 10px;border-bottom:1px solid var(--border)}
+#page-battlesim .bsimTable td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text2)}
 </style>
 
 <script>
@@ -8355,14 +8466,8 @@ function bstatRunBattleMC(){
 }
 
 // ── sub-tab switching ──
+// Battle Sim lives on its own top-level page now; see bsimTab below.
 function bstatTab(p){
-  // Battle Sim is ADMIN-ONLY while the deterministic engine is in preview.
-  if(p==='battle' && !(typeof isAdmin==='function' && isAdmin())){
-    if(typeof toast==='function') toast('Battle Simulator is admin-only for now.');
-    return;
-  }
-  var st=document.getElementById('bstatSubtabBattle');
-  if(st) st.style.display=(typeof isAdmin==='function' && isAdmin())?'':'none';
   var subs=document.querySelectorAll('#page-battlestats .bstatSubtab');
   for(var i=0;i<subs.length;i++){ subs[i].classList.toggle('active', subs[i].getAttribute('data-p')===p); }
   var panes=document.querySelectorAll('#page-battlestats .bstatPane');
@@ -8371,7 +8476,16 @@ function bstatTab(p){
   if(p==='rank') bstatRenderRank();
   if(p==='prog') bstatRenderProg();
   if(p==='wt') bstatRenderWeights();
-  if(p==='battle') bstatRenderBattle();
+}
+
+// ── Battle Sim page router (ADMIN ONLY) ──
+function bsimTab(p){
+  var subs=document.querySelectorAll('#page-battlesim .bstatSubtab');
+  for(var i=0;i<subs.length;i++){ subs[i].classList.toggle('active', subs[i].getAttribute('data-p')===p); }
+  var panes=document.querySelectorAll('#page-battlesim .bstatPane');
+  for(var j=0;j<panes.length;j++){ panes[j].classList.remove('active'); }
+  var pane=document.getElementById('bsimPane-'+p); if(pane) pane.classList.add('active');
+  if(p==='sim') bstatRenderBattle();
 }
 
 // ── hero pickers ──
@@ -8866,6 +8980,117 @@ function bstatWtToggleEdit(){
       <button class="btn btn-danger" onclick="adminReset('all')">⚠️ Reset EVERYTHING</button>
       <span id="adminResetUndo"></span>
     </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ BATTLE SIM (top-level, ADMIN ONLY) ══════════════════════ -->
+<!-- Promoted out of the Battle Stats sub-tab. Engine is experimental — see the
+     Accuracy pane before trusting any number it prints. -->
+<div id="page-battlesim" class="page">
+  <div class="bstatWrap">
+    <div class="bstatSubtabs">
+      <div class="bstatSubtab active" data-p="start" onclick="bsimTab('start')">Overview</div>
+      <div class="bstatSubtab" data-p="sim" onclick="bsimTab('sim')">Simulator</div>
+      <div class="bstatSubtab" data-p="how" onclick="bsimTab('how')">How it works</div>
+      <div class="bstatSubtab" data-p="acc" onclick="bsimTab('acc')">Accuracy &amp; limits</div>
+    </div>
+
+    <!-- ── OVERVIEW ── -->
+    <div class="bstatPane active" id="bsimPane-start">
+      <div class="bstatCard">
+        <div class="bstatCardT">Battle Simulator <span class="bstatHint">experimental</span></div>
+        <div class="bstatNote" style="margin:0 0 16px"><b>Scout both sides in, predicted outcome out.</b> Enter troops, tiers, the four stat percentages per troop type, and the heroes on each side. The engine fights the battle turn by turn and reports who wins and roughly what survives.</div>
+        <div class="bsimGrid">
+          <div class="bsimTile"><div class="bsimTileT">What it is good at</div><div class="bsimTileB">Calling the <b>winner</b>. Validated against real KvK reports, it picked the right side in every one tested so far. Use it to answer &ldquo;can I take this rally?&rdquo;</div></div>
+          <div class="bsimTile"><div class="bsimTileT">What it is bad at</div><div class="bsimTileB">Exact survivor counts. Residents come out around <b>&plusmn;50%</b>. Treat the numbers as a direction, never as a plan.</div></div>
+          <div class="bsimTile"><div class="bsimTileT">What it cannot see</div><div class="bsimTileB">Pets are not modelled at all. Joiner troop tiers vary more than the engine assumes. Composition effects are still too weak.</div></div>
+        </div>
+        <div class="bstatFoot" style="margin-top:18px">
+          <span class="bstatFootNote">Admin only while the engine is in preview.</span>
+          <button class="bstatBtnPrimary" onclick="bsimTab('sim')">Open the simulator</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SIMULATOR ── -->
+    <div class="bstatPane" id="bsimPane-sim">
+
+      <div class="bstatCard">
+        <div class="bstatCardT">Battle Simulator <span class="bstatHint">deterministic engine</span></div>
+        <div class="bstatNote" style="margin:0 0 14px"><b>Full scout in, predicted outcome out.</b> Enter both armies - troops, tiers, the four stat percentages per type, and the heroes on each side. One fight is run to depletion with chance skills at expected value. <b>Winner is the reliable output; survivor counts are &plusmn;50%.</b></div>
+        <div class="bstatBattleSides">
+          <div class="bstatCard" style="margin:0"><div class="bstatCardT">Your side</div><div id="bstatBattleYou"></div></div>
+          <div class="bstatCard" style="margin:0"><div class="bstatCardT">Enemy side</div><div id="bstatBattleEnemy"></div></div>
+        </div>
+        <div class="bstatFoot" style="margin-top:14px">
+          <span class="bstatFootNote">Widgets fire only in the matching role - offensive on attack, defensive on defense.</span>
+          <button class="bstatBtnPrimary" id="bstatRunBtn" onclick="bstatRunBattle()">Run Simulator</button>
+          <button class="bstatBtn" id="bstatRunMcBtn" onclick="bstatRunBattleMC()" title="Monte-Carlo spread — optional uncertainty view">Uncertainty (1000 MC)</button>
+        </div>
+      </div>
+      <div class="bstatCard" id="bstatBattleResultCard" style="display:none">
+        <div class="bstatCardT">Result</div>
+        <div id="bstatBattleResult"></div>
+      </div>
+    </div>
+
+    <!-- ── HOW IT WORKS ── -->
+    <div class="bstatPane" id="bsimPane-how">
+      <div class="bstatCard">
+        <div class="bstatCardT">How the engine works</div>
+        <div class="bsimProse">
+          <h4>1 &middot; The damage formula</h4>
+          <p>Every squad&rsquo;s output comes from the community-reconstructed kill formula. Attack and Lethality <b>multiply</b> each other; the defender&rsquo;s Defense and Health multiply on the other side of the division. Army size enters as a <b>square root</b>, so doubling troops raises damage by about 41%, not 100%.</p>
+          <p>This structure is corroborated by two independent reverse-engineering projects. It is not published by Century Games, and it is not official.</p>
+
+          <h4>2 &middot; Deterministic, not random</h4>
+          <p>The engine runs one fight to depletion rather than rolling dice. Chance-based skills are folded in at their <b>expected value</b> &mdash; a 30% chance of +50% damage becomes a flat +15%. At the troop counts you actually field, proc variance averages out, and this beat Monte-Carlo on real battle data.</p>
+          <p>The <b>Uncertainty</b> button still runs 1000 randomised fights if you want to see the spread. It is the secondary view, not the primary answer.</p>
+
+          <h4>3 &middot; Two channels of stats</h4>
+          <p>The twelve percentages on a Battle Report already include research, gear, charms, pets, hero base stats and <b>widget stat lines</b>. Hero <i>skills</i> are a separate hidden layer that never appears on the report. The engine reads the report for the first and adds only the second &mdash; adding hero stats on top would double-count them.</p>
+
+          <h4>4 &middot; Who contributes what</h4>
+          <p>The rally leader supplies every stat for the whole pooled army, plus all three heroes&rsquo; Expedition skills and their widget. Joiners contribute troop bodies and the <b>first Expedition skill of their first hero only</b> &mdash; up to four of them. Everything else a joiner owns is discarded.</p>
+
+          <h4>5 &middot; Troops and targeting</h4>
+          <p>Targeting is fixed: Infantry, then Cavalry, then Archers. Cavalry Ambusher bypasses the infantry wall part of the time. The counter triangle is a flat +10% on offense with no defensive component. TrueGold troop skills feed in at their measured rates rather than the tooltip values, where the two disagree.</p>
+
+          <h4>6 &middot; Reading the output</h4>
+          <p>Winner is the side with Residents remaining. Damage <b>injures</b> troops rather than killing them outright, and the Injured to Lightly Injured split holds at a constant 35:65. Squad total = Losses + Injured + Lightly Injured + Residents.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ACCURACY ── -->
+    <div class="bstatPane" id="bsimPane-acc">
+      <div class="bstatCard">
+        <div class="bstatCardT">Accuracy &amp; known limits</div>
+        <div class="bstatNote" style="margin:0 0 16px;border-left-color:#c9803a"><b>This is not a finished simulator.</b> It is a rough experimental tool. Everything below is a known defect, not a rumour.</div>
+        <table class="bsimTable">
+          <tr><th>Measure</th><th>Current</th><th>Target</th></tr>
+          <tr><td>Winner called correctly</td><td>~77% overall &mdash; best on 2&ndash;3 hero setups</td><td>&ge;90%</td></tr>
+          <tr><td>Resident counts</td><td>&plusmn;50% &mdash; <b>do not trust these</b></td><td>&plusmn;20%</td></tr>
+          <tr><td>Hero registry wired in</td><td>4 of 23 heroes</td><td>all 23</td></tr>
+        </table>
+        <div class="bsimProse" style="margin-top:18px">
+          <h4>Known defects</h4>
+          <ul>
+            <li><b>Opportunity pools are wrong.</b> Hero skills fire once per round, twice per round, or once per squad attack depending on the skill. The engine treats them all the same. This is the largest single error, and it is backed by 52 logged battles.</li>
+            <li><b>Composition is too weak.</b> Real data shows 60/40/0 beating 100/0/0 for the same hero. The engine cannot reproduce that yet.</li>
+            <li><b>Registry errors.</b> Vivian&rsquo;s Focus Fire is listed as periodic but fires ~18&ndash;20 times. Marlin&rsquo;s Dynamo is listed as a 50% proc but fires deterministically. Margot&rsquo;s Subterfuge behaves as a static, not a 20% proc.</li>
+            <li><b>Ambusher rate.</b> Measured at ~28%, not the listed 20% &mdash; and ~50% was needed to reconcile some real battles. Unresolved.</li>
+            <li><b>Pets are not modelled.</b> No per-level curves exist yet.</li>
+            <li><b>Calibration is narrow.</b> The damage scale was fitted against 31 battles versus a single fixed target at one tier. It may not generalise to other opponents.</li>
+          </ul>
+          <h4>Evidence grades</h4>
+          <p><b>Confirmed by own battle data:</b> the 35:65 injured split, TG5 proc rates, widgets being army-wide and additive within a stat, heroes stacking multiplicatively, deterministic beating Monte-Carlo.</p>
+          <p><b>Community consensus, not verified:</b> op-code IDs, per-hero skill percentages, base stat tables above T11, the counter triangle percentage.</p>
+          <p><b>Folklore &mdash; deliberately not implemented:</b> the 5,000 infantry floor, any hard Defense cap, the old &ldquo;Attack counters Defense&rdquo; model.</p>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
