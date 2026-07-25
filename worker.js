@@ -7566,6 +7566,49 @@ per type:  atkPower = base_att <span class="bstatK">×</span> <span class="bstat
 #page-battlesim .bsimTable{width:100%;border-collapse:collapse;font-size:12.5px}
 #page-battlesim .bsimTable th{font-family:var(--head);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--text3);text-align:left;padding:7px 10px;border-bottom:1px solid var(--border)}
 #page-battlesim .bsimTable td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text2)}
+
+/* ── Battle Sim card layout ── */
+#page-battlesim .bsimCard{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:12px;background:var(--bg2)}
+#page-battlesim .bsimCardH{font-family:var(--head);font-size:12px;font-weight:700;letter-spacing:.05em;padding:9px 13px;color:#fff}
+#page-battlesim .bsimH-stats{background:#1d2a52}
+#page-battlesim .bsimH-troops{background:#4a1c1c}
+#page-battlesim .bsimH-heroes{background:#123320}
+#page-battlesim .bsimH-join{background:#5a4310}
+#page-battlesim .bsimCardB{padding:12px 13px}
+#page-battlesim .bsimBar{display:flex;align-items:center;gap:9px;margin-bottom:10px;flex-wrap:wrap}
+#page-battlesim .bsimRoleBar{font-family:var(--head);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3)}
+#page-battlesim .bsimRoleBar select{flex:1;max-width:260px}
+#page-battlesim .bsimHint{font-size:11px;color:var(--text3);line-height:1.5;max-width:60%}
+#page-battlesim .bsimToggle{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text2);cursor:pointer}
+#page-battlesim .bsimToggle input{appearance:none;width:34px;height:18px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);position:relative;cursor:pointer;flex-shrink:0}
+#page-battlesim .bsimToggle input:checked{background:var(--gold)}
+#page-battlesim .bsimToggle input::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:left .12s}
+#page-battlesim .bsimToggle input:checked::after{left:18px}
+#page-battlesim .bsimQ{width:16px;height:16px;border-radius:50%;border:1px solid var(--border);color:var(--text3);font-size:10px;display:inline-flex;align-items:center;justify-content:center;cursor:help;flex-shrink:0}
+#page-battlesim .bsimBtnBlue,#page-battlesim .bsimBtnRed,#page-battlesim .bsimBtnGreen,#page-battlesim .bsimBtnGold{font-family:var(--head);font-size:11px;font-weight:600;letter-spacing:.03em;padding:7px 13px;border-radius:6px;border:0;cursor:pointer;white-space:nowrap}
+#page-battlesim .bsimBtnBlue{background:#bcd8f7;color:#12233d}
+#page-battlesim .bsimBtnRed{background:#f6c9c9;color:#4a1414}
+#page-battlesim .bsimBtnGreen{background:#bfeccf;color:#123320}
+#page-battlesim .bsimBtnGold{background:#f2d98a;color:#402f06}
+#page-battlesim .bsimStatus{font-size:11.5px;color:var(--text2);background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:7px 10px;margin-bottom:10px}
+#page-battlesim .bsimTbl{width:100%;border-collapse:collapse;font-size:12.5px}
+#page-battlesim .bsimTbl th{font-family:var(--head);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text3);padding:7px 8px;border-bottom:1px solid var(--border);text-align:center}
+#page-battlesim .bsimTbl th:first-child{text-align:left}
+#page-battlesim .bsimTbl td{padding:5px 6px;border-bottom:1px solid var(--border);color:var(--text2)}
+#page-battlesim .bsimTd-infantry{color:var(--accent2)}
+#page-battlesim .bsimTd-cavalry{color:#6ab0ff}
+#page-battlesim .bsimTd-archer{color:var(--green)}
+#page-battlesim .bsimPct{display:flex;align-items:center;gap:4px}
+#page-battlesim .bsimPct input{width:100%;text-align:right}
+#page-battlesim .bsimPct span{font-size:11px;color:var(--text3)}
+#page-battlesim .bsimRow{display:grid;gap:7px;align-items:center;margin-bottom:7px}
+#page-battlesim .bsimRow-troop{grid-template-columns:1.4fr 1fr 1fr 1.2fr 34px}
+#page-battlesim .bsimRow-hero{grid-template-columns:1.8fr 1fr 1fr 34px}
+#page-battlesim .bsimRow-join{grid-template-columns:1fr 34px}
+#page-battlesim .bsimRowHead{font-family:var(--head);font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:var(--text3);margin-bottom:6px}
+#page-battlesim .bsimDel{background:#8d2020;border:0;border-radius:5px;color:#fff;height:30px;cursor:pointer;font-size:12px}
+#page-battlesim .bsimEmpty{font-size:12px;color:var(--text3);text-align:center;padding:12px 0}
+#page-battlesim .bsimHeroNote{font-size:11px;color:var(--text3)}
 </style>
 
 <script>
@@ -8279,7 +8322,7 @@ function ksdSideFighter(inp){
   });
   var names=[]; BSTAT_TYPES.forEach(function(t){ var q=inp.types[t]||{}; if(q.hero) names.push(q.hero); });
   var heroSkills=ksdHeroFamSkills(names,5)
-    .concat(ksdWidgetFamSkills(inp.types, inp.role))
+    .concat(inp.widgetsIncluded ? [] : ksdWidgetFamSkills(inp.types, inp.role))
     .concat(ksdJoinerFamSkills(inp.joiners,5));
   var cavT=+String((inp.types.cavalry||{}).tier||'10.0').split('.')[0];
   return ksdBuildFighter(stats,counts,{ base:base, skills:ksdTroopSkills(inp.types),
@@ -8352,52 +8395,167 @@ function bstatJoinerEntries(names){
   return ents;
 }
 
-// Build one side's input form into a container. side = 'you' | 'enemy'.
-function bstatBattleForm(side, role){
-  var rows=[['infantry','INF','inf'],['cavalry','CAV','cav'],['archer','ARC','arc']];
-  var def={you:{n:20000},enemy:{n:20000}};
-  var h='<div class="bstatBrow bstatBhead"><span></span><span>Troops</span><span>Tier</span><span>Atk%</span><span>Leth%</span><span>Def%</span><span>HP%</span><span>Hero</span><span>Wgt</span></div>';
-  rows.forEach(function(r){
-    var id=side+'_'+r[0];
-    h+='<div class="bstatBrow">'
-      +'<span class="bstatSlot '+r[2]+'">'+r[1]+'</span>'
-      +'<input type="number" id="'+id+'_n" value="'+(r[0]==='infantry'?20000:(r[0]==='cavalry'?8000:12000))+'">'
-      +'<select id="'+id+'_tier">'+bstatTierOpts('10.0')+'</select>'
-      +'<input type="number" id="'+id+'_atk" value="0">'
-      +'<input type="number" id="'+id+'_leth" value="0">'
-      +'<input type="number" id="'+id+'_def" value="0">'
-      +'<input type="number" id="'+id+'_hp" value="0">'
-      +'<select id="'+id+'_hero">'+bstatHeroOpts(r[0],'')+'</select>'
-      +'<select id="'+id+'_wlv">'+bstatWlvOpts(10)+'</select>'
-      +'</div>';
+// ── Battle Sim side form: four cards (Stats / Troops / Heroes / Joiners) ──
+// side = 'you' | 'enemy'. Rows are dynamic; state lives in the DOM and is read
+// back by bstatReadSide(). Tier and TG are separate pickers and recombined into
+// the "tier.tg" key the engine looks up.
+var BSIM_TYPE_LABEL={infantry:'Infantry',cavalry:'Cavalry',archer:'Archer'};
+
+function bsimTypeOpts(sel){
+  return BSTAT_TYPES.map(function(t){
+    return '<option value="'+t+'"'+(t===sel?' selected':'')+'>'+BSIM_TYPE_LABEL[t]+'</option>';
+  }).join('');
+}
+function bsimTierOnlyOpts(sel){
+  var o='';
+  for(var i=1;i<=11;i++){ o+='<option value="'+i+'"'+(String(i)===String(sel)?' selected':'')+'>T'+i+'</option>'; }
+  return o;
+}
+function bsimTgOpts(sel){
+  var o='';
+  for(var i=0;i<=5;i++){ o+='<option value="'+i+'"'+(String(i)===String(sel)?' selected':'')+'>'+(i?'TG'+i:'—')+'</option>'; }
+  return o;
+}
+
+// ── card 1: stats ──
+function bsimStatsCard(side){
+  var h='<div class="bsimCard"><div class="bsimCardH bsimH-stats">Stats</div><div class="bsimCardB">';
+  h+='<div class="bsimBar">'
+    +'<label class="bsimToggle"><input type="checkbox" id="'+side+'_winc" checked><span></span>'
+    +'Hero &amp; widget stats already included</label>'
+    +'<span class="bsimQ" title="Scouted and Battle Report percentages already contain hero base stats, hero gear and widget stat lines. Leave this ON when you paste those numbers, or they get counted twice. Turn it OFF only for raw research-only stats.">?</span>'
+    +'<span style="flex:1"></span>'
+    +'<label class="bsimBtnBlue" for="'+side+'_ocrFile">Import from Screenshot</label>'
+    +'<input type="file" id="'+side+'_ocrFile" accept="image/*" style="display:none">'
+    +'</div>';
+  h+='<div class="bsimStatus" id="'+side+'_ocrStatus" style="display:none"></div>';
+  h+='<table class="bsimTbl"><tr><th>Type</th><th>Attack</th><th>Defense</th><th>Lethality</th><th>Health</th></tr>';
+  BSTAT_TYPES.forEach(function(t){
+    h+='<tr><td class="bsimTd-'+t+'">'+BSIM_TYPE_LABEL[t]+'</td>';
+    ['atk','def','leth','hp'].forEach(function(k){
+      h+='<td><div class="bsimPct"><input type="number" id="'+side+'_'+t+'_'+k+'" value="0"><span>%</span></div></td>';
+    });
+    h+='</tr>';
   });
-  var roleSel='<div class="bstatBrole">Role '
+  h+='</table></div></div>';
+  return h;
+}
+
+// ── card 2: troops ──
+function bsimTroopRow(side,type,tier,tg,qty){
+  return '<div class="bsimRow bsimRow-troop">'
+    +'<select class="'+side+'_tType">'+bsimTypeOpts(type)+'</select>'
+    +'<select class="'+side+'_tTier">'+bsimTierOnlyOpts(tier)+'</select>'
+    +'<select class="'+side+'_tTg">'+bsimTgOpts(tg)+'</select>'
+    +'<input type="number" class="'+side+'_tQty" value="'+qty+'">'
+    +'<button class="bsimDel" onclick="bsimDelRow(this)" title="Remove">&#128465;</button>'
+    +'</div>';
+}
+function bsimTroopsCard(side){
+  var d=[['infantry',10,5,20000],['cavalry',10,5,8000],['archer',10,5,12000]];
+  var h='<div class="bsimCard"><div class="bsimCardH bsimH-troops">Troops</div><div class="bsimCardB">';
+  h+='<div class="bsimBar"><span style="flex:1"></span><button class="bsimBtnRed" onclick="bsimAddTroop(\''+side+'\')">Add Unit</button></div>';
+  h+='<div class="bsimRow bsimRowHead bsimRow-troop"><span>Type</span><span>Tier</span><span>TG level</span><span>Quantity</span><span></span></div>';
+  h+='<div id="'+side+'_troopList">';
+  d.forEach(function(r){ h+=bsimTroopRow(side,r[0],r[1],r[2],r[3]); });
+  h+='</div></div></div>';
+  return h;
+}
+function bsimAddTroop(side){
+  var el=document.getElementById(side+'_troopList'); if(!el) return;
+  el.insertAdjacentHTML('beforeend', bsimTroopRow(side,'infantry',10,5,0));
+}
+function bsimDelRow(btn){ var r=btn.closest('.bsimRow'); if(r) r.remove(); }
+
+// ── card 3: leader heroes (one per troop type; widget level per hero) ──
+function bsimHeroRow(side,hero,wlv){
+  return '<div class="bsimRow bsimRow-hero">'
+    +'<select class="'+side+'_hName">'+bstatAllHeroOpts(hero||'')+'</select>'
+    +'<select class="'+side+'_hWlv">'+bstatWlvOpts(wlv||10)+'</select>'
+    +'<span class="bsimHeroNote"></span>'
+    +'<button class="bsimDel" onclick="bsimDelRow(this)" title="Remove">&#128465;</button>'
+    +'</div>';
+}
+function bsimHeroesCard(side){
+  var h='<div class="bsimCard"><div class="bsimCardH bsimH-heroes">Heroes</div><div class="bsimCardB">';
+  h+='<div class="bsimBar"><span class="bsimHint">Leader trio &mdash; one per troop type. All three Expedition skills fire, plus the widget.</span>'
+    +'<span style="flex:1"></span><button class="bsimBtnGreen" onclick="bsimAddHero(\''+side+'\')">Add Hero</button></div>';
+  h+='<div class="bsimRow bsimRowHead bsimRow-hero"><span>Hero</span><span>Widget lv</span><span></span><span></span></div>';
+  h+='<div id="'+side+'_heroList"></div>';
+  h+='<div class="bsimEmpty" id="'+side+'_heroEmpty">No heroes selected</div>';
+  h+='</div></div>';
+  return h;
+}
+function bsimAddHero(side){
+  var el=document.getElementById(side+'_heroList'); if(!el) return;
+  if(el.children.length>=3){ if(typeof toast==='function') toast('Three leader heroes maximum.'); return; }
+  el.insertAdjacentHTML('beforeend', bsimHeroRow(side,'',10));
+  var e=document.getElementById(side+'_heroEmpty'); if(e) e.style.display='none';
+}
+
+// ── card 4: joiner heroes (first Expedition skill only, up to 4) ──
+function bsimJoinRow(side,hero){
+  return '<div class="bsimRow bsimRow-join">'
+    +'<select class="'+side+'_jName">'+bstatAllHeroOpts(hero||'')+'</select>'
+    +'<button class="bsimDel" onclick="bsimDelRow(this)" title="Remove">&#128465;</button>'
+    +'</div>';
+}
+function bsimJoinersCard(side){
+  var h='<div class="bsimCard"><div class="bsimCardH bsimH-join">Joiner Heroes</div><div class="bsimCardB">';
+  h+='<div class="bsimBar"><span class="bsimHint">First Expedition skill only, up to 4. Identical proc skills count once.</span>'
+    +'<span style="flex:1"></span><button class="bsimBtnGold" onclick="bsimAddJoin(\''+side+'\')">Add Hero</button></div>';
+  h+='<div id="'+side+'_joinList"></div>';
+  h+='<div class="bsimEmpty" id="'+side+'_joinEmpty">No joiner heroes selected</div>';
+  h+='</div></div>';
+  return h;
+}
+function bsimAddJoin(side){
+  var el=document.getElementById(side+'_joinList'); if(!el) return;
+  if(el.children.length>=4){ if(typeof toast==='function') toast('Four joiner skills maximum.'); return; }
+  el.insertAdjacentHTML('beforeend', bsimJoinRow(side,''));
+  var e=document.getElementById(side+'_joinEmpty'); if(e) e.style.display='none';
+}
+
+// Role picker — plain wording. Which widgets fire is decided by each hero's own
+// widget (offensive vs defensive), not by this control.
+function bstatBattleForm(side, role){
+  var h='<div class="bsimBar bsimRoleBar">Role '
     +'<select id="'+side+'_role">'
-    +'<option value="attack"'+(role==='attack'?' selected':'')+'>Attacking (offensive widgets)</option>'
-    +'<option value="defend"'+(role==='defend'?' selected':'')+'>Defending (defensive widgets)</option>'
+    +'<option value="attack"'+(role==='attack'?' selected':'')+'>Attacking</option>'
+    +'<option value="defend"'+(role==='defend'?' selected':'')+'>Defending</option>'
     +'</select></div>';
-  var jo='<div class="bstatBjoin"><div class="bstatBjoinT">Joiners <span class="bstatHint">first skill each, up to 4</span></div><div class="bstatBjoinRow">';
-  for(var ji=1;ji<=4;ji++){ jo+='<select id="'+side+'_j'+ji+'">'+bstatAllHeroOpts('')+'</select>'; }
-  jo+='</div></div>';
-  return roleSel+h+jo;
+  return h+bsimStatsCard(side)+bsimTroopsCard(side)+bsimHeroesCard(side)+bsimJoinersCard(side);
 }
 
-function bstatRenderBattle(){
-  var you=document.getElementById('bstatBattleYou'), en=document.getElementById('bstatBattleEnemy');
-  if(you && !you.getAttribute('data-built')){ you.innerHTML=bstatBattleForm('you','attack'); you.setAttribute('data-built','1'); }
-  if(en && !en.getAttribute('data-built')){ en.innerHTML=bstatBattleForm('enemy','defend'); en.setAttribute('data-built','1'); }
-}
-
+// ── read one side back out of the DOM ──
 function bstatReadSide(side){
-  function v(id){ var e=document.getElementById(side+'_'+id); return e?e.value:''; }
+  function el(id){ return document.getElementById(side+'_'+id); }
+  function val(id){ var e=el(id); return e?e.value:''; }
+  function all(cls){ return Array.prototype.slice.call(document.querySelectorAll('.'+side+'_'+cls)); }
+
+  // troops: aggregate rows by type; first row of a type sets its tier/TG
   var types={};
   BSTAT_TYPES.forEach(function(t){
-    types[t]={ n:v(t+'_n'), tier:v(t+'_tier'), atk:v(t+'_atk'), leth:v(t+'_leth'),
-      def:v(t+'_def'), hp:v(t+'_hp'), hero:v(t+'_hero'), widgetLv:v(t+'_wlv') };
+    types[t]={ n:0, tier:'10.0', atk:val(t+'_atk'), leth:val(t+'_leth'),
+               def:val(t+'_def'), hp:val(t+'_hp'), hero:'', widgetLv:0 };
   });
-  var roleEl=document.getElementById(side+'_role');
-  var joiners=[]; for(var ji=1;ji<=4;ji++){ var jv=v('j'+ji); if(jv) joiners.push(jv); }
-  return { role:roleEl?roleEl.value:'attack', types:types, joiners:joiners };
+  var tT=all('tType'), tR=all('tTier'), tG=all('tTg'), tQ=all('tQty'), seenT={};
+  for(var i=0;i<tT.length;i++){
+    var ty=tT[i].value; if(!types[ty]) continue;
+    types[ty].n = bstatN(types[ty].n) + bstatN(tQ[i]?tQ[i].value:0);
+    if(!seenT[ty]){ types[ty].tier=(tR[i]?tR[i].value:'10')+'.'+(tG[i]?tG[i].value:'0'); seenT[ty]=1; }
+  }
+  // leader heroes: each hero maps onto its own troop type
+  var hN=all('hName'), hW=all('hWlv');
+  for(var j=0;j<hN.length;j++){
+    var nm=hN[j].value; if(!nm||!REG[nm]) continue;
+    var ht=REG[nm].type; if(!types[ht]) continue;
+    types[ht].hero=nm; types[ht].widgetLv=hW[j]?hW[j].value:10;
+  }
+  var joiners=all('jName').map(function(e){ return e.value; }).filter(Boolean).slice(0,4);
+  var wincEl=el('winc');
+  return { role:val('role')||'attack', types:types, joiners:joiners,
+           widgetsIncluded: wincEl ? !!wincEl.checked : true };
 }
 
 function bstatBattleHisto(bins, max, color){
@@ -8602,6 +8760,36 @@ document.addEventListener('change', function(e){
     reader.onload=function(ev){ bstatScan(ev.target.result); };
     reader.readAsDataURL(f);
   }
+});
+
+// Battle Sim per-side screenshot import — reuses /ocr-battlestats.
+document.addEventListener('change', function(e){
+  var id=e.target && e.target.id;
+  if(id!=='you_ocrFile' && id!=='enemy_ocrFile') return;
+  var side=id.split('_')[0];
+  var f=e.target.files && e.target.files[0]; if(!f) return;
+  var st=document.getElementById(side+'_ocrStatus');
+  if(st){ st.style.display='block'; st.textContent='Reading the screenshot…'; }
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    fetch(bstatApiBase()+'/ocr-battlestats', {
+      method:'POST', headers: stateHeaders({'Content-Type':'application/json'}),
+      body: JSON.stringify({ image: String(ev.target.result).split(',')[1] })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if(d && d.ok && d.values){
+        BSTAT_TYPES.forEach(function(t){
+          var v=d.values[t]||{};
+          ['atk','def','leth','hp'].forEach(function(k){
+            var inp=document.getElementById(side+'_'+t+'_'+k);
+            if(inp && v[k]!==undefined && v[k]!=='') inp.value=v[k];
+          });
+        });
+        if(st) st.textContent='Scan complete — check every value, OCR misreads are common.';
+      } else if(st){ st.textContent='Could not read that screenshot — enter the values by hand.'; }
+    }).catch(function(){ if(st) st.textContent='Scan failed — enter the values by hand.'; });
+  };
+  reader.readAsDataURL(f);
+  e.target.value='';
 });
 
 function bstatScan(dataUrl){
