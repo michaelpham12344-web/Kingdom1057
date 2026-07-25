@@ -8527,6 +8527,13 @@ function bstatBattleForm(side, role){
   return h+bsimStatsCard(side)+bsimTroopsCard(side)+bsimHeroesCard(side)+bsimJoinersCard(side);
 }
 
+// ── build both sides once, on first visit to the Simulator pane ──
+function bstatRenderBattle(){
+  var you=document.getElementById('bstatBattleYou'), en=document.getElementById('bstatBattleEnemy');
+  if(you && !you.getAttribute('data-built')){ you.innerHTML=bstatBattleForm('you','attack'); you.setAttribute('data-built','1'); }
+  if(en && !en.getAttribute('data-built')){ en.innerHTML=bstatBattleForm('enemy','defend'); en.setAttribute('data-built','1'); }
+}
+
 // ── read one side back out of the DOM ──
 function bstatReadSide(side){
   function el(id){ return document.getElementById(side+'_'+id); }
