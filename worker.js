@@ -14,6 +14,8 @@
  */
 
 const KINGSHOT_API  = "https://kingshot.net/api";
+// Upstream error keys that mean "their API is down", not "no such player"
+const KS_OUTAGE_KEYS_SRV = ['PLAYER_API_UNAVAILABLE','SERVICE_UNAVAILABLE','UPSTREAM_ERROR'];
 const GIFTCODE_API  = "https://ks-giftcode.centurygame.com/api";
 const SALT          = "tB87#kPtkxqOS2";
 const BATCH_SIZE    = 5;   // players per cron run — keeps well under 30s CPU limit
@@ -928,8 +930,8 @@ document.addEventListener('touchend',function(e){
       <!-- OUTAGE BYPASS — hidden unless kingshot.net is down -->
       <div id="bypassBox" style="display:none;margin-top:18px">
         <div class="lgOutage">
-          <div class="lgOutageH">&#9888; Player ID check is offline</div>
-          <div style="font-size:12.5px;color:var(--text2);line-height:1.55">kingshot.net isn't responding, so we can't verify IDs right now. Enter your details manually to get in.</div>
+          <div class="lgOutageH">&#9888; Player ID verification is down</div>
+          <div style="font-size:12.5px;color:var(--text2);line-height:1.55">The game publisher changed the gift code system, and the lookup we relied on is gone. <b>Not our bug, and not yours</b> &mdash; your Player ID is fine.<br><br>R4/R5 and Rally Leaders can still get in with their password. New registrations are on hold until it's back or a workaround ships.</div>
         </div>
 
         <div class="lgQ">&#128100; Your details</div>
@@ -2966,6 +2968,7 @@ async function bsLookupPlayer(){
   if(!pid){ toast('Enter a Player ID'); return; }
   prev.innerHTML='<span style="color:var(--text3);font-size:12px">Looking up…</span>';
   const p=await doPlayerLookup(pid);
+  if(p && p._outage){ bsPendingPlayer=null; prev.innerHTML='<span style="color:var(--enemy);font-size:12px">⚠ kingshot.net lookup is down — add the leader manually.</span>'; return; }
   if(!p){ bsPendingPlayer=null; prev.innerHTML='<span style="color:var(--enemy);font-size:12px">⚠ Player not found. Check the ID.</span>'; return; }
   bsPendingPlayer={ playerId:p.playerId, name:p.name, avatar:p.profilePhoto||null };
   prev.innerHTML='<div style="display:flex;align-items:center;gap:10px;background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:8px 10px">'+(p.profilePhoto?'<img src="'+p.profilePhoto+'" style="width:36px;height:36px;border-radius:50%;flex-shrink:0">':'')+'<div><div style="font-weight:700">'+p.name+'</div><div style="font-size:11px;color:var(--text3)">ID: '+p.playerId+'</div></div></div>';
@@ -5915,13 +5918,25 @@ function landingConfirmAlliance() {
 // ── Player lookup ──
 let verifiedPlayer = null;
 
+// Upstream returns status:'fail' for BOTH "no such player" and its own
+// outages. Only meta.errorKey separates them.
+const KS_OUTAGE_KEYS = ['PLAYER_API_UNAVAILABLE','SERVICE_UNAVAILABLE','UPSTREAM_ERROR'];
+function _ksIsOutage(d) {
+  if (!d) return true;
+  if (d.status === 'upstream' || d.status === 'error') return true;
+  const k = d.meta && d.meta.errorKey;
+  return !!k && KS_OUTAGE_KEYS.indexOf(k) >= 0;
+}
+
 async function doPlayerLookup(playerId) {
   try {
     const res = await fetch('/kingshot-player?id=' + encodeURIComponent(playerId));
     const data = await res.json();
     if (data.status === 'success' && data.data) return data.data;
-  } catch(e) {}
-  return null;
+    if (data && data.meta && data.meta.errorKey) console.warn('[ks] errorKey:', data.meta.errorKey);
+    if (_ksIsOutage(data)) { _ksNetIsDown = true; return { _outage: (data.meta && data.meta.errorKey) || 'UNKNOWN' }; }
+  } catch(e) { _ksNetIsDown = true; return { _outage: 'NETWORK' }; }
+  return null; // genuine not-found
 }
 // ════════════════════════════════════════════════════════
 // KINGSHOT.NET OUTAGE BYPASS
@@ -5932,8 +5947,7 @@ async function checkKingshotHealth() {
   try {
     const res = await fetch('/kingshot-player?id=158134757', { cache: 'no-store' });
     const data = await res.json();
-    if (data && (data.status === 'success' || data.status === 'fail')) { _ksNetIsDown = false; return; }
-    _ksNetIsDown = true;
+    _ksNetIsDown = !(data && data.status === 'success' && data.data);
   } catch (e) {
     _ksNetIsDown = true;
   }
@@ -6003,6 +6017,17 @@ async function lookupPlayer() {
   const p = await doPlayerLookup(id);
 
   if (btn) { btn.disabled = false; btn.innerHTML = 'Verify my ID  &#8594;'; }
+
+  if (p && p._outage) {
+    if (resultEl) {
+      resultEl.innerHTML = '<div class="lgErr"><b>Player ID verification is down.</b> Your ID is fine \\u2014 the lookup service is unavailable. See the box below.<br>' +
+        '<span style="opacity:.6;font-size:11px">code: ' + p._outage + '</span></div>';
+      resultEl.style.display = 'block';
+    }
+    showBypassUI();
+    _landingRailSync();
+    return;
+  }
 
   if (p) {
     const inKingdom = p.kingdom === 1057;
@@ -9847,8 +9872,12 @@ export default {
       if (!playerId) return json({status:'fail',message:'Player ID required'},400);
       try {
         const res = await fetch(KINGSHOT_API+'/player-info?playerId='+encodeURIComponent(playerId),{headers:{Accept:'application/json'}});
-        return json(await res.json(), res.status);
-      } catch(e) { return json({status:'error',message:'API unreachable'},502); }
+        const body = await res.text();
+        // Always 200: the client swallows non-2xx, and upstream signals both
+        // "no such player" and its own outages via meta.errorKey in the body.
+        try { return json(JSON.parse(body),200); }
+        catch(e) { return json({status:'upstream',code:res.status,body:body.slice(0,300)},200); }
+      } catch(e) { return json({status:'upstream',code:0,message:e.message},200); }
     }
 
     // Register verified player
@@ -10254,6 +10283,11 @@ Reply with ONLY one line of raw JSON, no explanation, no markdown. Format exactl
         if (!r.ok) { outage = true; }
         else {
           const d = await r.json();
+          // Upstream answers HTTP 200 with a fail body during its own outages.
+          // Only meta.errorKey separates "their API is down" from "no such player".
+          if (d && d.status !== 'success' && KS_OUTAGE_KEYS_SRV.indexOf(d.meta && d.meta.errorKey) >= 0) {
+            outage = true;
+          } else {
           const p = (d && d.data) ? d.data : (d && d.status==='success' ? d.data : null);
           if (!p) return json({ok:false, error:'not-found'}, 404);
           const kd = p.kingdom || p.kid || p.stove_lv || p.k;
@@ -10261,6 +10295,7 @@ Reply with ONLY one line of raw JSON, no explanation, no markdown. Format exactl
             return json({ok:false, error:'not-1057'}, 403);
           }
           verified = true;
+          }
         }
       } catch(e) { outage = true; }
 
