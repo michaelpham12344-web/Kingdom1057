@@ -6134,6 +6134,10 @@ function enterApp(role) {
   const adminTab = document.getElementById('tabAdmin');
   if(adminTab) adminTab.style.display = isAdm ? '' : 'none';
 
+  // Battle Sim sub-tab (deterministic engine preview) — ADMIN ONLY
+  const bsimSub = document.getElementById('bstatSubtabBattle');
+  if(bsimSub) bsimSub.style.display = isAdm ? '' : 'none';
+
   // Battle Stats — admin only for now. To open to rally leaders later, change this to
   // (isRally || isR4 || isAdm) AND relax the server /battle-stats + KEY_MIN_ROLE gates.
   const bstatTab = document.getElementById('tabBattleStats');
@@ -7108,7 +7112,7 @@ document.addEventListener('DOMContentLoaded', initApp);
       <div class="bstatSubtab" data-p="rank" onclick="bstatTab('rank')">Rankings</div>
       <div class="bstatSubtab" data-p="prog" onclick="bstatTab('prog')">My Progress</div>
       <div class="bstatSubtab" data-p="wt" onclick="bstatTab('wt')">Weights</div>
-      <div class="bstatSubtab" data-p="battle" onclick="bstatTab('battle')">Battle Sim</div>
+      <div class="bstatSubtab" data-p="battle" id="bstatSubtabBattle" style="display:none" onclick="bstatTab('battle')">Battle Sim</div>
       <div class="bstatSubtab" data-p="how" onclick="bstatTab('how')">How scoring works</div>
     </div>
 
@@ -7302,7 +7306,8 @@ per type:  atkPower = base_att <span class="bstatK">×</span> <span class="bstat
         </div>
         <div class="bstatFoot" style="margin-top:14px">
           <span class="bstatFootNote">Widgets fire only in the matching role - offensive on attack, defensive on defense.</span>
-          <button class="bstatBtnPrimary" id="bstatRunBtn" onclick="bstatRunBattle()">Run 1000 battles</button>
+          <button class="bstatBtnPrimary" id="bstatRunBtn" onclick="bstatRunBattle()">Run Simulator</button>
+          <button class="bstatBtn" id="bstatRunMcBtn" onclick="bstatRunBattleMC()" title="Monte-Carlo spread — optional uncertainty view">Uncertainty (1000 MC)</button>
         </div>
       </div>
       <div class="bstatCard" id="bstatBattleResultCard" style="display:none">
@@ -7541,7 +7546,7 @@ var BSTAT_REGISTRY = {
   // ========================= GENERATION 4 (Mythic) =========================
   'Margot': { gen:4, type:'cavalry', rarity:'mythic', widget:bstatMkWidget('def','leth'), exp:[
     bstatMkStatic('Warbringer','atk',[5,10,15,20,25]),
-    bstatMkProc('Subterfuge','dmgTakenDown',[4,8,12,16,20],0.20,{note:'dodge (evasion)'}),
+    bstatMkStatic('Subterfuge','dmgTakenDown',[4,8,12,16,20],{note:'dodge — MEASURED static (1,1,1), not 20% proc [HANDOVER fix]'}),
     bstatMkProc('Sleight Hand','dmgDealt',[120,140,160,180,200],0.25,{restrict:['cavalry']})
   ]},
   'Alcar': { gen:4, type:'infantry', rarity:'mythic', widget:bstatMkWidget('def','hea'), exp:[
@@ -7907,6 +7912,245 @@ function bstatMonteCarlo(A, B, opts){
   };
 }
 
+// ── KSD: Deterministic battle engine (Laurent sos.battle port) ─────────────
+// ADMIN-ONLY PREVIEW. Validated 31/31 winner calls on the PvP Tile dataset
+// (26 train + 5 blind); blind residents within ±7%. Port fidelity flags
+// F1-F7 and adapter notes: see HANDOVER_v2.md. Escaping-safe block (no template-literal tokens).
+var KSD_TYPES = ['infantry','cavalry','ranged'];
+var KSD_DFAMS = ['leth','atk','dmg','edt','edf'];   // damage families (multiplicative across, additive within)
+var KSD_FFAMS = ['def','hp','dtd'];                  // defense families [(1+v) multiplier on defense]
+var KSD_CFAMS = ['edd','ela','ell'];                 // defender's enemy-debuffs (divide attacker damage)
+var KSD_OP2FAM = { atk:'atk', leth:'leth', dmgDealt:'dmg', skillDmg:'dmg',
+  enDmgTakenUp:'edt', enDefDown:'edf', def:'def', hp:'hp', dmgTakenDown:'dtd',
+  enDmgDown:'edd', enAtkDown:'ela', enLethDown:'ell' };
+
+function ksdMkSkill(s){
+  return { unitType:(s.unitType==='archer'?'ranged':s.unitType), roundFreq:s.roundFreq||1,
+    roundLag:s.roundLag||0, value:s.value||0, effect:s.effect, effectTarget:s.effectTarget||0,
+    target:null, trigger:null, effectRelation:s.effectRelation||1,
+    rate:(s.rate==null?1:s.rate), lastRound:-1, protect:0, name:s.name||'' };
+}
+function ksdSkillFires(sk, fighter, unitType, vs, round){
+  if(sk.effectTarget===31 && sk.unitType===unitType) return false;
+  var prev=fighter.round[round-1];
+  if(sk.effectRelation===2 && prev[sk.unitType].nbUnit<=0) return false;
+  if((round-sk.roundLag)>0 && (round-sk.roundLag)%sk.roundFreq===0){
+    if(sk.target===null || sk.target===(sk.effectTarget===20?vs:unitType)){
+      if(sk.trigger===null || sk.trigger===vs){ if(prev[unitType].nbUnit>0) return true; }
+    }
+  }
+  return false;
+}
+function ksdSkillDamage(f, unitType, vs, round){
+  var coef=1;
+  f.skills.forEach(function(sk){
+    if(!ksdSkillFires(sk,f,unitType,vs,round)) return;
+    var v=sk.value*sk.rate;
+    switch(sk.effect){
+      case 101: if(unitType===sk.unitType){ if(sk.lastRound===round) coef=coef-1;
+        coef=coef*(1+v/100); sk.lastRound=round; } break;
+      case 201: case 301: coef=coef+v/100; break;
+      case 221: coef=coef+(v/3)/100; break;
+      case 211: if(unitType===sk.unitType) coef=coef+v*1.4/100; break;
+    }
+  });
+  return coef;
+}
+function ksdSkillDefense(f, unitType, vs, round){
+  var coef=0;
+  f.skills.forEach(function(sk){
+    if(!ksdSkillFires(sk,f,unitType,vs,round)) return;
+    if(sk.effect===202||sk.effect===302) coef=coef+(sk.value*sk.rate)/100;
+  });
+  return Math.min(coef,0.99);
+}
+function ksdHeroActive(sk, squadType, round){
+  if(sk.only && squadType!==null){
+    var alias=(squadType==='ranged')?'archer':squadType;
+    if(sk.only.indexOf(alias)<0 && sk.only.indexOf(squadType)<0) return false;
+  }
+  var freq=sk.freq||1;
+  if(freq>1 && round%freq!==0) return false;
+  return true;
+}
+function ksdFamProduct(skills, fams, squadType, round){
+  var sums={};
+  (skills||[]).forEach(function(sk){
+    if(fams.indexOf(sk.fam)<0) return;
+    if(!ksdHeroActive(sk,squadType,round)) return;
+    sums[sk.fam]=(sums[sk.fam]||0)+sk.value*(sk.rate==null?1:sk.rate);
+  });
+  var p=1;
+  fams.forEach(function(fm){ if(sums[fm]) p*=(1+sums[fm]/100); });
+  return p;
+}
+function ksdBuildFighter(stats, counts, opts){
+  opts=opts||{};
+  var f={ attackByType:{}, defenseByType:{}, troopsByType:{}, round:[],
+    skills:(opts.skills||[]).map(ksdMkSkill), heroSkills:opts.heroSkills||[],
+    hasBikers:opts.hasBikers!==false, hasSnipers:!!opts.hasSnipers };
+  KSD_TYPES.forEach(function(t){
+    var kt=(t==='ranged')?'archer':t;
+    var s=stats[kt]||stats[t]||{atk:0,def:0,leth:0,hp:0};
+    var b=(opts.base&&(opts.base[t]||opts.base[kt]))||[0,0];
+    f.attackByType[t]=b[0]*(1+s.atk/100)*10*(1+s.leth/100)/100;
+    f.defenseByType[t]=b[1]*(1+s.hp/100)*10*(1+s.def/100)/100;
+    f.troopsByType[t]=(counts[kt]!=null?counts[kt]:counts[t])||0;
+  });
+  return f;
+}
+function ksdSum(f){ return KSD_TYPES.reduce(function(s,t){ return s+f.troopsByType[t]; },0); }
+function ksdCalcDead(round, army, attack, defense){
+  var d=army*attack/defense/100.0; d=d-d*0.0001*round; return Math.ceil(d);
+}
+function ksdUnitRound(unitType, fighter, opponent, armyMin, round, roundUnit){
+  if(round===0){ roundUnit.nbUnit=fighter.troopsByType[unitType]; return; }
+  var prev=fighter.round[round-1][unitType];
+  roundUnit.nbUnit=prev.nbUnit;
+  var cont=true, types=KSD_TYPES;
+  if(round%20===0){ // periodic bypass (Laurent) — see HANDOVER Ambusher flag
+    if(unitType==='cavalry'&&fighter.hasBikers) types=['ranged','infantry','cavalry'];
+    if(unitType==='ranged'&&fighter.hasSnipers) types=['cavalry','infantry','ranged'];
+  }
+  types.forEach(function(vs){
+    var det=roundUnit.details[vs];
+    var army=Math.sqrt(prev.nbUnit)*Math.sqrt(armyMin);
+    if(cont && opponent.defenseByType[vs]>0 && army>0 && opponent.round[round-1][vs].nbUnit>0){
+      var attack=fighter.attackByType[unitType]*ksdSkillDamage(fighter,unitType,vs,round)
+        *ksdFamProduct(fighter.heroSkills,KSD_DFAMS,unitType,round)
+        /ksdFamProduct(opponent.heroSkills,KSD_CFAMS,null,round);
+      var defense=opponent.defenseByType[vs]/(1-ksdSkillDefense(opponent,vs,unitType,round))
+        *ksdFamProduct(opponent.heroSkills,KSD_FFAMS,vs,round);
+      det.dead=ksdCalcDead(round,army,attack,defense);
+      det.damage=army*attack;
+      cont=false; // needContinue: no Kingshot skills use it yet
+    }
+  });
+}
+function ksdNewLine(f){
+  var line={};
+  KSD_TYPES.forEach(function(t){
+    var d={}; KSD_TYPES.forEach(function(vs){ d[vs]={dead:0,damage:0}; });
+    line[t]={nbUnit:0,details:d};
+  });
+  f.round.push(line); return line;
+}
+function ksdApplyDeaths(fighter, opponent, round){
+  var total=0;
+  KSD_TYPES.forEach(function(t1){
+    var unit=fighter.round[round][t1].nbUnit;
+    KSD_TYPES.forEach(function(t2){
+      var det=opponent.round[round][t2].details[t1], dead=det.dead;
+      if(unit<dead){ dead=unit; det.dead=dead; if(dead===0) det.damage=0; }
+      unit-=dead;
+    });
+    total+=unit; fighter.round[round][t1].nbUnit=unit;
+  });
+  return total===0;
+}
+function ksdFight(attacker, attacked, maxRound){
+  maxRound=maxRound||2000;
+  var armyMin=Math.min(ksdSum(attacker),ksdSum(attacked));
+  var end=false, round=0;
+  while(!end){
+    [attacker,attacked].forEach(function(f){
+      var opp=(f===attacker)?attacked:attacker;
+      var line=ksdNewLine(f);
+      KSD_TYPES.forEach(function(t){ ksdUnitRound(t,f,opp,armyMin,round,line[t]); });
+    });
+    var e1=ksdApplyDeaths(attacker,attacked,round);
+    var e2=ksdApplyDeaths(attacked,attacker,round);
+    end=e1||e2; round++;
+    if(round>maxRound) end=true;
+  }
+  function res(f){
+    var last=f.round.length-1, start=0, endN=0, bt={start:{},end:{}};
+    KSD_TYPES.forEach(function(t){ bt.start[t]=f.round[0][t].nbUnit; bt.end[t]=f.round[last][t].nbUnit;
+      start+=bt.start[t]; endN+=bt.end[t]; });
+    var tot=start-endN, minor=Math.round(0.65*tot), wound=tot-minor; // confirmed 35:65
+    return { start:start, end:endN, total:tot, wound:wound, minorWound:minor, byType:bt };
+  }
+  return { rounds:round, attacker:res(attacker), attacked:res(attacked) };
+}
+// registry entry -> family specs (lv 1-5; widgets handled separately)
+function ksdEntryToFam(sk, lv){
+  var out=[];
+  function one(op, vals){
+    var fam=KSD_OP2FAM[op]; if(!fam) return;
+    var v=vals[Math.max(0,Math.min(4,(lv||5)-1))];
+    var spec={fam:fam,value:v,name:sk.name};
+    if(sk.kind==='proc'&&sk.chance) spec.rate=sk.chance;
+    if(sk.kind==='periodic'&&sk.period){ spec.freq=sk.period; spec.rate=sk.active||1; }
+    if(sk.restrict) spec.only=sk.restrict;
+    out.push(spec);
+  }
+  one(sk.op, sk.vals);
+  if(sk.pair) one(sk.pair.op, sk.pair.vals);
+  return out;
+}
+function ksdHeroFamSkills(names, lv){
+  var out=[];
+  (names||[]).forEach(function(n){
+    var h=n&&REG[n]; if(!h||!h.exp) return;
+    h.exp.forEach(function(sk){ ksdEntryToFam(sk,lv).forEach(function(s){ out.push(s); }); });
+  });
+  return out;
+}
+function ksdJoinerFamSkills(names, lv){
+  var out=[], seen={};
+  (names||[]).forEach(function(n){
+    var h=n&&REG[n]; if(!h||!h.exp||!h.exp[0]) return;
+    var sk=h.exp[0]; if(sk.op==='noncombat') return;
+    if(sk.kind==='proc'||sk.kind==='dot'){ var k=n+':'+sk.name; if(seen[k]) return; seen[k]=true; }
+    ksdEntryToFam(sk,lv).forEach(function(s){ out.push(s); });
+  });
+  return out;
+}
+function ksdWidgetFamSkills(typesInput, role){
+  var out=[];
+  BSTAT_TYPES.forEach(function(t){
+    var q=typesInput[t]||{}; var h=q.hero&&REG[q.hero];
+    if(!h||!h.widget) return;
+    var want=(role==='defend')?'def':'off';
+    if(h.widget.role!==want) return;
+    var lvW=Math.max(1,Math.min(10,bstatN(q.widgetLv))); if(!bstatN(q.widgetLv)) return;
+    var pct=BSTAT_WIDGET_PCT[lvW]||0; if(!pct) return;
+    var fam={atk:'atk',leth:'leth',def:'def',hea:'hp'}[h.widget.stat];
+    if(fam) out.push({fam:fam,value:pct,name:q.hero+' widget'});
+  });
+  return out;
+}
+// TG troop skills: EVs use TG5-CONFIRMED rates; applied when TG>=3
+// (TG3-4 true values UNVERIFIED — flagged in the result note).
+function ksdTroopSkills(typesInput){
+  var out=[];
+  function tg(t){ var p=String((typesInput[t]||{}).tier||'10.0').split('.'); return +p[1]||0; }
+  if(tg('cavalry')>=3) out.push({name:'AssaultLance',unitType:'cavalry',effect:201,value:100,rate:0.15});
+  if(tg('archer')>=3){
+    out.push({name:'HowlingWind',unitType:'archer',effect:201,value:50,rate:0.30});
+    out.push({name:'Volley',unitType:'archer',effect:201,value:100,rate:0.10});
+  }
+  if(tg('infantry')>=3) out.push({name:'UnyieldShield',unitType:'infantry',effect:302,value:36,rate:0.375});
+  return out;
+}
+function ksdSideFighter(inp){
+  var stats={}, counts={}, base={};
+  BSTAT_TYPES.forEach(function(t){
+    var q=inp.types[t]||{};
+    stats[t]={atk:bstatN(q.atk),def:bstatN(q.def),leth:bstatN(q.leth),hp:bstatN(q.hp)};
+    counts[t]=Math.max(0,bstatN(q.n));
+    base[t]=bstatBase(t,q.tier||'10.0');
+  });
+  var names=[]; BSTAT_TYPES.forEach(function(t){ var q=inp.types[t]||{}; if(q.hero) names.push(q.hero); });
+  var heroSkills=ksdHeroFamSkills(names,5)
+    .concat(ksdWidgetFamSkills(inp.types, inp.role))
+    .concat(ksdJoinerFamSkills(inp.joiners,5));
+  var cavT=+String((inp.types.cavalry||{}).tier||'10.0').split('.')[0];
+  return ksdBuildFighter(stats,counts,{ base:base, skills:ksdTroopSkills(inp.types),
+    heroSkills:heroSkills, hasBikers:cavT>=7 });
+}
+// ── end KSD ────────────────────────────────────────────────────────────────
+
 // ── Battle Simulator (client) ──────────────────────────────────────────────
 var REG = BSTAT_REGISTRY, SIDE = BSTAT_SIDE;   // engine hooks to the embedded registry
 
@@ -8029,6 +8273,32 @@ function bstatBattleHisto(bins, max, color){
 }
 
 function bstatRunBattle(){
+  // PRIMARY: deterministic Laurent-port engine (admin preview).
+  if(!(typeof isAdmin==='function'&&isAdmin())){ if(typeof toast==='function') toast('Admin only.'); return; }
+  var inA=bstatReadSide('you'), inB=bstatReadSide('enemy');
+  var fA=ksdSideFighter(inA), fB=ksdSideFighter(inB);
+  var r=ksdFight(fA,fB,2000);
+  var card=document.getElementById('bstatBattleResultCard'); if(card) card.style.display='block';
+  var youWin=r.attacker.end>0&&r.attacked.end===0, enWin=r.attacked.end>0&&r.attacker.end===0;
+  var verdict=youWin?'You win':(enWin?'Enemy wins':(r.attacker.end>r.attacked.end?'You win (attrition)':'Enemy wins (attrition)'));
+  function sideHtml(tt,res){
+    return '<div><div class="bstatBcolT '+(tt==='you'?'atk':'def')+'">'+(tt==='you'?'Your side':'Enemy side')+'</div>'
+      +'<div class="bstatBstat">residents <b>'+res.end.toLocaleString()+'</b> of '+res.start.toLocaleString()+'</div>'
+      +'<div class="bstatHint">injured '+res.wound.toLocaleString()+' \u00b7 lightly '+res.minorWound.toLocaleString()
+      +' \u00b7 inf/cav/arc left '+res.byType.end.infantry.toLocaleString()+'/'+res.byType.end.cavalry.toLocaleString()+'/'+res.byType.end.ranged.toLocaleString()+'</div></div>';
+  }
+  var html='<div class="bstatBverdict">'+verdict+' <span class="bstatHint">deterministic \u00b7 '+r.rounds+' rounds</span></div>'
+    +'<div class="bstatBcols">'+sideHtml('you',r.attacker)+sideHtml('enemy',r.attacked)+'</div>'
+    +'<div class="bstatNote" style="margin:14px 0 0"><b>Admin preview \u2014 read the flags.</b> '
+    +'Winner calls validated 31/31 on tile battles (26 train + 5 blind); blind residents within \u00b17%. '
+    +'Casualty counts have a hard floor: identical real battles vary \u00b122%. '
+    +'UNVERIFIED here: rally widgets (tile data cannot test them), Gen 6\u20137 hero values, TG3\u20134 troop-skill rates (TG5 rates applied), '
+    +'small armies (&lt;5k residents drift), and the Ambusher bypass model (periodic vs per-round \u2014 unresolved). '
+    +'Validated vs ONE NPC target + 3 KvK reports; player-vs-player accuracy is not yet established.</div>';
+  var out=document.getElementById('bstatBattleResult'); if(out) out.innerHTML=html;
+}
+
+function bstatRunBattleMC(){
   var A=bstatBattleSide(bstatReadSide('you')), B=bstatBattleSide(bstatReadSide('enemy'));
   var r=bstatMonteCarlo(A,B,{iters:1000, k:0.1});
   var card=document.getElementById('bstatBattleResultCard'); if(card) card.style.display='block';
@@ -8061,6 +8331,13 @@ function bstatRunBattle(){
 
 // ── sub-tab switching ──
 function bstatTab(p){
+  // Battle Sim is ADMIN-ONLY while the deterministic engine is in preview.
+  if(p==='battle' && !(typeof isAdmin==='function' && isAdmin())){
+    if(typeof toast==='function') toast('Battle Simulator is admin-only for now.');
+    return;
+  }
+  var st=document.getElementById('bstatSubtabBattle');
+  if(st) st.style.display=(typeof isAdmin==='function' && isAdmin())?'':'none';
   var subs=document.querySelectorAll('#page-battlestats .bstatSubtab');
   for(var i=0;i<subs.length;i++){ subs[i].classList.toggle('active', subs[i].getAttribute('data-p')===p); }
   var panes=document.querySelectorAll('#page-battlestats .bstatPane');
@@ -8833,7 +9110,7 @@ var BSTAT_REGISTRY = {
   // ========================= GENERATION 4 (Mythic) =========================
   'Margot': { gen:4, type:'cavalry', rarity:'mythic', widget:bstatMkWidget('def','leth'), exp:[
     bstatMkStatic('Warbringer','atk',[5,10,15,20,25]),
-    bstatMkProc('Subterfuge','dmgTakenDown',[4,8,12,16,20],0.20,{note:'dodge (evasion)'}),
+    bstatMkStatic('Subterfuge','dmgTakenDown',[4,8,12,16,20],{note:'dodge — MEASURED static (1,1,1), not 20% proc [HANDOVER fix]'}),
     bstatMkProc('Sleight Hand','dmgDealt',[120,140,160,180,200],0.25,{restrict:['cavalry']})
   ]},
   'Alcar': { gen:4, type:'infantry', rarity:'mythic', widget:bstatMkWidget('def','hea'), exp:[
