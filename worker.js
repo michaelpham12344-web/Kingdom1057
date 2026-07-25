@@ -8454,7 +8454,7 @@ function bsimTroopRow(side,type,tier,tg,qty){
 function bsimTroopsCard(side){
   var d=[['infantry',10,5,20000],['cavalry',10,5,8000],['archer',10,5,12000]];
   var h='<div class="bsimCard"><div class="bsimCardH bsimH-troops">Troops</div><div class="bsimCardB">';
-  h+='<div class="bsimBar"><span style="flex:1"></span><button class="bsimBtnRed" onclick="bsimAddTroop(\''+side+'\')">Add Unit</button></div>';
+  h+='<div class="bsimBar"><span style="flex:1"></span><button class="bsimBtnRed" onclick="bsimAddTroop(\\''+side+'\\')">Add Unit</button></div>';
   h+='<div class="bsimRow bsimRowHead bsimRow-troop"><span>Type</span><span>Tier</span><span>TG level</span><span>Quantity</span><span></span></div>';
   h+='<div id="'+side+'_troopList">';
   d.forEach(function(r){ h+=bsimTroopRow(side,r[0],r[1],r[2],r[3]); });
@@ -8479,7 +8479,7 @@ function bsimHeroRow(side,hero,wlv){
 function bsimHeroesCard(side){
   var h='<div class="bsimCard"><div class="bsimCardH bsimH-heroes">Heroes</div><div class="bsimCardB">';
   h+='<div class="bsimBar"><span class="bsimHint">Leader trio &mdash; one per troop type. All three Expedition skills fire, plus the widget.</span>'
-    +'<span style="flex:1"></span><button class="bsimBtnGreen" onclick="bsimAddHero(\''+side+'\')">Add Hero</button></div>';
+    +'<span style="flex:1"></span><button class="bsimBtnGreen" onclick="bsimAddHero(\\''+side+'\\')">Add Hero</button></div>';
   h+='<div class="bsimRow bsimRowHead bsimRow-hero"><span>Hero</span><span>Widget lv</span><span></span><span></span></div>';
   h+='<div id="'+side+'_heroList"></div>';
   h+='<div class="bsimEmpty" id="'+side+'_heroEmpty">No heroes selected</div>';
@@ -8503,7 +8503,7 @@ function bsimJoinRow(side,hero){
 function bsimJoinersCard(side){
   var h='<div class="bsimCard"><div class="bsimCardH bsimH-join">Joiner Heroes</div><div class="bsimCardB">';
   h+='<div class="bsimBar"><span class="bsimHint">First Expedition skill only, up to 4. Identical proc skills count once.</span>'
-    +'<span style="flex:1"></span><button class="bsimBtnGold" onclick="bsimAddJoin(\''+side+'\')">Add Hero</button></div>';
+    +'<span style="flex:1"></span><button class="bsimBtnGold" onclick="bsimAddJoin(\\''+side+'\\')">Add Hero</button></div>';
   h+='<div id="'+side+'_joinList"></div>';
   h+='<div class="bsimEmpty" id="'+side+'_joinEmpty">No joiner heroes selected</div>';
   h+='</div></div>';
