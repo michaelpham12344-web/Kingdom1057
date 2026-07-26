@@ -790,6 +790,91 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .bs-launch-soon{animation:bsPulse 1s infinite}
 @keyframes bsPulse{0%,100%{background:transparent}50%{background:rgba(255,80,80,.16)}}
 .bs-launch-go{background:rgba(60,200,120,.12);border-radius:4px}
+
+/* ── Enemy Scout ── */
+.scoutSubtabs{display:flex;flex-direction:column;gap:8px;max-width:320px;margin-bottom:16px}
+.scoutTab{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px 16px;cursor:pointer;transition:.15s}
+.scoutTab:hover{border-color:var(--border2)}
+.scoutTab.on{background:linear-gradient(180deg,rgba(217,166,72,.14),rgba(217,166,72,.03));border-color:var(--gold)}
+.scoutTabT{font-family:var(--head);font-size:14px;font-weight:600;color:var(--text)}
+.scoutTab.on .scoutTabT{color:var(--gold)}
+.scoutTabS{font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
+.scoutMuted{font-size:11.5px;color:var(--text3)}
+.mono{font-family:var(--mono)}
+.scoutChipBtn{background:var(--bg3);border:1px solid var(--border);border-radius:14px;color:var(--text2);font-family:var(--mono);font-size:12px;padding:4px 12px;cursor:pointer}
+.scoutChipBtn:hover{border-color:var(--gold);color:var(--text)}
+.scoutHead{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;border-color:var(--enemy)!important}
+.scoutHeadL{display:flex;align-items:center;gap:14px}
+.scoutShield{width:52px;height:60px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:var(--head);font-weight:700;font-size:15px;color:var(--gold);background:linear-gradient(180deg,#3a2c1e,#241a10);border:2px solid var(--gold);border-radius:8px 8px 22px 22px}
+.scoutKName{font-family:var(--head);font-size:22px;font-weight:700}
+.scoutChip{display:inline-block;font-size:11px;color:var(--text2);border:1px solid var(--border);border-radius:5px;padding:2px 8px;margin-top:6px}
+.scoutChip.warn{color:#e0a05e;border-color:rgba(224,140,60,.4)}
+.scoutThreat{text-align:center}
+.scoutThreatL{font-family:var(--head);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)}
+.scoutVerdict{font-family:var(--head);font-size:34px;font-weight:700;line-height:1.05;letter-spacing:.02em}
+.scoutGap{font-family:var(--mono);font-size:22px;font-weight:600;margin-top:2px}
+.scoutGapSub{font-size:11px;color:var(--text3);margin-top:2px;line-height:1.4}
+.scoutGrades{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.scoutGrade{text-align:center;background:rgba(46,204,113,.06);border:1px solid rgba(46,204,113,.2);border-radius:8px;padding:9px}
+.scoutGradeL{font-family:var(--head);font-size:10px;letter-spacing:.05em;color:var(--text3)}
+.scoutGradeV{font-family:var(--head);font-size:20px;font-weight:700;color:var(--green)}
+.scoutCall{display:flex;gap:10px;align-items:flex-start;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:8px;padding:11px 14px;font-size:13px;color:var(--text);line-height:1.5}
+.scoutCallTag{font-family:var(--head);font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--gold);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;flex-shrink:0;margin-top:1px}
+.scoutRally{display:grid;grid-template-columns:1fr 40px 1fr;align-items:center;gap:8px;margin-bottom:6px}
+.scoutRallyCell{text-align:center;padding:12px;border-radius:8px}
+.scoutRallyCell.enemy{background:rgba(224,69,69,.07);border:1px solid rgba(224,69,69,.25)}
+.scoutRallyCell.ours{background:rgba(46,204,113,.07);border:1px solid rgba(46,204,113,.25)}
+.scoutRallyN{font-family:var(--mono);font-size:32px;font-weight:600}
+.scoutRallyCell.enemy .scoutRallyN{color:var(--enemy)}
+.scoutRallyCell.ours .scoutRallyN{color:var(--green)}
+.scoutRallyL{font-family:var(--head);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3)}
+.scoutVs{text-align:center;font-family:var(--head);font-size:12px;color:var(--text3)}
+.scoutTgRow{display:grid;grid-template-columns:56px 1fr 34px;align-items:center;gap:10px;padding:4px 0}
+.scoutTgL{font-family:var(--head);font-size:13px;font-weight:600;color:var(--gold)}
+.scoutTgBar{height:15px;background:var(--bg2);border-radius:4px;overflow:hidden}
+.scoutTgFill{height:100%;background:linear-gradient(90deg,#e0885e,#c85a3a);opacity:.9}
+.scoutTgN{font-family:var(--mono);font-size:13px;font-weight:600;text-align:right}
+.scoutKvkStats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.scoutStat{text-align:center;background:var(--bg3);border-radius:8px;padding:11px}
+.scoutStatV{font-family:var(--mono);font-size:22px;font-weight:600}
+.scoutStatL{font-family:var(--head);font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-top:2px}
+.scoutKing{font-size:12.5px;color:var(--text2);margin-bottom:10px}
+.scoutSov{font-family:var(--head);font-size:10px;font-weight:600;color:var(--gold);background:rgba(217,166,72,.12);border:1px solid rgba(217,166,72,.35);border-radius:5px;padding:2px 8px}
+.scoutMatchups{border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.scoutMatchup{display:grid;grid-template-columns:1fr 40px 60px 1.2fr;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px}
+.scoutMatchup:last-child{border-bottom:none}
+.scoutAiRow{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.scoutBrief{font-size:13.5px;line-height:1.62;color:var(--text)}
+.scoutH2HTop{display:grid;grid-template-columns:1fr 54px 1fr;background:rgba(0,0,0,.25);border-radius:8px;margin-bottom:8px}
+.scoutH2HSide{padding:12px 14px}.scoutH2HSide.r{text-align:right}
+.scoutH2HK{font-family:var(--head);font-size:15px;font-weight:700}
+.scoutH2HK.enemy{color:#ff9a9a}.scoutH2HK.ours{color:#8fd6a8}
+.scoutH2HVs{display:flex;align-items:center;justify-content:center;font-family:var(--head);font-weight:700;color:var(--gold)}
+.scoutH2HRow{display:grid;grid-template-columns:1fr 130px 1fr;align-items:center;border-bottom:1px solid var(--border)}
+.scoutH2HRow:last-child{border-bottom:none}
+.scoutH2HNum{font-family:var(--mono);font-size:14px;font-weight:600;padding:10px 14px}.scoutH2HNum.r{text-align:right}
+.scoutH2HM{text-align:center;font-family:var(--head);font-size:10px;text-transform:uppercase;color:var(--text3)}
+.scoutTblWrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px}
+.scoutTbl{width:100%;border-collapse:collapse;min-width:520px}
+.scoutTbl th{font-family:var(--head);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.2);white-space:nowrap}
+.scoutTbl th.num{text-align:right}
+.scoutTbl td{padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px;white-space:nowrap}
+.scoutTbl td.num{text-align:right}
+.scoutTbl tbody tr:last-child td{border-bottom:none}
+.scoutTbl tbody tr:hover td{background:rgba(217,166,72,.03)}
+.scoutTbl td.top,.scoutTbl .mono.top{color:var(--gold);font-weight:600}
+.scoutName{font-family:var(--head);font-size:13px;font-weight:600}
+.scoutAlly{font-family:var(--mono);font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;border:1px solid var(--border);background:var(--bg4);color:var(--text2)}
+.scoutAlly.top{border-color:var(--gold);color:var(--gold)}
+.scoutRatio{font-family:var(--mono);font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:4px}
+.scoutRatio.over{background:rgba(224,69,69,.12);color:#ff8080}
+.scoutRatio.under{background:rgba(46,204,113,.12);color:#5fd48a}
+.scoutBoardSel{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.scoutBoardBtn{font-family:var(--head);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:6px;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--text2)}
+.scoutBoardBtn:hover{border-color:var(--gold);color:var(--text)}
+.scoutBoardBtn.on{background:linear-gradient(180deg,rgba(168,50,44,.35),rgba(168,50,44,.12));color:var(--gold);border-color:var(--gold)}
+@media(max-width:560px){.scoutGrades{grid-template-columns:repeat(2,1fr)}.scoutHead{flex-direction:column;align-items:stretch;text-align:center}.scoutHeadL{justify-content:center}}
+
 </style>
 <script>
 // DragDropTouch polyfill — enables HTML5 drag-and-drop on iOS and Android
@@ -980,6 +1065,7 @@ document.addEventListener('touchend',function(e){
   <div class="nav-logo"><svg width="26" height="30" viewBox="0 0 60 68" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0" aria-hidden="true"><path d="M14 12 L20 4 L30 10 L40 4 L46 12 Z" fill="#d9a648"/><path d="M8 16 H52 V38 C52 52 42 60 30 66 C18 60 8 52 8 38 Z" fill="#7e1f26" stroke="#d9a648" stroke-width="3"/><path d="M14 34 L30 24 L46 34 V42 L30 32 L14 42 Z" fill="#d9a648" opacity="0.92"/></svg>KINGDOM<span>1057</span></div>
   <div class="tab active" onclick="showPage('strategy')">Battle Strategy</div>
   <div class="tab" onclick="showPage('minister')">Minister Spots</div>
+  <div class="tab" id="tabScout" onclick="showPage('scout')" style="display:none">Enemy Scout</div>
   <div class="tab" id="tabBattleStats" onclick="showPage('battlestats')" style="display:none">Battle Stats</div>
   <div class="tab" id="tabBattleSim" onclick="showPage('battlesim')" style="display:none">Battle Sim</div>
   <div class="tab" id="tabSwordland" onclick="showPage('swordland')" style="display:none">Swordland</div>
@@ -6163,6 +6249,10 @@ function enterApp(role) {
     if(el) el.style.display = (isRally || isR4 || isAdm) ? '' : 'none';
   });
 
+  // Enemy Scout — R4/R5, Admin, Rally Leaders
+  const scoutTab = document.getElementById('tabScout');
+  if(scoutTab) scoutTab.style.display = (isRally || isR4 || isAdm) ? '' : 'none';
+
   // Admin tab
   const adminTab = document.getElementById('tabAdmin');
   if(adminTab) adminTab.style.display = isAdm ? '' : 'none';
@@ -6201,6 +6291,7 @@ function showPageDirect(p) {
   if (p === 'swordland')   { renderAttendance('sw'); }
   if (p === 'trialliance') { renderAttendance('ta'); }
   if (p === 'battlestats') { if (typeof bstatInit==='function') bstatInit(); }
+  if (p === 'scout')       { if (typeof scoutInit==='function') scoutInit(); }
   if (p === 'admin') {
     adminRefreshPasswordDisplay();
     adminLoadGiftLog();
@@ -9115,7 +9206,282 @@ function bstatWtToggleEdit(){
     else { btn.textContent='💾 Save weights'; if(typeof toast==='function') toast('Save failed'+(d&&d.error?': '+d.error:'')); }
   }).catch(function(){ btn.disabled=false; btn.textContent='💾 Save weights'; if(typeof toast==='function') toast('Save failed.'); });
 }
+
+// ══════════════════════════════════════════════════════════
+// ENEMY SCOUT  (front-end; mock data — live jeabslist proxy is Phase 2)
+// ══════════════════════════════════════════════════════════
+var SCOUT = { kid:"924", view:"overview", board:"power", showAll:false, expanded:{} };
+
+var SCOUT_TCTOTG = function(tc){ return Math.max(1, Math.min(9, 4 + Math.floor((tc-50)/5))); };
+var SCOUT_WHALE = 700e6;      // >= this power = whale
+var SCOUT_RALLY = 2700;       // >= this mystic = potential rally leader
+var SCOUT_BOARDS = [
+ {key:"power",t:3,label:"Personal Power"},{key:"kills",t:4,label:"Kill Count"},{key:"tc",t:5,label:"Town Center"},
+ {key:"heroPower",t:7,label:"Hero Power"},{key:"heroTotal",t:8,label:"Hero Total"},{key:"petPower",t:16,label:"Pet Power"},
+ {key:"mystic",t:20,label:"Mystic Trial"},{key:"coliseum",t:21,label:"Coliseum"},{key:"forest",t:22,label:"Forest of Life"},
+ {key:"crystal",t:23,label:"Crystal Cave"},{key:"nexus",t:24,label:"Knowledge Nexus"},{key:"molten",t:25,label:"Molten Fort"},
+ {key:"radiant",t:26,label:"Radiant Spire"},{key:"masterTotal",t:29,label:"Master Total"}
+];
+var SCOUT_BIGNUM = {power:1,kills:1,heroPower:1,heroTotal:1,petPower:1,masterTotal:1};
+
+var SCOUT_DATA = {
+ "924":{name:"Jenkins",snapshot:"2h ago",grade:"A",grades:{Whales:"A",Spending:"A+",Lethality:"A",Activity:"A"},tracked:172,
+   kvk:{prep_wins:1,prep_losses:7,castles_taken:0,castles_lost:4,king:"Massa Disasta",reigns:19,sovereign:true,
+     matchups:[{kid:"812",name:"Ironhold",grade:"A",power:1.71e9,result:"loss",note:"crushed in battle phase"},
+       {kid:"1190",name:"Larkspur",grade:"C",power:0.62e9,result:"win",note:"rolled a weak kingdom"},
+       {kid:"655",name:"Verdance",grade:"B",power:0.98e9,result:"loss",note:"lost sovereign mid-season"},
+       {kid:"1402",name:"Ashfall",grade:"D",power:0.41e9,result:"win",note:"stomped, no contest"},
+       {kid:"903",name:"Stormgate",grade:"A",power:1.55e9,result:"loss",note:"wiped, worst result"}]},
+   players:[
+     {n:"Massa Disasta",a:"ACE",fid:"116917976",power:1604481767,kills:413967990,tc:70,heroPower:19200000,heroTotal:126900000,petPower:38700000,mystic:3181,coliseum:769,forest:333,crystal:449,nexus:314,molten:480,radiant:794,masterTotal:21200000,vip:12},
+     {n:"Tom & Jerry",a:"SUN",fid:"130928577",power:761800000,kills:301200000,tc:67,heroPower:19000000,heroTotal:97000000,petPower:32800000,mystic:2939,coliseum:745,forest:302,crystal:381,nexus:310,molten:433,radiant:730,masterTotal:14300000,vip:12},
+     {n:"Sadden",a:"OLS",fid:"115239504",power:753500000,kills:288400000,tc:65,heroPower:17000000,heroTotal:94200000,petPower:30300000,mystic:2788,coliseum:678,forest:283,crystal:385,nexus:307,molten:425,radiant:710,masterTotal:12900000,vip:11},
+     {n:"Rick",a:"ACE",fid:"136599431",power:684300000,kills:150900000,tc:67,heroPower:18800000,heroTotal:94600000,petPower:32700000,mystic:2885,coliseum:721,forest:307,crystal:367,nexus:316,molten:433,radiant:736,masterTotal:15200000,vip:11},
+     {n:"SuperMario",a:"ACE",fid:"128328080",power:682200000,kills:142800000,tc:66,heroPower:19200000,heroTotal:100600000,petPower:32900000,mystic:2781,coliseum:702,forest:247,crystal:394,nexus:310,molten:434,radiant:694,masterTotal:18800000,vip:12},
+     {n:"Smurfy",a:"ACE",fid:"134223697",power:676900000,kills:198300000,tc:70,heroPower:18600000,heroTotal:96100000,petPower:34300000,mystic:2922,coliseum:713,forest:304,crystal:407,nexus:310,molten:439,radiant:739,masterTotal:18300000,vip:12},
+     {n:"Aura",a:"ACE",fid:"138008721",power:650700000,kills:121400000,tc:65,heroPower:18000000,heroTotal:92200000,petPower:28000000,mystic:2812,coliseum:717,forest:270,crystal:365,nexus:304,molten:403,radiant:681,masterTotal:13500000,vip:11},
+     {n:"Bye Mate",a:"ACE",fid:"138320052",power:570300000,kills:95400000,tc:68,heroPower:17800000,heroTotal:80500000,petPower:30000000,mystic:2700,coliseum:654,forest:269,crystal:378,nexus:308,molten:404,radiant:685,masterTotal:15800000,vip:10},
+     {n:"Astronaut Zed",a:"ACE",fid:"136534279",power:569800000,kills:88100000,tc:66,heroPower:14200000,heroTotal:69800000,petPower:21400000,mystic:2560,coliseum:601,forest:215,crystal:311,nexus:281,molten:372,radiant:598,masterTotal:11400000,vip:11},
+     {n:"SteveWeinberg",a:"OLS",fid:"137533305",power:569600000,kills:130200000,tc:70,heroPower:14100000,heroTotal:81000000,petPower:24700000,mystic:2572,coliseum:609,forest:239,crystal:334,nexus:297,molten:391,radiant:625,masterTotal:11900000,vip:10},
+     {n:"Gollum",a:"ACE",fid:"122790571",power:540200000,kills:76400000,tc:64,heroPower:17700000,heroTotal:83100000,petPower:21900000,mystic:2630,coliseum:638,forest:214,crystal:388,nexus:302,molten:408,radiant:642,masterTotal:13100000,vip:10},
+     {n:"Mustachio",a:"ACE",fid:"137573332",power:512800000,kills:69200000,tc:65,heroPower:15100000,heroTotal:77200000,petPower:24900000,mystic:2617,coliseum:652,forest:233,crystal:356,nexus:288,molten:386,radiant:645,masterTotal:13500000,vip:10},
+     {n:"Uhtred",a:"ACE",fid:"138336358",power:520400000,kills:71300000,tc:69,heroPower:13900000,heroTotal:71400000,petPower:23500000,mystic:2552,coliseum:608,forest:228,crystal:338,nexus:313,molten:384,radiant:629,masterTotal:12600000,vip:10},
+     {n:"Nollo",a:"ACE",fid:"138418386",power:472900000,kills:64100000,tc:66,heroPower:16400000,heroTotal:80700000,petPower:26300000,mystic:2578,coliseum:668,forest:242,crystal:302,nexus:287,molten:381,radiant:639,masterTotal:14700000,vip:10}
+   ]},
+ "936":{name:"Doom Zebra",snapshot:"5h ago",grade:"F",grades:{Whales:"F",Spending:"F",Lethality:"F",Activity:"F"},tracked:172,
+   kvk:{prep_wins:3,prep_losses:5,castles_taken:1,castles_lost:3,king:"nightmare",reigns:6,sovereign:false,
+     matchups:[{kid:"1201",name:"Frostvale",grade:"D",power:0.34e9,result:"win",note:"close"},{kid:"770",name:"Emberfall",grade:"B",power:0.91e9,result:"loss",note:"outmatched"}]},
+   players:[
+     {n:"nightmare",a:"CRW",fid:"135671969",power:310042636,kills:120400000,tc:55,heroPower:9200000,heroTotal:48000000,petPower:14100000,mystic:2210,coliseum:540,forest:180,crystal:260,nexus:190,molten:280,radiant:430,masterTotal:9100000,vip:10},
+     {n:"AZA",a:"CRW",fid:"134426917",power:291243993,kills:98200000,tc:55,heroPower:8800000,heroTotal:46000000,petPower:13600000,mystic:2180,coliseum:512,forest:172,crystal:250,nexus:185,molten:270,radiant:410,masterTotal:8700000,vip:9},
+     {n:"Mini Killa",a:"CRW",fid:"141204426",power:253945718,kills:110300000,tc:50,heroPower:8200000,heroTotal:42000000,petPower:12100000,mystic:2010,coliseum:498,forest:160,crystal:230,nexus:170,molten:250,radiant:390,masterTotal:7800000,vip:10}
+   ]},
+ "1057":{name:"your kingdom",snapshot:"today",grade:"B",own:true,grades:{Whales:"B",Spending:"B",Lethality:"B",Activity:"A"},tracked:50,
+   kvk:{prep_wins:4,prep_losses:4,castles_taken:2,castles_lost:2,king:"Olaf",reigns:5,sovereign:true,matchups:[]},
+   players:[
+     {n:"Olaf",a:"FIR",fid:"158134757",power:470400000,kills:171100000,tc:55,heroPower:14000000,heroTotal:70000000,petPower:20000000,mystic:2518,coliseum:620,forest:210,crystal:300,nexus:220,molten:320,radiant:470,masterTotal:11000000,vip:12},
+     {n:"Ragnar",a:"FIR",fid:"151002211",power:445200000,kills:158300000,tc:55,heroPower:13500000,heroTotal:67000000,petPower:19000000,mystic:2470,coliseum:598,forest:200,crystal:290,nexus:215,molten:310,radiant:450,masterTotal:10500000,vip:11},
+     {n:"Freya",a:"FIR",fid:"152880044",power:421900000,kills:142100000,tc:55,heroPower:13000000,heroTotal:64000000,petPower:18000000,mystic:2440,coliseum:572,forest:190,crystal:280,nexus:210,molten:300,radiant:430,masterTotal:10000000,vip:11},
+     {n:"Bjorn",a:"FIR",fid:"153771290",power:398600000,kills:133700000,tc:54,heroPower:12500000,heroTotal:61000000,petPower:17000000,mystic:2390,coliseum:551,forest:180,crystal:270,nexus:205,molten:290,radiant:410,masterTotal:9500000,vip:10},
+     {n:"Sigrid",a:"FIR",fid:"154662108",power:376400000,kills:120900000,tc:54,heroPower:12000000,heroTotal:58000000,petPower:16000000,mystic:2350,coliseum:530,forest:170,crystal:260,nexus:200,molten:280,radiant:390,masterTotal:9000000,vip:10},
+     {n:"Ivar",a:"FIR",fid:"155553017",power:352800000,kills:108400000,tc:54,heroPower:11500000,heroTotal:55000000,petPower:15000000,mystic:2300,coliseum:508,forest:160,crystal:250,nexus:195,molten:270,radiant:370,masterTotal:8500000,vip:10}
+   ]}
+};
+
+function scoutFmt(v,key){
+  if(v===undefined||v===null)return "-";
+  if(key==="mystic")return (v/1000).toFixed(3);
+  if(!SCOUT_BIGNUM[key])return String(v);
+  if(v>=1e9)return (v/1e9).toFixed(2)+"B";
+  if(v>=1e6){var m=v/1e6;return (m>=100?Math.round(m):Math.round(m*10)/10)+"M";}
+  return v.toLocaleString();
+}
+function scoutOwnTopPower(){ return Math.max.apply(null, SCOUT_DATA["1057"].players.map(function(p){return p.power;})); }
+function scoutOwnTopName(){ var ps=SCOUT_DATA["1057"].players; return ps.slice().sort(function(a,b){return b.power-a.power;})[0].n; }
+var SCOUT_GR = {"A+":9,"A":8,"B":6,"C":4,"D":2,"F":0};
+
+function scoutAnalyze(k){
+  var Y = SCOUT_DATA["1057"];
+  var top = Math.max.apply(null,k.players.map(function(p){return p.power;}));
+  var yTop = scoutOwnTopPower();
+  var gap = top/yTop;
+  // alliance blocks
+  var m={}; k.players.forEach(function(p){var b=m[p.a]||(m[p.a]={name:p.a,players:[],power:0,whales:0,rally:0});b.players.push(p);b.power+=p.power;if(p.power>=SCOUT_WHALE)b.whales++;if(p.mystic>=SCOUT_RALLY)b.rally++;});
+  var blocks=Object.keys(m).map(function(n){var b=m[n];b.count=b.players.length;b.top=Math.max.apply(null,b.players.map(function(p){return p.power;}));b.avgMystic=Math.round(b.players.reduce(function(s,p){return s+p.mystic;},0)/b.count);return b;}).sort(function(a,b){return b.power-a.power;});
+  // TG countdown
+  var tg={}; k.players.forEach(function(p){var t=SCOUT_TCTOTG(p.tc);tg[t]=(tg[t]||0)+1;});
+  var tgRows=Object.keys(tg).map(Number).sort(function(a,b){return b-a;}).map(function(t){return {tg:t,tc:50+(t-4)*5,count:tg[t]};});
+  // rally leaders
+  var rallyEnemy=k.players.filter(function(p){return p.mystic>=SCOUT_RALLY;}).length;
+  var rallyOurs=Y.players.filter(function(p){return p.mystic>=SCOUT_RALLY;}).length;
+  // farm target: active-ish, no whales, lowest power, >=2 players (mock has no "active" flag; use no-whale + not-strongest)
+  var farm=blocks.filter(function(b){return b.whales===0 && b.count>=2;}).sort(function(a,b){return a.power-b.power;})[0]
+        || blocks.filter(function(b){return b.name!==blocks[0].name;}).sort(function(a,b){return a.power-b.power;})[0];
+  // verdict
+  var verdict = gap>=2.5?"SEVERE":gap>=1.5?"HIGH":gap>=1.0?"EVEN":"FAVORABLE";
+  var vcolor  = gap>=1.5?"var(--enemy)":gap>=1.0?"var(--gold)":"var(--green)";
+  // tactical CALL (one-liner)
+  var strongest=blocks[0];
+  var call = "Do NOT rally "+k.players[0].n+" or the "+strongest.name+" bloc. Farm "+
+    blocks.filter(function(b){return b.whales===0;}).map(function(b){return b.name;}).slice(0,2).join(" & ")+" — active but no whale backing.";
+  return {top:top,yTop:yTop,gap:gap,blocks:blocks,strongest:strongest,tgRows:tgRows,rallyEnemy:rallyEnemy,rallyOurs:rallyOurs,farm:farm,verdict:verdict,vcolor:vcolor,call:call};
+}
+
+// ── init / render ──
+function scoutInit(){
+  var kEl=document.getElementById('scoutKid'); if(kEl && !kEl.value) kEl.value=SCOUT.kid;
+  scoutRun();
+}
+function scoutRun(){
+  var kid=String((document.getElementById('scoutKid')||{}).value||SCOUT.kid).trim();
+  if(!SCOUT_DATA[kid]){ document.getElementById('scoutBody').innerHTML='<div class="card"><div style="text-align:center;padding:36px;color:var(--text3)"><div style="font-size:30px;opacity:.5">⚑</div><div style="font-family:var(--head);font-size:15px;color:var(--text2);margin:8px 0">Kingdom '+kid+' not in sample data</div><div>This build carries 924 &amp; 936. Live version returns any tracked kingdom.</div></div></div>'; return; }
+  SCOUT.kid=kid; SCOUT.showAll=false; SCOUT.expanded={};
+  scoutRenderSubtabs();
+  scoutRenderView();
+}
+function scoutSetView(v){ SCOUT.view=v; scoutRenderSubtabs(); scoutRenderView(); }
+function scoutRenderSubtabs(){
+  var tabs=[["overview","⚑ Threat Overview","Verdict · rally · TG · KvK"],["matchup","⚔ Matchup","5v5 · compare · alliances"],["board","☰ Player Board","Top 100 · re-rank"]];
+  document.getElementById('scoutSubtabs').innerHTML = tabs.map(function(t){var on=SCOUT.view===t[0];
+    return '<div class="scoutTab'+(on?' on':'')+'" onclick="scoutSetView(\''+t[0]+'\')"><div class="scoutTabT">'+t[1]+'</div><div class="scoutTabS">'+t[2]+'</div></div>';
+  }).join('');
+}
+function scoutRenderView(){
+  if(SCOUT.view==="overview") scoutRenderOverview();
+  else if(SCOUT.view==="matchup") scoutRenderMatchup();
+  else scoutRenderBoard();
+}
+
+// ── VIEW 1: THREAT OVERVIEW ──
+function scoutRenderOverview(){
+  var k=SCOUT_DATA[SCOUT.kid], A=scoutAnalyze(k);
+  var gradeCells=["Whales","Spending","Lethality","Activity"].map(function(g){
+    return '<div class="scoutGrade"><div class="scoutGradeL">'+g.toUpperCase()+'</div><div class="scoutGradeV">'+k.grades[g]+'</div></div>';
+  }).join('');
+  var tgMax=Math.max.apply(null,A.tgRows.map(function(r){return r.count;}));
+  var tgRows=A.tgRows.map(function(r){
+    return '<div class="scoutTgRow"><span class="scoutTgL">TG'+r.tg+'</span><div class="scoutTgBar"><div class="scoutTgFill" style="width:'+(r.count/tgMax*100)+'%"></div></div><span class="scoutTgN">'+r.count+'</span></div>';
+  }).join('');
+  var mm=k.kvk;
+  var body=''
+  // header + threat
+  +'<div class="card scoutHead">'
+  +  '<div class="scoutHeadL">'
+  +    '<div class="scoutShield">'+SCOUT.kid+'</div>'
+  +    '<div><div class="scoutKName">'+SCOUT.kid+' · '+k.name.toUpperCase()+'</div>'
+  +      '<div class="scoutChip">'+k.tracked+' tracked</div> <div class="scoutChip warn">⚠ snapshot '+k.snapshot+' — stale</div></div>'
+  +  '</div>'
+  +  '<div class="scoutThreat"><div class="scoutThreatL">THREAT LEVEL</div><div class="scoutVerdict" style="color:'+A.vcolor+'">'+A.verdict+'</div>'
+  +    '<div class="scoutGap" style="color:'+A.vcolor+'">'+A.gap.toFixed(1)+'x</div>'
+  +    '<div class="scoutGapSub">their #1 outweighs ours<br><span class="mono">'+scoutFmt(A.top,"power")+' enemy #1 · '+scoutFmt(A.yTop,"power")+' ours</span></div>'
+  +  '</div>'
+  +'</div>'
+  // grades + call
+  +'<div class="card">'
+  +  '<div class="scoutGrades">'+gradeCells+'</div>'
+  +  '<div class="scoutCall"><span class="scoutCallTag">CALL</span> '+A.call+'</div>'
+  +'</div>'
+  // rally leaders
+  +'<div class="card"><div class="sec-title">Potential rally leaders</div>'
+  +  '<div class="scoutRally"><div class="scoutRallyCell enemy"><div class="scoutRallyN">'+A.rallyEnemy+'</div><div class="scoutRallyL">Enemy</div></div>'
+  +    '<div class="scoutVs">vs</div>'
+  +    '<div class="scoutRallyCell ours"><div class="scoutRallyN">'+A.rallyOurs+'</div><div class="scoutRallyL">Ours</div></div></div>'
+  +  '<div class="scoutMuted">Governors capable of leading a full rally (mystic trial ≥ '+(SCOUT_RALLY/1000).toFixed(3)+' — tunable).</div>'
+  +'</div>'
+  // TG countdown
+  +'<div class="card"><div class="sec-title">Troop-grade countdown <span class="scoutMuted" style="margin-left:auto;font-weight:400">'+k.players.length+' tracked</span></div>'
+  +  tgRows
+  +  '<div class="scoutMuted" style="margin-top:8px;font-style:italic">Mapping: 5 TC per tier (TC70=TG8, TC55=TG5).</div>'
+  +'</div>'
+  // KvK history
+  +'<div class="card"><div class="sec-title">KvK history &amp; reputation</div>'
+  +  '<div class="scoutKvkStats">'
+  +    '<div class="scoutStat"><div class="scoutStatV" style="color:'+(mm.prep_wins>=mm.prep_losses?'var(--green)':'var(--enemy)')+'">'+mm.prep_wins+'–'+mm.prep_losses+'</div><div class="scoutStatL">Prep record</div></div>'
+  +    '<div class="scoutStat"><div class="scoutStatV">'+mm.castles_taken+'</div><div class="scoutStatL">Castles taken</div></div>'
+  +    '<div class="scoutStat"><div class="scoutStatV" style="color:'+(mm.castles_lost>0?'var(--enemy)':'var(--green)')+'">'+mm.castles_lost+'</div><div class="scoutStatL">Castles lost</div></div>'
+  +  '</div>'
+  +  '<div class="scoutKing">'+(mm.sovereign?'<span class="scoutSov">👑 SOVEREIGN</span> ':'')+'Current king: <b>'+mm.king+'</b></div>'
+  +  (mm.matchups.length?'<div class="scoutMatchups">'+mm.matchups.map(function(o){var gc=SCOUT_GR[o.grade]>=8?'var(--enemy)':SCOUT_GR[o.grade]>=6?'var(--gold)':'var(--green)';
+      return '<div class="scoutMatchup" style="background:'+(o.result==="win"?"rgba(46,204,113,.05)":"rgba(224,69,69,.05)")+'"><span><b>K'+o.kid+'</b> <span class="scoutMuted">'+o.name+'</span></span><span style="color:'+gc+';font-weight:600">'+o.grade+'</span><span style="color:'+(o.result==="win"?"var(--green)":"var(--enemy)")+';text-transform:uppercase;font-weight:600">'+o.result+'</span><span class="scoutMuted" style="text-align:right">'+o.note+'</span></div>';}).join('')+'</div>':'')
+  +'</div>'
+  // AI brief
+  +'<div class="card"><div class="sec-title">AI tactical brief</div>'
+  +  '<div class="scoutAiRow"><button class="btn" id="scoutBriefBtn" onclick="scoutGenerateBrief()" style="background:linear-gradient(180deg,#e3c15f,#b8912f);color:#2a1e0a;font-weight:700">✦ Generate tactical brief</button>'
+  +  '<span class="scoutMuted">Synthesizes threat level, blocs, KvK record and matchup into a written war plan.</span></div>'
+  +  '<div id="scoutBriefOut" style="margin-top:12px"></div>'
+  +'</div>';
+  document.getElementById('scoutBody').innerHTML=body;
+}
+
+// ── VIEW 2: MATCHUP (head-to-head vs 1057) ──
+function scoutRenderMatchup(){
+  var E=SCOUT_DATA[SCOUT.kid], Y=SCOUT_DATA["1057"];
+  function agg(k){var ps=k.players;var s=function(f){return ps.reduce(function(a,p){return a+p[f];},0);};return {topPower:Math.max.apply(null,ps.map(function(p){return p.power;})),totPower:s("power"),avgMystic:Math.round(s("mystic")/ps.length),totKills:s("kills"),grade:k.grade};}
+  var ea=agg(E),ya=agg(Y);
+  function row(label,ev,yv,key){var eW=ev>yv,yW=yv>ev;return '<div class="scoutH2HRow"><div class="scoutH2HNum" style="color:'+(eW?'var(--enemy)':'var(--text2)')+'">'+(key==="raw"?ev:scoutFmt(ev,key))+'</div><div class="scoutH2HM">'+label+'</div><div class="scoutH2HNum r" style="color:'+(yW?'var(--green)':'var(--text2)')+'">'+(key==="raw"?yv:scoutFmt(yv,key))+'</div></div>';}
+  var eTop=E.players.slice().sort(function(a,b){return b.power-a.power;}).slice(0,5);
+  var yTop=Y.players.slice().sort(function(a,b){return b.power-a.power;}).slice(0,5);
+  var face=''; for(var i=0;i<Math.min(5,eTop.length,yTop.length);i++){var ep=eTop[i],yp=yTop[i],eW=ep.power>yp.power;
+    face+='<div class="scoutH2HRow"><div class="scoutH2HNum" style="color:'+(eW?'var(--enemy)':'var(--text2)')+';font-size:12px">'+ep.n+' <span class="scoutMuted">'+scoutFmt(ep.power,"power")+'</span></div><div class="scoutH2HM">#'+(i+1)+'</div><div class="scoutH2HNum r" style="color:'+(!eW?'var(--green)':'var(--text2)')+';font-size:12px"><span class="scoutMuted">'+scoutFmt(yp.power,"power")+'</span> '+yp.n+'</div></div>';}
+  var body='<div class="card"><div class="scoutH2HTop"><div class="scoutH2HSide"><div class="scoutH2HK enemy">Kingdom '+SCOUT.kid+'</div><div class="scoutMuted">'+E.name+' · grade '+ea.grade+'</div></div><div class="scoutH2HVs">VS</div><div class="scoutH2HSide r"><div class="scoutH2HK ours">Kingdom 1057</div><div class="scoutMuted">you · grade '+ya.grade+'</div></div></div>'
+   +row("Top power",ea.topPower,ya.topPower,"power")+row("Total power",ea.totPower,ya.totPower,"power")+row("Avg mystic",ea.avgMystic,ya.avgMystic,"mystic")+row("Total kills",ea.totKills,ya.totKills,"power")+row("Grade",ea.grade,ya.grade,"raw")
+   +'<div class="sec-title" style="margin-top:16px">Top-5 power face-off</div>'+face+'</div>'
+   +'<div class="card"><div class="sec-title">Enemy alliance blocs</div>'+scoutAllianceTable(E)+'</div>';
+  document.getElementById('scoutBody').innerHTML=body;
+}
+function scoutAllianceTable(k){
+  var A=scoutAnalyze(k);
+  return '<div class="scoutTblWrap"><table class="scoutTbl"><thead><tr><th>#</th><th>Ally</th><th>Players</th><th class="num">Avg mystic</th><th class="num">Total power</th></tr></thead><tbody>'
+    +A.blocks.map(function(b,i){return '<tr><td class="mono" style="color:var(--text3)">'+(i+1)+'</td><td><span class="scoutAlly'+(i===0?' top':'')+'">'+b.name+'</span></td><td class="scoutMuted">'+b.count+' · '+b.whales+' whale'+(b.whales!==1?'s':'')+'</td><td class="num mono">'+(b.avgMystic/1000).toFixed(3)+'</td><td class="num mono" style="color:'+(i===0?'var(--gold)':'var(--text)')+'">'+scoutFmt(b.power,"power")+'</td></tr>';}).join('')
+    +'</tbody></table></div>';
+}
+
+// ── VIEW 3: PLAYER BOARD (top 100, re-rank) ──
+function scoutRenderBoard(){
+  var body='<div class="card"><div class="scoutBoardSel" id="scoutBoardSel"></div><div class="scoutTblWrap"><table class="scoutTbl"><thead><tr><th>#</th><th>Player</th><th>Ally</th><th class="num" id="scoutBoardHead">Power</th><th class="num">TC</th><th class="num">vs #1</th></tr></thead><tbody id="scoutBoardRows"></tbody></table></div><div id="scoutBoardMore" style="text-align:center;margin-top:12px"></div></div>';
+  document.getElementById('scoutBody').innerHTML=body;
+  document.getElementById('scoutBoardSel').innerHTML='<span class="scoutMuted" style="font-family:var(--head);text-transform:uppercase;font-size:10px;letter-spacing:.06em;margin-right:4px">Rank by</span>'
+    +SCOUT_BOARDS.map(function(b){var on=SCOUT.board===b.key;return '<button class="scoutBoardBtn'+(on?' on':'')+'" onclick="scoutSetBoard(\''+b.key+'\')" title="board_type '+b.t+'">'+b.label+' <span style="opacity:.45;font-size:9px">'+b.t+'</span></button>';}).join('');
+  scoutRenderBoardRows();
+}
+function scoutSetBoard(key){ SCOUT.board=key;
+  document.querySelectorAll('.scoutBoardBtn').forEach(function(b){b.classList.remove('on');});
+  if(window.event&&window.event.target){var t=window.event.target;(t.classList.contains('scoutBoardBtn')?t:t.closest('.scoutBoardBtn')).classList.add('on');}
+  var lbl=SCOUT_BOARDS.filter(function(b){return b.key===key;})[0]; var h=document.getElementById('scoutBoardHead'); if(h&&lbl)h.textContent=lbl.label;
+  scoutRenderBoardRows();
+}
+function scoutRenderBoardRows(){
+  var k=SCOUT_DATA[SCOUT.kid], yTop=scoutOwnTopPower();
+  var sorted=k.players.slice().sort(function(a,b){return b[SCOUT.board]-a[SCOUT.board];});
+  var limit=SCOUT.showAll?sorted.length:Math.min(25,sorted.length);
+  var out='';
+  for(var i=0;i<limit;i++){var p=sorted[i],ratio=p.power/yTop,rc=ratio>=1?'over':'under',rt=ratio>=1?ratio.toFixed(1)+'x':ratio.toFixed(2)+'x';
+    out+='<tr><td class="mono'+(i===0?' top':'')+'">'+(i+1)+'</td><td><span class="scoutName">'+p.n+'</span></td><td><span class="scoutAlly">'+p.a+'</span></td><td class="num mono" style="color:var(--gold)">'+scoutFmt(p[SCOUT.board],SCOUT.board)+'</td><td class="num mono">'+p.tc+'</td><td class="num"><span class="scoutRatio '+rc+'">'+rt+'</span></td></tr>';}
+  document.getElementById('scoutBoardRows').innerHTML=out;
+  document.getElementById('scoutBoardMore').innerHTML=sorted.length>25?'<button class="btn btn-ghost" onclick="scoutToggleAll()">'+(SCOUT.showAll?'Collapse to top 25':'Show all '+sorted.length)+'</button>':'';
+}
+function scoutToggleAll(){ SCOUT.showAll=!SCOUT.showAll; scoutRenderBoardRows(); }
+
+// ── AI brief (front-end demo call; Phase 2 moves this server-side into the Worker) ──
+function scoutGenerateBrief(){
+  var btn=document.getElementById('scoutBriefBtn'), out=document.getElementById('scoutBriefOut');
+  var k=SCOUT_DATA[SCOUT.kid], A=scoutAnalyze(k);
+  btn.disabled=true; btn.textContent='Analyzing…'; out.innerHTML='<div class="scoutMuted" style="font-style:italic">Reading the intel and writing the brief…</div>';
+  var payload={kingdom:SCOUT.kid,name:k.name,grade:k.grade,threat:A.verdict,powerGap:A.gap.toFixed(2)+"x",
+    alliances:A.blocks.map(function(b){return {ally:b.name,players:b.count,power:scoutFmt(b.power,"power"),whales:b.whales,rallyLeaders:b.rally};}),
+    rallyLeaders:{enemy:A.rallyEnemy,us:A.rallyOurs},farmTarget:A.farm?A.farm.name:"none",
+    kvk:{prep:k.kvk.prep_wins+"-"+k.kvk.prep_losses,castlesTaken:k.kvk.castles_taken,castlesLost:k.kvk.castles_lost,king:k.kvk.king,sovereign:k.kvk.sovereign,
+      opponents:k.kvk.matchups.map(function(o){return {kingdom:"K"+o.kid,grade:o.grade,power:(o.power/1e9).toFixed(2)+"B",result:o.result};})}};
+  var prompt="You are a KvK intelligence officer for Kingdom 1057 in Kingshot. Write a tight, blunt tactical war brief (~200 words) for our war council based ONLY on this data. Sections with short headers: Threat, Who carries them, Rally leaders, Farm target, KvK reputation (weigh their wins/losses by opponent grade+power — do they only beat weak kingdoms?), and end with the single most important tactical takeaway. Data:\n"+JSON.stringify(payload,null,2);
+  // add snapshot so the server can cache the brief per enemy snapshot
+  payload.snapshot=k.snapshot; payload.threat=A.verdict;
+  fetch("/scout/brief",{method:"POST",headers:stateHeaders({"Content-Type":"application/json"}),body:JSON.stringify({payload:payload})})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d && d.ok && d.brief){ out.innerHTML='<div class="scoutBrief">'+d.brief.replace(/\n/g,"<br>")+'</div>'; btn.disabled=false; btn.textContent='↻ Regenerate'; }
+      else { out.innerHTML='<div style="color:#ff9a9a">Brief unavailable: '+((d&&d.error)||"unknown")+'</div>'; btn.disabled=false; btn.textContent='✦ Generate tactical brief'; }
+    }).catch(function(e){ out.innerHTML='<div style="color:#ff9a9a">Brief failed: '+e.message+'</div>'; btn.disabled=false; btn.textContent='✦ Generate tactical brief'; });
+}
+
 </script>
+
+<div id="page-scout" class="page">
+  <div class="sec-title" style="margin-bottom:10px">Scout an enemy kingdom</div>
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+      <div class="field"><label>Enemy kingdom number</label><input type="number" id="scoutKid" value="924" style="width:150px;font-family:var(--mono);font-size:18px;letter-spacing:.05em"></div>
+      <button class="btn" onclick="scoutRun()" style="background:linear-gradient(180deg,#b8423a,#962b25);color:#fff;font-weight:600">⚔ Scout</button>
+      <div style="display:flex;gap:6px;align-items:center;margin-left:6px">
+        <span class="scoutMuted" style="font-family:var(--head);font-size:10px;letter-spacing:.05em">RECENT:</span>
+        <button class="scoutChipBtn" onclick="document.getElementById('scoutKid').value=924;scoutRun()">924 · Jenkins</button>
+        <button class="scoutChipBtn" onclick="document.getElementById('scoutKid').value=936;scoutRun()">936 · Doom Zebra</button>
+      </div>
+    </div>
+    <div class="scoutMuted" style="margin-top:10px">Pulls the enemy top-100 with hero gear, alliance blocs, KvK reputation and a live threat read — ranked against your Kingdom 1057.</div>
+  </div>
+  <div class="scoutSubtabs" id="scoutSubtabs"></div>
+  <div id="scoutBody"></div>
+</div>
+
 
 <!-- ADMIN PAGE -->
 <div id="page-admin" class="page">
@@ -10397,6 +10763,106 @@ export default {
       } catch(e) { return json({ok:false,message:e.message},500); }
     }
     
+    // ══════════════════════════════════════════════════════════
+    // ENEMY SCOUT — Phase 2 backend (jeabslist proxy + KV cache + server-side AI brief)
+    // NOTE: Cloudflare Worker IPs may be blocked by jeabslist the same way Century's
+    // gift-code API blocks them. If every /scout/* fetch throws, that's the cause —
+    // the fix is the same off-platform pattern used for gift redeeming (a runner with
+    // a non-datacenter IP fetches jeabslist and pushes into KV). These endpoints try
+    // the direct path first and report the real error so we know which case we're in.
+    // ──────────────────────────────────────────────────────────
+    if (url.pathname.startsWith('/scout/')) {
+      // auth: any signed-in role may read; brief limited to rally/r4r5/admin
+      const _role = await verifyToken(env, bearer(request));
+      if (!_role) return json({ok:false,error:'unauthorized'},401);
+
+      const JEABS = 'https://jeabslist.com/api';
+      const UA = { 'Accept':'application/json', 'User-Agent':'KvK1057-Scout/1.0 (alliance tool; contact via jeabslist)' };
+
+      // cache-first fetch helper: KV key -> upstream, with TTL (seconds)
+      async function scoutFetch(cacheKey, upstreamUrl, ttl){
+        try {
+          const cached = await env.SVS_KV.get(cacheKey);
+          if (cached) return { ok:true, cached:true, data: JSON.parse(cached) };
+        } catch(e) {}
+        let res;
+        try { res = await fetch(upstreamUrl, { headers: UA }); }
+        catch(e){ return { ok:false, error:'fetch_failed', detail:e.message, upstream:upstreamUrl }; }
+        const body = await res.text();
+        if (!res.ok) return { ok:false, error:'upstream_'+res.status, body: body.slice(0,300), upstream:upstreamUrl };
+        let data; try { data = JSON.parse(body); } catch(e){ return { ok:false, error:'bad_json', body: body.slice(0,300) }; }
+        try { await env.SVS_KV.put(cacheKey, JSON.stringify(data), { expirationTtl: ttl }); } catch(e) {}
+        return { ok:true, cached:false, data };
+      }
+
+      // GET /scout/kingdom?kid=924   (overview: grades, kvk, alliances, top_players)
+      if (url.pathname==='/scout/kingdom') {
+        const kid = (url.searchParams.get('kid')||'').replace(/[^0-9]/g,'');
+        if (!kid) return json({ok:false,error:'kid required'},400);
+        const r = await scoutFetch('scout:kingdom:'+kid, JEABS+'/kingdoms/'+kid, 900);
+        return json(r, r.ok?200:502);
+      }
+
+      // GET /scout/board?kid=924&type=3   (one leaderboard, top 100)
+      if (url.pathname==='/scout/board') {
+        const kid = (url.searchParams.get('kid')||'').replace(/[^0-9]/g,'');
+        const type = (url.searchParams.get('type')||'').replace(/[^0-9]/g,'');
+        if (!kid || !type) return json({ok:false,error:'kid and type required'},400);
+        const r = await scoutFetch('scout:board:'+kid+':'+type, JEABS+'/kingdoms/'+kid+'/boards/'+type+'?limit=100', 900);
+        return json(r, r.ok?200:502);
+      }
+
+      // GET /scout/player?fid=...   (per-player detail: name, alliance, power, mystic, kills, tc, vip)
+      if (url.pathname==='/scout/player') {
+        const fid = (url.searchParams.get('fid')||'').replace(/[^0-9]/g,'');
+        if (!fid) return json({ok:false,error:'fid required'},400);
+        const r = await scoutFetch('scout:player:'+fid, JEABS+'/players/'+fid, 3600);
+        return json(r, r.ok?200:502);
+      }
+
+      // GET /scout/matchups?kid=924   (past KvK opponents; path best-guess — confirm from a live capture)
+      if (url.pathname==='/scout/matchups') {
+        const kid = (url.searchParams.get('kid')||'').replace(/[^0-9]/g,'');
+        if (!kid) return json({ok:false,error:'kid required'},400);
+        const r = await scoutFetch('scout:matchups:'+kid, JEABS+'/kingdoms/'+kid+'/season-matchups?top=8', 900);
+        return json(r, r.ok?200:502);
+      }
+
+      // POST /scout/brief   { payload:{...computed analysis...} }  -> server-side Claude, key stays private
+      if (url.pathname==='/scout/brief' && request.method==='POST') {
+        if (_role!=='rallyleader' && _role!=='r4r5' && _role!=='admin')
+          return json({ok:false,error:'brief limited to rally leaders / R4-R5 / admin'},403);
+        if (!env.ANTHROPIC_API_KEY)
+          return json({ok:false,error:'AI brief not configured: set the ANTHROPIC_API_KEY secret (wrangler secret put ANTHROPIC_API_KEY)'},501);
+        let payload; try { payload = (await request.json()).payload; } catch(e){ return json({ok:false,error:'bad body'},400); }
+        if (!payload) return json({ok:false,error:'payload required'},400);
+
+        // cache brief by kingdom + snapshot so repeated scouts of one enemy don't re-bill
+        const cacheKey = 'scout:brief:'+(payload.kingdom||'x')+':'+(payload.snapshot||'')+':'+(payload.threat||'');
+        try { const c = await env.SVS_KV.get(cacheKey); if (c) return json({ok:true,cached:true,brief:c}); } catch(e){}
+
+        const prompt = "You are a KvK intelligence officer for Kingdom 1057 in Kingshot. Write a tight, blunt tactical war brief (~200 words) for our war council based ONLY on this data. Short headers: Threat, Who carries them, Rally leaders, Farm target, KvK reputation (weigh their wins/losses by opponent grade+power — do they only beat weak kingdoms and fold vs strong ones?), then end with the single most important tactical takeaway. Data:\n"+JSON.stringify(payload,null,2);
+
+        let res;
+        try {
+          res = await fetch('https://api.anthropic.com/v1/messages', {
+            method:'POST',
+            headers:{ 'Content-Type':'application/json', 'x-api-key':env.ANTHROPIC_API_KEY, 'anthropic-version':'2023-06-01' },
+            body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:1024, messages:[{ role:'user', content:prompt }] })
+          });
+        } catch(e){ return json({ok:false,error:'anthropic_fetch_failed',detail:e.message},502); }
+        const abody = await res.text();
+        if (!res.ok) return json({ok:false,error:'anthropic_'+res.status, body: abody.slice(0,300)}, 502);
+        let ad; try { ad = JSON.parse(abody); } catch(e){ return json({ok:false,error:'anthropic_bad_json'},502); }
+        const text = (ad.content||[]).map(function(b){return b.text||'';}).join('').trim();
+        try { await env.SVS_KV.put(cacheKey, text, { expirationTtl: 3600 }); } catch(e){}
+        return json({ ok:true, cached:false, brief: text });
+      }
+
+      return json({ok:false,error:'unknown scout route'},404);
+    }
+
+
     // ── EXTERNAL REDEEMER (GitHub Actions) ──────────────────────────────────
     // Cloudflare Worker IPs are blocked by Century's gift-code API (every fetch
     // throws → "network error"), so the actual redeeming runs off-platform on a
