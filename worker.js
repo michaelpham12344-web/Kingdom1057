@@ -9323,7 +9323,7 @@ function scoutSetView(v){ SCOUT.view=v; scoutRenderSubtabs(); scoutRenderView();
 function scoutRenderSubtabs(){
   var tabs=[["overview","⚑ Threat Overview","Verdict · rally · TG · KvK"],["matchup","⚔ Matchup","5v5 · compare · alliances"],["board","☰ Player Board","Top 100 · re-rank"]];
   document.getElementById('scoutSubtabs').innerHTML = tabs.map(function(t){var on=SCOUT.view===t[0];
-    return '<div class="scoutTab'+(on?' on':'')+'" onclick="scoutSetView(\''+t[0]+'\')"><div class="scoutTabT">'+t[1]+'</div><div class="scoutTabS">'+t[2]+'</div></div>';
+    return '<div class="scoutTab'+(on?' on':'')+'" onclick="scoutSetView(\\''+t[0]+'\\')"><div class="scoutTabT">'+t[1]+'</div><div class="scoutTabS">'+t[2]+'</div></div>';
   }).join('');
 }
 function scoutRenderView(){
@@ -9421,7 +9421,7 @@ function scoutRenderBoard(){
   var body='<div class="card"><div class="scoutBoardSel" id="scoutBoardSel"></div><div class="scoutTblWrap"><table class="scoutTbl"><thead><tr><th>#</th><th>Player</th><th>Ally</th><th class="num" id="scoutBoardHead">Power</th><th class="num">TC</th><th class="num">vs #1</th></tr></thead><tbody id="scoutBoardRows"></tbody></table></div><div id="scoutBoardMore" style="text-align:center;margin-top:12px"></div></div>';
   document.getElementById('scoutBody').innerHTML=body;
   document.getElementById('scoutBoardSel').innerHTML='<span class="scoutMuted" style="font-family:var(--head);text-transform:uppercase;font-size:10px;letter-spacing:.06em;margin-right:4px">Rank by</span>'
-    +SCOUT_BOARDS.map(function(b){var on=SCOUT.board===b.key;return '<button class="scoutBoardBtn'+(on?' on':'')+'" onclick="scoutSetBoard(\''+b.key+'\')" title="board_type '+b.t+'">'+b.label+' <span style="opacity:.45;font-size:9px">'+b.t+'</span></button>';}).join('');
+    +SCOUT_BOARDS.map(function(b){var on=SCOUT.board===b.key;return '<button class="scoutBoardBtn'+(on?' on':'')+'" onclick="scoutSetBoard(\\''+b.key+'\\')" title="board_type '+b.t+'">'+b.label+' <span style="opacity:.45;font-size:9px">'+b.t+'</span></button>';}).join('');
   scoutRenderBoardRows();
 }
 function scoutSetBoard(key){ SCOUT.board=key;
@@ -9452,12 +9452,11 @@ function scoutGenerateBrief(){
     rallyLeaders:{enemy:A.rallyEnemy,us:A.rallyOurs},farmTarget:A.farm?A.farm.name:"none",
     kvk:{prep:k.kvk.prep_wins+"-"+k.kvk.prep_losses,castlesTaken:k.kvk.castles_taken,castlesLost:k.kvk.castles_lost,king:k.kvk.king,sovereign:k.kvk.sovereign,
       opponents:k.kvk.matchups.map(function(o){return {kingdom:"K"+o.kid,grade:o.grade,power:(o.power/1e9).toFixed(2)+"B",result:o.result};})}};
-  var prompt="You are a KvK intelligence officer for Kingdom 1057 in Kingshot. Write a tight, blunt tactical war brief (~200 words) for our war council based ONLY on this data. Sections with short headers: Threat, Who carries them, Rally leaders, Farm target, KvK reputation (weigh their wins/losses by opponent grade+power — do they only beat weak kingdoms?), and end with the single most important tactical takeaway. Data:\n"+JSON.stringify(payload,null,2);
   // add snapshot so the server can cache the brief per enemy snapshot
   payload.snapshot=k.snapshot; payload.threat=A.verdict;
   fetch("/scout/brief",{method:"POST",headers:stateHeaders({"Content-Type":"application/json"}),body:JSON.stringify({payload:payload})})
     .then(function(r){return r.json();}).then(function(d){
-      if(d && d.ok && d.brief){ out.innerHTML='<div class="scoutBrief">'+d.brief.replace(/\n/g,"<br>")+'</div>'; btn.disabled=false; btn.textContent='↻ Regenerate'; }
+      if(d && d.ok && d.brief){ out.innerHTML='<div class="scoutBrief">'+d.brief.replace(/\\n/g,"<br>")+'</div>'; btn.disabled=false; btn.textContent='↻ Regenerate'; }
       else { out.innerHTML='<div style="color:#ff9a9a">Brief unavailable: '+((d&&d.error)||"unknown")+'</div>'; btn.disabled=false; btn.textContent='✦ Generate tactical brief'; }
     }).catch(function(e){ out.innerHTML='<div style="color:#ff9a9a">Brief failed: '+e.message+'</div>'; btn.disabled=false; btn.textContent='✦ Generate tactical brief'; });
 }
