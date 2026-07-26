@@ -9314,10 +9314,97 @@ function scoutInit(){
 }
 function scoutRun(){
   var kid=String((document.getElementById('scoutKid')||{}).value||SCOUT.kid).trim();
-  if(!SCOUT_DATA[kid]){ document.getElementById('scoutBody').innerHTML='<div class="card"><div style="text-align:center;padding:36px;color:var(--text3)"><div style="font-size:30px;opacity:.5">⚑</div><div style="font-family:var(--head);font-size:15px;color:var(--text2);margin:8px 0">Kingdom '+kid+' not in sample data</div><div>This build carries 924 &amp; 936. Live version returns any tracked kingdom.</div></div></div>'; return; }
+  if(!/^[0-9]+$/.test(kid)){ document.getElementById('scoutBody').innerHTML='<div class="card"><div style="text-align:center;padding:30px;color:var(--text3)">Enter a kingdom number.</div></div>'; return; }
   SCOUT.kid=kid; SCOUT.showAll=false; SCOUT.expanded={};
-  scoutRenderSubtabs();
-  scoutRenderView();
+  document.getElementById('scoutSubtabs').innerHTML='';
+  document.getElementById('scoutBody').innerHTML='<div class="card"><div style="text-align:center;padding:30px;color:var(--text3)"><div style="width:26px;height:26px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:syncspin .9s linear infinite;margin:0 auto 12px"></div>Scouting Kingdom '+kid+'…</div></div>';
+  scoutLoadLive(kid);
+}
+
+// Pull live data from the Phase 2 proxy, assemble into the shape the renderers expect,
+// and fall back to sample data if the proxy is unreachable (e.g. jeabslist blocks Worker IPs).
+function scoutLoadLive(kid){
+  var boardTypes = SCOUT_BOARDS.map(function(b){return b;});
+  var jget = function(path){ return fetch(path, { headers: stateHeaders() }).then(function(r){ return r.json(); }); };
+
+  // 1) kingdom overview (grades, kvk, alliances) + matchups + the core boards
+  Promise.all([
+    jget('/scout/kingdom?kid='+kid),
+    jget('/scout/matchups?kid='+kid),
+    jget('/scout/board?kid='+kid+'&type=3')   // Personal Power = the roster spine
+  ]).then(function(res){
+    var kd=res[0], mm=res[1], pb=res[2];
+    if(!kd || !kd.ok){ return scoutLiveFail(kid, (kd&&kd.error)||'kingdom fetch failed'); }
+    var K = kd.data || {};
+    // roster: from personal-power board (rank + player_id + score), enrich name/alliance from top_players if present
+    var enrich = {};
+    (K.top_players||K.players||[]).forEach(function(p){ var id=String(p.player_id||p.fid||p.id||''); if(id) enrich[id]=p; });
+    var roster = ((pb&&pb.ok&&pb.data&&pb.data.entries)||[]).map(function(e){
+      var id=String(e.player_id||e.uid||''); var ex=enrich[id]||{};
+      return {
+        n: ex.username||ex.name||('#'+id), a: ex.alliance_abbr||ex.alliance||ex.tag||'—', fid:id,
+        power: e.score||ex.power||0, mystic:ex.mystic_trial_score||0, kills:ex.kills||0,
+        tc: ex.town_hall_level||ex.tc||0, vip: ex.vip_label||ex.vip||0
+      };
+    });
+    // if board gave nothing, fall back to top_players
+    if(!roster.length && (K.top_players||[]).length){
+      roster = K.top_players.map(function(p){ return {n:p.username||('#'+p.player_id),a:p.alliance_abbr||'—',fid:String(p.player_id),power:p.power||0,mystic:p.mystic_trial_score||0,kills:p.kills||0,tc:p.town_hall_level||0,vip:p.vip_label||0}; });
+    }
+    var kvkSrc = K.kvk||{};
+    var matchups = ((mm&&mm.ok&&mm.data)|| kvkSrc.matchups || []);
+    if(matchups && matchups.entries) matchups=matchups.entries;
+    var mapped = (Array.isArray(matchups)?matchups:[]).map(function(o){
+      return { kid:String(o.opponent_kid||o.kid||o.kingdom||'?'), name:o.opponent_name||o.name||'', grade:o.opponent_grade||o.grade||'?',
+               power:o.opponent_power||o.power||0, result:(o.result||o.outcome||'').toLowerCase(), note:o.note||'' };
+    });
+    SCOUT_DATA[kid] = {
+      name: K.name||K.kingdom_name||('K'+kid), snapshot: scoutAgo(K.snapshot||K.fetched_at||(pb&&pb.data&&pb.data.fetched_at)),
+      grade: (K.grades&&K.grades.overall)||K.grade||'?',
+      grades: scoutGrades(K.grades),
+      tracked: K.tracked_players||K.tracked||roster.length,
+      kvk: { prep_wins:kvkSrc.prep_wins||0, prep_losses:kvkSrc.prep_losses||0, castles_taken:kvkSrc.castles_taken||0,
+             castles_lost:kvkSrc.castles_lost||0, king:kvkSrc.king_name||kvkSrc.king||'—', reigns:kvkSrc.reign_count||0,
+             sovereign:!!kvkSrc.sovereign, matchups:mapped },
+      players: roster.length?roster:(SCOUT_DATA[kid]?SCOUT_DATA[kid].players:[]),
+      _live:true
+    };
+    // lazily pull the other boards so Player Board re-rank has real values (best-effort)
+    scoutLoadBoards(kid, boardTypes);
+    scoutRenderSubtabs(); scoutRenderView();
+  }).catch(function(e){ scoutLiveFail(kid, e.message); });
+}
+
+function scoutLoadBoards(kid, boards){
+  // enrich each player with every board's score, matched by fid — best effort, non-blocking
+  var byId={}; (SCOUT_DATA[kid].players||[]).forEach(function(p){ byId[p.fid]=p; });
+  boards.forEach(function(b){
+    if(b.key==='power') return; // already have it
+    fetch('/scout/board?kid='+kid+'&type='+b.t,{headers:stateHeaders()}).then(function(r){return r.json();}).then(function(d){
+      if(d&&d.ok&&d.data&&d.data.entries){ d.data.entries.forEach(function(e){ var p=byId[String(e.player_id)]; if(p) p[b.key]=e.score; }); }
+    }).catch(function(){});
+  });
+}
+
+function scoutGrades(g){
+  g=g||{};
+  return [["Whales",g.whales||g.Whales||"?"],["Spending",g.spending||g.Spending||"?"],["Lethality",g.lethality||g.Lethality||"?"],["Activity",g.activity||g.Activity||"?"]]
+    .reduce(function(o,x){o[x[0]]=x[1];return o;},{});
+}
+function scoutAgo(ts){
+  if(!ts) return 'unknown';
+  if(typeof ts==='string' && ts.indexOf('ago')>-1) return ts;
+  var t=Date.parse(ts); if(isNaN(t)) return String(ts);
+  var m=Math.round((Date.now()-t)/60000);
+  if(m<60) return m+'m ago'; var h=Math.round(m/60); if(h<48) return h+'h ago'; return Math.round(h/24)+'d ago';
+}
+function scoutLiveFail(kid, reason){
+  // graceful fallback: use sample data if we have it, else show the error
+  if(SCOUT_DATA[kid] && !SCOUT_DATA[kid]._live){
+    document.getElementById('scoutBody').innerHTML='<div class="card" style="border-color:rgba(224,140,60,.4)"><div style="color:#e0a05e;font-size:12.5px">⚠ Live data unavailable ('+reason+') — showing sample data. This usually means jeabslist is unreachable from the Worker (datacenter-IP block); the fix is the off-platform relay we discussed.</div></div>';
+    SCOUT.showAll=false; SCOUT.expanded={}; scoutRenderSubtabs(); scoutRenderView(); return;
+  }
+  document.getElementById('scoutBody').innerHTML='<div class="card"><div style="text-align:center;padding:30px;color:#ff9a9a"><div style="font-size:26px">⚠</div><div style="margin-top:8px">Could not scout Kingdom '+kid+'</div><div class="scoutMuted" style="margin-top:6px">'+reason+'</div><div class="scoutMuted" style="margin-top:6px">If every scout fails, jeabslist is likely blocking the Worker IP — needs the off-platform relay.</div></div></div>';
 }
 function scoutSetView(v){ SCOUT.view=v; scoutRenderSubtabs(); scoutRenderView(); }
 function scoutRenderSubtabs(){
