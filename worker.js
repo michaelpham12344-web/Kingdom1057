@@ -9334,6 +9334,8 @@ function scoutLoadLive(kid){
     jget('/scout/board?kid='+kid+'&type=3')   // Personal Power = the roster spine
   ]).then(function(res){
     var kd=res[0], mm=res[1], pb=res[2];
+    if(kd && kd.ok){ SCOUT_RETRY=0; }
+    if(kd && kd.queued){ return scoutQueuedRetry(kid); }
     if(!kd || !kd.ok){ return scoutLiveFail(kid, (kd&&kd.error)||'kingdom fetch failed'); }
     var K = kd.data || {};
     // roster: from personal-power board (rank + player_id + score), enrich name/alliance from top_players if present
@@ -9375,6 +9377,13 @@ function scoutLoadLive(kid){
   }).catch(function(e){ scoutLiveFail(kid, e.message); });
 }
 
+var SCOUT_RETRY=0;
+function scoutQueuedRetry(kid){
+  SCOUT_RETRY++;
+  if(SCOUT_RETRY>6){ SCOUT_RETRY=0; document.getElementById('scoutBody').innerHTML='<div class="card" style="border-color:rgba(224,140,60,.4)"><div style="color:#e0a05e;font-size:12.5px">⏳ Kingdom '+kid+' was queued for the relay but hasn\\'t come back yet. The Oracle relay may not be running, or jeabslist is slow. Try Scout again in a minute.</div></div>'; return; }
+  document.getElementById('scoutBody').innerHTML='<div class="card"><div style="text-align:center;padding:30px;color:var(--text3)"><div style="width:26px;height:26px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:syncspin .9s linear infinite;margin:0 auto 12px"></div>First scout of Kingdom '+kid+' — the relay is fetching it from jeabslist.<br><span class="scoutMuted">Auto-retrying… ('+SCOUT_RETRY+'/6)</span></div></div>';
+  setTimeout(function(){ scoutLoadLive(kid); }, 6000);
+}
 function scoutLoadBoards(kid, boards){
   // enrich each player with every board's score, matched by fid — best effort, non-blocking
   var byId={}; (SCOUT_DATA[kid].players||[]).forEach(function(p){ byId[p.fid]=p; });
@@ -10857,61 +10866,82 @@ export default {
     // a non-datacenter IP fetches jeabslist and pushes into KV). These endpoints try
     // the direct path first and report the real error so we know which case we're in.
     // ──────────────────────────────────────────────────────────
+    // ── SCOUT RELAY (Oracle server; jeabslist blocks Worker IPs, same as gift codes) ──
+    // Oracle polls /scout-queue, fetches jeabslist, POSTs results to /scout-ingest.
+    if (url.pathname==='/scout-queue' && request.method==='GET') {
+      const secret = request.headers.get('X-Gift-Secret');
+      if (!env.GIFT_SECRET || secret !== env.GIFT_SECRET) return json({ok:false,error:'unauthorized'},401);
+      const raw = await env.SVS_KV.get('scout:queue');
+      return json({ ok:true, kingdoms: raw ? JSON.parse(raw) : [] });
+    }
+    if (url.pathname==='/scout-ingest' && request.method==='POST') {
+      const secret = request.headers.get('X-Gift-Secret');
+      if (!env.GIFT_SECRET || secret !== env.GIFT_SECRET) return json({ok:false,error:'unauthorized'},401);
+      let b; try { b = await request.json(); } catch(e){ return json({ok:false,error:'bad body'},400); }
+      const kid = String(b.kid||'').replace(/[^0-9]/g,'');
+      if (!kid) return json({ok:false,error:'kid required'},400);
+      const TTL = 3600;
+      try {
+        if (b.kingdom)  await env.SVS_KV.put('scout:kingdom:'+kid,  JSON.stringify(b.kingdom),  { expirationTtl: TTL });
+        if (b.matchups) await env.SVS_KV.put('scout:matchups:'+kid, JSON.stringify(b.matchups), { expirationTtl: TTL });
+        if (b.boards && typeof b.boards==='object') {
+          for (const t of Object.keys(b.boards)) {
+            await env.SVS_KV.put('scout:board:'+kid+':'+t, JSON.stringify(b.boards[t]), { expirationTtl: TTL });
+          }
+        }
+        const raw = await env.SVS_KV.get('scout:queue');
+        let q = raw ? JSON.parse(raw) : [];
+        q = q.filter(function(x){ return x !== kid; });
+        await env.SVS_KV.put('scout:queue', JSON.stringify(q), { expirationTtl: 3600 });
+      } catch(e){ return json({ok:false,error:e.message},500); }
+      return json({ ok:true, stored:kid });
+    }
+
     if (url.pathname.startsWith('/scout/')) {
       // auth: any signed-in role may read; brief limited to rally/r4r5/admin
       const _role = await verifyToken(env, bearer(request));
       if (!_role) return json({ok:false,error:'unauthorized'},401);
 
-      const JEABS = 'https://jeabslist.com/api';
-      const UA = { 'Accept':'application/json', 'User-Agent':'KvK1057-Scout/1.0 (alliance tool; contact via jeabslist)' };
-
-      // cache-first fetch helper: KV key -> upstream, with TTL (seconds)
-      async function scoutFetch(cacheKey, upstreamUrl, ttl){
+      const QUEUE_KEY = 'scout:queue';
+      // Oracle relay populates KV (jeabslist blocks Worker IPs). Serve from KV;
+      // on a miss, queue the kingdom so the Oracle relay fetches it next cycle.
+      async function scoutQueue(kid){
         try {
-          const cached = await env.SVS_KV.get(cacheKey);
-          if (cached) return { ok:true, cached:true, data: JSON.parse(cached) };
+          const raw = await env.SVS_KV.get(QUEUE_KEY);
+          const q = raw ? JSON.parse(raw) : [];
+          if (q.indexOf(kid) === -1){ q.push(kid); await env.SVS_KV.put(QUEUE_KEY, JSON.stringify(q), { expirationTtl: 3600 }); }
         } catch(e) {}
-        let res;
-        try { res = await fetch(upstreamUrl, { headers: UA }); }
-        catch(e){ return { ok:false, error:'fetch_failed', detail:e.message, upstream:upstreamUrl }; }
-        const body = await res.text();
-        if (!res.ok) return { ok:false, error:'upstream_'+res.status, body: body.slice(0,300), upstream:upstreamUrl };
-        let data; try { data = JSON.parse(body); } catch(e){ return { ok:false, error:'bad_json', body: body.slice(0,300) }; }
-        try { await env.SVS_KV.put(cacheKey, JSON.stringify(data), { expirationTtl: ttl }); } catch(e) {}
-        return { ok:true, cached:false, data };
+      }
+      async function scoutServe(cacheKey, kid){
+        try { const c = await env.SVS_KV.get(cacheKey); if (c) return { ok:true, cached:true, data: JSON.parse(c) }; } catch(e) {}
+        if (kid) await scoutQueue(kid);
+        return { ok:false, queued:true, error:'queued', message:'Fetching from jeabslist via the relay — refresh in a moment.' };
       }
 
-      // GET /scout/kingdom?kid=924   (overview: grades, kvk, alliances, top_players)
       if (url.pathname==='/scout/kingdom') {
         const kid = (url.searchParams.get('kid')||'').replace(/[^0-9]/g,'');
         if (!kid) return json({ok:false,error:'kid required'},400);
-        const r = await scoutFetch('scout:kingdom:'+kid, JEABS+'/kingdoms/'+kid, 900);
-        return json(r, r.ok?200:502);
+        const r = await scoutServe('scout:kingdom:'+kid, kid);
+        return json(r, r.ok?200:(r.queued?202:502));
       }
-
-      // GET /scout/board?kid=924&type=3   (one leaderboard, top 100)
       if (url.pathname==='/scout/board') {
         const kid = (url.searchParams.get('kid')||'').replace(/[^0-9]/g,'');
         const type = (url.searchParams.get('type')||'').replace(/[^0-9]/g,'');
         if (!kid || !type) return json({ok:false,error:'kid and type required'},400);
-        const r = await scoutFetch('scout:board:'+kid+':'+type, JEABS+'/kingdoms/'+kid+'/boards/'+type+'?limit=100', 900);
-        return json(r, r.ok?200:502);
+        const r = await scoutServe('scout:board:'+kid+':'+type, kid);
+        return json(r, r.ok?200:(r.queued?202:502));
       }
-
-      // GET /scout/player?fid=...   (per-player detail: name, alliance, power, mystic, kills, tc, vip)
       if (url.pathname==='/scout/player') {
         const fid = (url.searchParams.get('fid')||'').replace(/[^0-9]/g,'');
         if (!fid) return json({ok:false,error:'fid required'},400);
-        const r = await scoutFetch('scout:player:'+fid, JEABS+'/players/'+fid, 3600);
-        return json(r, r.ok?200:502);
+        const r = await scoutServe('scout:player:'+fid, null);
+        return json(r, r.ok?200:(r.queued?202:404));
       }
-
-      // GET /scout/matchups?kid=924   (past KvK opponents; path best-guess — confirm from a live capture)
       if (url.pathname==='/scout/matchups') {
         const kid = (url.searchParams.get('kid')||'').replace(/[^0-9]/g,'');
         if (!kid) return json({ok:false,error:'kid required'},400);
-        const r = await scoutFetch('scout:matchups:'+kid, JEABS+'/kingdoms/'+kid+'/season-matchups?top=8', 900);
-        return json(r, r.ok?200:502);
+        const r = await scoutServe('scout:matchups:'+kid, kid);
+        return json(r, r.ok?200:(r.queued?202:502));
       }
 
       // POST /scout/brief   { payload:{...computed analysis...} }  -> server-side Claude, key stays private
