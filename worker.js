@@ -753,9 +753,11 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .team-dot.rallying{background:#ff5555;box-shadow:0 0 6px rgba(255,85,85,.7);}
 .bs-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;}
 .bs-modal{background:var(--bg2);border:1px solid var(--border2);border-radius:12px;max-width:380px;width:100%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;}
-/* Multi-team rally pop-up: an in-page overlay card, never a browser popup. */
-.bs-modal.wide{max-width:760px;}
-.bsMultiBody{overflow-y:auto;padding:14px 16px;}
+/* Multi-team rally: swapped into the Final Calculation card, capped so the card
+   keeps roughly its normal footprint and scrolls internally instead of growing. */
+.bsMultiBody{max-height:430px;overflow-y:auto;}
+.bsMultiHead{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.bsMultiRow.me{background:rgba(217,166,72,.12);border-radius:5px;padding:4px 7px;margin:2px -7px;}
 .bsMultiPick{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
 .bsMultiChip{display:flex;align-items:center;gap:7px;background:var(--bg3);border:1.5px solid var(--border2);border-radius:20px;padding:6px 13px;cursor:pointer;font-size:13px;color:var(--text2);user-select:none;transition:.12s;}
 .bsMultiChip:hover{border-color:var(--gold);}
@@ -1248,14 +1250,18 @@ document.addEventListener('touchend',function(e){
           <span><span class="team-dot free"></span>Free</span>
           <span><span class="team-dot rallying"></span>Rallying</span>
         </div>
-        <div id="bsTeamButtons" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
-        <div style="margin-bottom:12px">
-          <button class="btn btn-ghost btn-sm" onclick="bsMultiOpen()">&#9889; Multi-team rally&#8230;</button>
-          <span style="font-size:11px;color:var(--text3);margin-left:8px">Launch 2+ teams onto one landing time.</span>
+        <div id="bsSingleView">
+          <div id="bsTeamButtons" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
+          <div style="margin-bottom:12px">
+            <button class="btn btn-ghost btn-sm" onclick="bsMultiOpen()">&#9889; Multi-team rally</button>
+            <span style="font-size:11px;color:var(--text3);margin-left:8px">Launch 2+ teams onto one landing time.</span>
+          </div>
+          <div id="bsFinalResult">
+            <div style="color:var(--text3);font-size:13px">Select an offset, then click a team to see the schedule.</div>
+          </div>
         </div>
-        <div id="bsFinalResult">
-          <div style="color:var(--text3);font-size:13px">Select an offset, then click a team to see the schedule.</div>
-        </div>
+        <!-- Swapped in place of the view above — same card, no overlay. -->
+        <div id="bsMultiView" style="display:none"></div>
       </div>
 
       <!-- PET ACTIVATION PLAN -->
@@ -1650,7 +1656,7 @@ let syncApplyingRemote = false; // guards against re-triggering a push while app
 let syncRev = null;   // server revision this client last saw
 let syncBase = {};    // last known shared state — we diff against this to build a patch
 let syncPollTimer = null;
-let syncSafetyTimer = null;
+let syncSafetyTimer = null;   // retired: replaced by the free WS ping above
 // Identifies THIS tab. The server echoes it back on the broadcast so we can ignore our
 // own writes — otherwise every keystroke you save comes straight back, re-renders the
 // DOM, and yanks the caret out of the field you are typing in.
@@ -1670,6 +1676,7 @@ const CLIENT_ROLE_RANK = { member: 1, rallyleader: 2, r4r5: 3, admin: 4 };
 const CLIENT_KEY_MIN_ROLE = {
   leaders: 'rallyleader', teams: 'rallyleader', alliances: 'rallyleader',
   garrisonAllianceName: 'rallyleader', attackAllianceName: 'rallyleader',
+  bsMultiSched: 'rallyleader',
   rally: 'rallyleader', teamRally: 'rallyleader', petPlans: 'rallyleader',
   bsSetup: 'rallyleader', bsFrozen: 'rallyleader', finalCalc: 'rallyleader',
   msAllocByBoard: 'r4r5', msLastAllocation: 'r4r5', msAuditLog: 'r4r5',
@@ -1802,6 +1809,9 @@ let syncSerialize = function() {
         selectedTeamId: (typeof BS_CALC !== 'undefined') ? BS_CALC.selectedTeamId : null
       };
     })(),
+    // Multi-team rally schedule. Shared like bsFrozen so every leader counts down
+    // to the same absolute instant on their own device.
+    bsMultiSched: (typeof BS_MULTI !== 'undefined' && BS_MULTI.calc) ? BS_MULTI.calc : null,
     // The schedule frozen by the Final Calculation "Copy" button. launchSec values are
     // absolute epoch seconds, so every device counts down to the same instant.
     // _fired is local (it drives the vibrate), so it is deliberately not sent.
@@ -1865,6 +1875,24 @@ let syncApplyRemote = function(data) {
     }
     // Frozen (copied) schedule. Rebuilt only when it actually changes, so an unrelated
     // patch doesn't re-arm the "GO!" vibrate on everyone's phone.
+    // Multi-team schedule from the coordinator. Rebuilt only when it actually
+    // changes, so an unrelated patch cannot re-arm the GO vibrate on every phone.
+    if (data.bsMultiSched !== undefined && typeof BS_MULTI !== 'undefined') {
+      const _ms = data.bsMultiSched || null;
+      const _msig = _ms ? JSON.stringify(_ms) : 'null';
+      if (_msig !== _bsMultiSig) {
+        _bsMultiSig = _msig;
+        BS_MULTI.calc = _ms;
+        BS_MULTI.fired = {};
+        if (_ms && _ms.teams && _ms.teams.length) {
+          BS_MULTI.teamIds = _ms.teams.map(function(t){ return t.id; });
+          // Surface it by itself, the way the frozen single-team schedule does.
+          if (typeof bsMultiShow === 'function') { bsMultiShow(true); bsMultiRender(); }
+        } else if (typeof bsMultiVisible === 'function' && bsMultiVisible()) {
+          bsMultiRender();
+        }
+      }
+    }
     if (data.bsFrozen !== undefined && typeof BS_CALC !== 'undefined') {
       const _f = data.bsFrozen;
       const _sig = _f ? JSON.stringify([_f.teamId, (_f.results||[]).map(function(r){ return [r.name, r.march, r.launchSec]; })]) : 'null';
@@ -2130,9 +2158,33 @@ function syncStopPolling(){
 }
 // Belt and braces: even with a healthy socket, re-pull every 5 minutes in case a
 // broadcast was ever missed. Cheap (~12 requests/hour/user).
+// The old safety net was a /state fetch every 5 minutes, forever, in every open
+// tab. Each one woke the Durable Object, which defeated the hibernation the DO is
+// explicitly set up for. The socket itself is free while idle, so instead we send
+// a 'ping' over it: the runtime answers 'pong' via setWebSocketAutoResponse
+// WITHOUT waking the object. Same dead-socket detection, no DO wake-ups, and it
+// reacts in ~90s instead of up to 5 minutes.
+const SYNC_PING_MS = 45000;
+let syncPingTimer = null, syncLastPong = 0;
 function syncStartSafetyPoll(){
-  if (syncSafetyTimer) return;
-  syncSafetyTimer = setInterval(syncPull, 300000);
+  syncLastPong = Date.now();
+  if (syncPingTimer) return;
+  syncPingTimer = setInterval(function(){
+    const ws = syncWs;
+    if (!ws || ws.readyState !== 1) return;          // not open — retry logic owns it
+    // No pong across two intervals means the socket is a zombie: the tab thinks it
+    // is connected but nothing is arriving. Drop it so the existing backoff reconnects.
+    if (Date.now() - syncLastPong > SYNC_PING_MS * 2 + 5000) {
+      try { ws.close(); } catch(e){}
+      return;
+    }
+    try { ws.send('ping'); } catch(e){}
+  }, SYNC_PING_MS);
+}
+function syncStopSafetyPoll(){
+  if (!syncPingTimer) return;
+  clearInterval(syncPingTimer);
+  syncPingTimer = null;
 }
 
 // ── WebSocket: the server pushes changes instead of us asking for them ─────────
@@ -2156,6 +2208,8 @@ function syncWsConnect(){
     updateSyncStatus('synced');
   };
   ws.onmessage = function(ev){
+    if (ev.data === 'pong') { syncLastPong = Date.now(); return; }
+    syncLastPong = Date.now();   // any inbound frame proves the socket is alive
     let m; try { m = JSON.parse(ev.data); } catch(e){ return; }
     if (m.type === 'hello') {
       syncSetSkew(m.now);
@@ -2181,7 +2235,7 @@ function syncWsConnect(){
       updateSyncStatus('synced');
     }
   };
-  ws.onclose = function(){ if (syncWs === ws) syncWs = null; syncWsRetryLater(); };
+  ws.onclose = function(){ if (syncWs === ws) syncWs = null; syncStopSafetyPoll(); syncWsRetryLater(); };
   ws.onerror = function(){ try { ws.close(); } catch(e){} };
 }
 function syncWsRetryLater(){
@@ -3370,8 +3424,9 @@ const BS_CALC = { offsetSec: null, selectedTeamId: null, frozen: null };
 // bsTickClock() runs immediately below and reads it. A const declared further
 // down would still be in its temporal dead zone, and typeof on it throws
 // rather than reading as undefined.
-const BS_MULTI = { open:false, teamIds:[], calc:null };
+const BS_MULTI = { open:false, teamIds:[], calc:null, fired:{} };
 let _bsFrozenSig = null; // guards against rebuilding the frozen panel on every patch
+let _bsMultiSig = null;  // same guard for the multi-team schedule
 
 function bsTickClock(){
   const hh=document.getElementById('bsClockHH');
@@ -3394,7 +3449,7 @@ function bsTickClock(){
     } else prev.textContent='';
   }
   if(typeof bsRenderStickyBar==='function') bsRenderStickyBar();
-  if(BS_MULTI.open && BS_MULTI.calc) bsMultiRender();
+  if(BS_MULTI.open) bsMultiRender();
 }
 onEachSecond(bsTickClock, 'strategy'); bsTickClock();
 
@@ -3612,37 +3667,43 @@ function bsRenderFrozen(){
 // ═══════════════ MULTI-TEAM RALLY (in-page pop-up card) ═══════════════
 // Rare case: 2+ teams must land together. Rendered as an overlay card so the
 // normal Final Calculation card keeps its size — it is NOT a browser popup.
+function bsMultiVisible(){
+  var v = document.getElementById('bsMultiView');
+  return !!(v && v.style.display !== 'none');
+}
+function bsMultiShow(on){
+  var single = document.getElementById('bsSingleView');
+  var multi  = document.getElementById('bsMultiView');
+  if(!single || !multi) return;
+  single.style.display = on ? 'none' : '';
+  multi.style.display  = on ? '' : 'none';
+  BS_MULTI.open = !!on;
+}
 function bsMultiOpen(){
-  BS_MULTI.open = true;
   if(!BS_MULTI.teamIds.length && BS_CALC.selectedTeamId) BS_MULTI.teamIds = [BS_CALC.selectedTeamId];
-  var ov = document.getElementById('bsMultiOverlay');
-  if(!ov){
-    ov = document.createElement('div');
-    ov.id = 'bsMultiOverlay';
-    ov.className = 'bs-modal-overlay';
-    ov.onclick = function(e){ if(e.target === ov) bsMultiClose(); };
-    document.body.appendChild(ov);
-  }
-  ov.style.display = 'flex';
+  bsMultiShow(true);
   bsMultiRender();
 }
-function bsMultiClose(){
-  BS_MULTI.open = false;
-  var ov = document.getElementById('bsMultiOverlay');
-  if(ov) ov.style.display = 'none';
+function bsMultiClose(){ bsMultiShow(false); }
+
+// Only coordinators get the picker. A future view-only role falls through to
+// read-only automatically, because it will not satisfy isRallyLeader().
+function bsMultiCanEdit(){
+  return typeof isRallyLeader !== 'function' || isRallyLeader();
 }
 function bsMultiToggle(teamId){
+  if(!bsMultiCanEdit()) return;
   var i = BS_MULTI.teamIds.indexOf(teamId);
   if(i >= 0) BS_MULTI.teamIds.splice(i,1); else BS_MULTI.teamIds.push(teamId);
-  BS_MULTI.calc = null;
   bsMultiRender();
 }
 
-// One shared landing time across every selected team: the single longest march
-// in the whole selection sets the convergence point, everyone else waits.
+// One shared landing time across every selected team: the single longest march in
+// the whole selection sets the convergence point, everyone else waits. The result
+// is pushed to shared state, so each leader counts down on their own device.
 function bsMultiCalc(){
-  var offset = BS_CALC.offsetSec;
-  if(offset === null){ toast('Pick a launch offset first.'); return; }
+  if(!bsMultiCanEdit()) return;
+  if(BS_CALC.offsetSec === null){ toast('Pick a launch offset first.'); return; }
   var picked = S.teams.filter(function(t){ return BS_MULTI.teamIds.indexOf(t.id) >= 0; });
   if(picked.length < 2){ toast('Select at least two teams.'); return; }
 
@@ -3654,20 +3715,29 @@ function bsMultiCalc(){
   });
   if(!all.length){ toast('None of those teams have leaders assigned.'); return; }
 
-  var baseLaunch = nowUTCSec() + offset;
-  var maxMarch = Math.max.apply(null, all.map(function(l){ return l.march; }));
-  var landSec = baseLaunch + maxMarch;
+  var landSec = nowUTCSec() + BS_CALC.offsetSec + Math.max.apply(null, all.map(function(l){ return l.march; }));
 
   BS_MULTI.calc = {
     landSec: landSec,
     teams: picked.map(function(t){
       var rows = S.leaders
         .filter(function(l){ return l.bsSlot && l.bsSlot.slotType === 'team' && l.bsSlot.slotId === t.id; })
-        .map(function(l){ return { name:l.name, march:l.march, launchSec: landSec - l.march }; })
+        .map(function(l){ return { name:l.name, march:l.march, launchSec: landSec - l.march, playerId: l.playerId || null }; })
         .sort(function(a,b){ return a.launchSec - b.launchSec; });
-      return { id:t.id, name:t.name, color:t.color || 'var(--gold)', rows:rows };
+      return { id:t.id, name:t.name, color:t.color || '#d9a648', rows:rows };
     }).filter(function(t){ return t.rows.length; })
   };
+  BS_MULTI.fired = {};
+  syncQueuePush();          // share it — every leader gets their own countdown
+  bsMultiRender();
+  toast('Multi-team schedule sent to everyone');
+}
+
+function bsMultiClear(){
+  if(!bsMultiCanEdit()) return;
+  BS_MULTI.calc = null;
+  BS_MULTI.fired = {};
+  syncQueuePush();
   bsMultiRender();
 }
 
@@ -3686,23 +3756,40 @@ function bsMultiCopy(teamId){
 }
 
 function bsMultiRender(){
-  var ov = document.getElementById('bsMultiOverlay');
-  if(!ov || !BS_MULTI.open) return;
+  var el = document.getElementById('bsMultiView');
+  if(!el || !bsMultiVisible()) return;
   var now = nowUTCSec();
+  var me = (typeof bstatPid === 'function') ? bstatPid() : null;
+  var canEdit = bsMultiCanEdit();
+  var c = BS_MULTI.calc;
 
-  var chips = S.teams.map(function(t){
-    var on = BS_MULTI.teamIds.indexOf(t.id) >= 0;
-    var n = S.leaders.filter(function(l){ return l.bsSlot && l.bsSlot.slotType === 'team' && l.bsSlot.slotId === t.id; }).length;
-    return '<div class="bsMultiChip' + (on ? ' on' : '') + '" onclick="bsMultiToggle(&quot;' + t.id + '&quot;)">' +
-      '<span style="width:9px;height:9px;border-radius:50%;background:' + (t.color || 'var(--text3)') + '"></span>' +
-      t.name + ' <span style="opacity:.6;font-size:11px">(' + n + ')</span></div>';
-  }).join('') || '<div style="color:var(--text3);font-size:12px">No teams yet.</div>';
+  var head = '<div class="bsMultiHead">' +
+    '<button class="btn btn-ghost btn-sm" onclick="bsMultiClose()">&#8592; Back</button>' +
+    '<strong style="color:var(--gold);font-family:var(--head);letter-spacing:.03em">&#9889; Multi-team rally</strong>' +
+    (canEdit ? '' : '<span style="font-size:11px;color:var(--text3)">view only</span>') +
+    '</div>';
+
+  var picker = '';
+  if(canEdit){
+    var chips = S.teams.map(function(t){
+      var on = BS_MULTI.teamIds.indexOf(t.id) >= 0;
+      var n = S.leaders.filter(function(l){ return l.bsSlot && l.bsSlot.slotType === 'team' && l.bsSlot.slotId === t.id; }).length;
+      return '<div class="bsMultiChip' + (on ? ' on' : '') + '" onclick="bsMultiToggle(&quot;' + t.id + '&quot;)">' +
+        '<span style="width:9px;height:9px;border-radius:50%;background:' + (t.color || 'var(--text3)') + '"></span>' +
+        t.name + ' <span style="opacity:.6;font-size:11px">(' + n + ')</span></div>';
+    }).join('') || '<div style="color:var(--text3);font-size:12px">No teams yet.</div>';
+    var offLbl = BS_CALC.offsetSec === null ? 'no offset set'
+      : ('offset +' + (BS_CALC.offsetSec < 60 ? BS_CALC.offsetSec + 's' : Math.floor(BS_CALC.offsetSec / 60) + 'm'));
+    picker = '<div class="bs4lbl">Teams launching together <span style="color:var(--text3);font-weight:400">&#183; ' + offLbl + '</span></div>' +
+      '<div class="bsMultiPick">' + chips + '</div>' +
+      '<button class="btn btn-primary btn-sm" onclick="bsMultiCalc()">Calculate &amp; send to all</button>' +
+      (c ? ' <button class="btn btn-ghost btn-sm" onclick="bsMultiClear()">Clear</button>' : '');
+  }
 
   var body = '';
-  var c = BS_MULTI.calc;
   if(c){
     var landIn = c.landSec - now;
-    body += '<div class="bsMultiLand"><strong style="color:var(--gold)">All rallies land ' + s2hms(c.landSec) + ' UTC</strong>' +
+    body += '<div class="bsMultiLand" style="margin-top:12px"><strong style="color:var(--gold)">All rallies land ' + s2hms(c.landSec) + ' UTC</strong>' +
       '<span style="color:var(--text3);margin-left:10px">' + (landIn > 0 ? 'in ' + bsFmtLand(landIn) : 'landed') + '</span></div>';
     body += '<div class="bsMultiGrid">' + c.teams.map(function(t){
       var rows = t.rows.map(function(r){
@@ -3710,7 +3797,14 @@ function bsMultiRender(){
         if(rem > 10) st = '<span class="mono" style="color:var(--text2);font-size:12px">in ' + rem + 's</span>';
         else if(rem > 0) st = '<span class="mono" style="color:#ff7070;font-size:13px;font-weight:700">in ' + rem + 's</span>';
         else st = '<span style="color:var(--green);font-size:12px;font-weight:700">GO!</span>';
-        return '<div class="bsMultiRow"><span><strong style="color:var(--text)">' + r.name + '</strong>' +
+        var mine = me && r.playerId && String(r.playerId) === me;
+        if(mine && rem <= 0){
+          var key = t.id + ':' + r.launchSec;
+          if(!BS_MULTI.fired[key]){ BS_MULTI.fired[key] = true; if(navigator.vibrate){ try{ navigator.vibrate([200,100,200]); }catch(e){} } }
+        }
+        return '<div class="bsMultiRow' + (mine ? ' me' : '') + '"><span>' +
+          (mine ? '<span style="color:var(--gold);font-size:10px;margin-right:5px">YOU</span>' : '') +
+          '<strong style="color:var(--text)">' + r.name + '</strong>' +
           '<span class="mono" style="color:var(--gold);margin-left:8px">' + s2hms(r.launchSec) + '</span>' +
           '<span style="color:var(--text3);font-size:11px;margin-left:6px">(' + r.march + 's)</span></span>' + st + '</div>';
       }).join('');
@@ -3719,28 +3813,15 @@ function bsMultiRender(){
         '<button class="btn btn-ghost btn-sm" style="margin-left:auto;font-size:11px" onclick="bsMultiCopy(&quot;' + t.id + '&quot;)">Copy</button>' +
         '</div>' + rows + '</div>';
     }).join('') + '</div>';
-    body += '<div style="margin-top:14px"><button class="btn btn-gold" onclick="bsMultiCopy(null)">&#128203; Copy all teams</button></div>';
+    body += '<div style="margin-top:12px"><button class="btn btn-gold btn-sm" onclick="bsMultiCopy(null)">&#128203; Copy all teams</button></div>';
   } else {
-    body += '<div style="color:var(--text3);font-size:13px">Pick two or more teams, then calculate. Every selected leader gets a launch time that converges on one shared landing moment.</div>';
+    body += '<div style="color:var(--text3);font-size:13px;margin-top:12px">' +
+      (canEdit
+        ? 'Pick two or more teams, then calculate. Every selected leader gets a launch time that converges on one shared landing moment, and the schedule appears on their phone too.'
+        : 'No multi-team rally is running right now.') + '</div>';
   }
 
-  var offLbl = BS_CALC.offsetSec === null ? 'no offset set' :
-    ('+' + (BS_CALC.offsetSec < 60 ? BS_CALC.offsetSec + 's' : Math.floor(BS_CALC.offsetSec / 60) + 'm'));
-
-  ov.innerHTML =
-    '<div class="bs-modal wide">' +
-      '<div class="bs-modal-head">' +
-        '<span style="font-family:var(--head);font-weight:700;letter-spacing:.04em;color:var(--gold);flex:1">&#9889; Multi-team rally ' +
-        '<span style="color:var(--text3);font-size:11px;font-weight:400">&#183; offset ' + offLbl + '</span></span>' +
-        '<span onclick="bsMultiClose()" style="cursor:pointer;color:var(--text3);font-size:18px">&#10005;</span>' +
-      '</div>' +
-      '<div class="bsMultiBody">' +
-        '<div class="bs4lbl">Teams launching together</div>' +
-        '<div class="bsMultiPick">' + chips + '</div>' +
-        '<button class="btn btn-primary btn-sm" style="margin-bottom:14px" onclick="bsMultiCalc()">Calculate combined schedule</button>' +
-        body +
-      '</div>' +
-    '</div>';
+  el.innerHTML = head + '<div class="bsMultiBody">' + picker + body + '</div>';
 }
 
 function bsUnfreezeSchedule(){
@@ -10545,6 +10626,7 @@ const KEY_MIN_ROLE = {
   // Battle Strategy — rally leaders and up
   leaders: 'rallyleader', teams: 'rallyleader', alliances: 'rallyleader',
   garrisonAllianceName: 'rallyleader', attackAllianceName: 'rallyleader',
+  bsMultiSched: 'rallyleader',
   rally: 'rallyleader', teamRally: 'rallyleader', petPlans: 'rallyleader',
   bsSetup: 'rallyleader', bsFrozen: 'rallyleader', finalCalc: 'rallyleader',
   // Manage Spots — R4/R5 and up
