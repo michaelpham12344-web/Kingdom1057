@@ -16,6 +16,8 @@
 const KINGSHOT_API  = "https://kingshot.net/api";
 // Upstream error keys that mean "their API is down", not "no such player"
 const KS_OUTAGE_KEYS_SRV = ['PLAYER_API_UNAVAILABLE','SERVICE_UNAVAILABLE','UPSTREAM_ERROR'];
+// Admin role is bound to this single Player ID. Password alone can never grant admin.
+const ADMIN_PID_SRV = '158134757';
 const GIFTCODE_API  = "https://ks-giftcode.centurygame.com/api";
 const SALT          = "tB87#kPtkxqOS2";
 const BATCH_SIZE    = 5;   // players per cron run — keeps well under 30s CPU limit
@@ -533,10 +535,12 @@ select.lgInput{cursor:pointer;font-size:15px;}
 .bs4clockrow .mono{font-family:var(--mono);font-size:20px;color:var(--gold);background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:4px 9px;min-width:40px;text-align:center;}
 .bs4clocklbl{font-size:9.5px;color:var(--text3);letter-spacing:.16em;text-align:right;margin-top:4px;}
 .bs4tabs{display:flex;padding:0 22px;border-bottom:1px solid var(--border);background:rgba(11,9,8,.35);}
-.bs4tab{padding:15px 4px;margin-right:28px;cursor:pointer;font-family:var(--head);font-size:14px;font-weight:600;color:var(--text3);background:none;border:none;border-bottom:2.5px solid transparent;display:flex;align-items:center;gap:8px;}
-.bs4tab .bs4n{font-family:var(--mono);font-size:11px;background:var(--bg4);color:var(--text3);border-radius:5px;padding:2px 7px;}
-.bs4tab.active{color:var(--text);border-bottom-color:var(--gold);}
-.bs4tab.active .bs4n{background:var(--gold);color:#100c0a;}
+.bs4tab{padding:15px 4px;margin-right:28px;cursor:pointer;font-family:var(--head);font-size:15px;font-weight:700;letter-spacing:.03em;color:var(--text2);background:none;border:none;border-bottom:2.5px solid transparent;display:flex;align-items:center;gap:8px;transition:color .15s,text-shadow .15s;}
+.bs4tab:hover{color:var(--text);}
+.bs4tab .bs4n{font-family:var(--mono);font-size:11px;font-weight:700;background:var(--bg4);color:var(--text2);border:1px solid var(--border2);border-radius:5px;padding:2px 7px;transition:.15s;}
+.bs4tab:hover .bs4n{border-color:var(--gold);color:var(--gold);}
+.bs4tab.active{color:var(--gold);border-bottom-color:var(--gold);text-shadow:0 0 14px rgba(217,166,72,.45);}
+.bs4tab.active .bs4n{background:var(--gold);color:#100c0a;border-color:var(--gold);box-shadow:0 0 10px rgba(217,166,72,.5);}
 .bs4pane{padding:22px 22px 30px;}
 .bs4hint{font-size:13px;color:var(--text3);margin-bottom:18px;display:flex;align-items:center;gap:8px;}
 .bs4card{background:#16130f;border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px;}
@@ -749,6 +753,19 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .team-dot.rallying{background:#ff5555;box-shadow:0 0 6px rgba(255,85,85,.7);}
 .bs-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;}
 .bs-modal{background:var(--bg2);border:1px solid var(--border2);border-radius:12px;max-width:380px;width:100%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;}
+/* Multi-team rally pop-up: an in-page overlay card, never a browser popup. */
+.bs-modal.wide{max-width:760px;}
+.bsMultiBody{overflow-y:auto;padding:14px 16px;}
+.bsMultiPick{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
+.bsMultiChip{display:flex;align-items:center;gap:7px;background:var(--bg3);border:1.5px solid var(--border2);border-radius:20px;padding:6px 13px;cursor:pointer;font-size:13px;color:var(--text2);user-select:none;transition:.12s;}
+.bsMultiChip:hover{border-color:var(--gold);}
+.bsMultiChip.on{background:rgba(217,166,72,.16);border-color:var(--gold);color:var(--text);font-weight:600;}
+.bsMultiGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;}
+.bsMultiTeam{background:var(--bg4);border:1px solid var(--border);border-radius:9px;padding:12px 14px;}
+.bsMultiTeamH{display:flex;align-items:center;gap:7px;font-weight:700;font-size:13px;margin-bottom:9px;}
+.bsMultiRow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:4px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);}
+.bsMultiRow:last-child{border-bottom:none;}
+.bsMultiLand{background:rgba(217,166,72,.1);border:1px solid rgba(217,166,72,.35);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--text);}
 .bs-modal-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);}
 .bs-modal-list{overflow-y:auto;padding:8px;}
 .bs-add-row{display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:7px;border:1px solid var(--border);background:var(--bg3);margin-bottom:6px;cursor:pointer;}
@@ -1133,17 +1150,6 @@ document.addEventListener('touchend',function(e){
       <div class="bs4card">
         <h3>&#127984; Alliances &amp; Teams</h3>
         <div class="bs4desc">Name each alliance, then create the teams that fight under them.</div>
-        <div class="bs4grid" style="margin-bottom:16px">
-          <div class="bs4zone">
-            <div class="bs4zh">&#128737; GARRISON</div>
-            <input type="text" id="garrisonAllianceName" placeholder="e.g. [GRD] Guardians" style="width:100%" oninput="updateAllianceNames()">
-          </div>
-          <div class="bs4zone">
-            <div class="bs4zh">&#9876; ATTACKING</div>
-            <input type="text" id="attackAllianceName" placeholder="e.g. [ATK] Vanguard" style="width:100%" oninput="updateAllianceNames()">
-          </div>
-        </div>
-
         <div class="bs4lbl">Alliances</div>
         <div id="bsAllianceList" style="margin-bottom:10px"></div>
         <div class="bs4row" id="bsAddAllianceRow" style="margin-bottom:20px">
@@ -1243,6 +1249,10 @@ document.addEventListener('touchend',function(e){
           <span><span class="team-dot rallying"></span>Rallying</span>
         </div>
         <div id="bsTeamButtons" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
+        <div style="margin-bottom:12px">
+          <button class="btn btn-ghost btn-sm" onclick="bsMultiOpen()">&#9889; Multi-team rally&#8230;</button>
+          <span style="font-size:11px;color:var(--text3);margin-left:8px">Launch 2+ teams onto one landing time.</span>
+        </div>
         <div id="bsFinalResult">
           <div style="color:var(--text3);font-size:13px">Select an offset, then click a team to see the schedule.</div>
         </div>
@@ -1586,17 +1596,25 @@ const S = {
 };
 const BS_ALLIANCE_PALETTE = ['#c084fc','#f5b833','#ff8fa3','#4dd0e1','#ffb74d','#a5d6a7','#9575cd','#4db6ac'];
 const BS_TEAM_PALETTE = ['#6ab0ff','#5ddb8a','#ff8fa3','#f5b833','#c084fc','#4dd0e1','#ffb74d','#9575cd'];
+// Rally leaders are always shown A→Z. One sort, applied to S.leaders itself, so
+// every consumer (pool, teams, turrets, overview, modals) inherits the order.
+function bsSortLeaders(){
+  if(!S.leaders) return;
+  S.leaders.sort(function(a,b){
+    return String(a.name||'').localeCompare(String(b.name||''), undefined, {sensitivity:'base', numeric:true});
+  });
+}
 function bsEnsureTeamColors(){
   (S.teams||[]).forEach(function(t,i){ if(!t.color) t.color=BS_TEAM_PALETTE[i % BS_TEAM_PALETTE.length]; });
 }
+// Legacy field names, kept only to migrate saved state that predates S.alliances.
+var bsLegacyAllyNames = { garrison:'', attack:'' };
 function bsEnsureAlliances(){
   if(!S.alliances) S.alliances=[];
   if(S.alliances.length===0){
-    var gEl=document.getElementById('garrisonAllianceName');
-    var aEl=document.getElementById('attackAllianceName');
     S.alliances=[
-      {id:'garrison',name:(gEl&&gEl.value)||'Garrison',color:'#6ab0ff'},
-      {id:'attack',name:(aEl&&aEl.value)||'Attacking',color:'#5ddb8a'}
+      {id:'garrison',name:bsLegacyAllyNames.garrison||'Garrison',color:'#6ab0ff'},
+      {id:'attack',name:bsLegacyAllyNames.attack||'Attacking',color:'#5ddb8a'}
     ];
   }
 }
@@ -1684,6 +1702,49 @@ function syncSetSkew(serverNow){
 }
 function nowSync(){ return Date.now() + syncSkew; }
 
+// ═══════════════ MASTER 1-SECOND SCHEDULER ═══════════════
+// Every per-second UI job runs off ONE timer that re-aligns to the wall clock
+// after each tick. setInterval(fn,1000) fires at whatever phase the page
+// happened to load at and drifts under load, so a value could sit on screen up
+// to ~1s past the second it belongs to — that is the "countdown lags a second"
+// symptom. Re-arming to the next true boundary of nowSync() flips the text
+// within a few ms of the rollover. Jobs also skip work when their page is not
+// visible, so a hidden tab does no DOM churn at all.
+const BS_TICKS = [];
+function onEachSecond(fn, pageId){ BS_TICKS.push({ fn: fn, pageId: pageId || null }); }
+function _tickPageActive(id){
+  if(!id) return true;
+  const el = document.getElementById('page-' + id);
+  return !!(el && el.classList.contains('active'));
+}
+let _tickTimer = null, _tickLastSec = -1;
+function _tickRun(){
+  _tickTimer = null;
+  const sec = Math.floor(nowSync() / 1000);
+  if(sec !== _tickLastSec && !document.hidden){
+    _tickLastSec = sec;
+    for(let i = 0; i < BS_TICKS.length; i++){
+      const t = BS_TICKS[i];
+      if(!_tickPageActive(t.pageId)) continue;
+      try { t.fn(); } catch(e) {}
+    }
+  }
+  _tickArm();
+}
+function _tickArm(){
+  if(_tickTimer) return;
+  let ms = 1000 - (nowSync() % 1000);
+  if(ms < 12) ms += 1000;               // don't double-fire on the same second
+  _tickTimer = setTimeout(_tickRun, ms);
+}
+_tickArm();
+document.addEventListener('visibilitychange', function(){
+  if(document.hidden) return;
+  _tickLastSec = -1;                    // force an immediate catch-up repaint
+  if(_tickTimer){ clearTimeout(_tickTimer); _tickTimer = null; }
+  _tickRun();
+});
+
 function syncEnabled() {
   // Empty string is a valid, intentional value meaning "same origin as this page"
   // (used when the Worker serves both the site and the API together).
@@ -1701,8 +1762,8 @@ let syncSerialize = function() {
     })),
     teams: S.teams.map(t => ({ id: t.id, name: t.name, alliance: t.alliance, color: t.color, customName: !!t.customName })),
     alliances: S.alliances || [],
-    garrisonAllianceName: document.getElementById('garrisonAllianceName') ? document.getElementById('garrisonAllianceName').value : '',
-    attackAllianceName: document.getElementById('attackAllianceName') ? document.getElementById('attackAllianceName').value : '',
+    garrisonAllianceName: ((S.alliances||[])[0]||{}).name || '',
+    attackAllianceName: ((S.alliances||[])[1]||{}).name || '',
     msSubmissions: (typeof MS!=='undefined') ? MS.submissions : [],
     msLastAllocation: (typeof MS!=='undefined') ? MS._lastAllocation : null,
     msAllocByBoard: (typeof MS!=='undefined') ? MS._allocByBoard : null,
@@ -1773,6 +1834,7 @@ let syncApplyRemote = function(data) {
         launchTimeStr: null, landTimeStr: null
       });
     });
+    if (typeof bsSortLeaders === 'function') bsSortLeaders();
     if (data.teamRally && typeof bsTeamRally !== 'undefined') bsTeamRally = data.teamRally;
     if (Array.isArray(data.petPlans) && typeof bsPetPlans !== 'undefined') bsPetPlans = data.petPlans;
     // Merge incoming teams over the existing objects instead of replacing them, so
@@ -1781,12 +1843,11 @@ let syncApplyRemote = function(data) {
     S.teams.forEach(function(t){ _oldTeams[t.id] = t; });
     S.teams = (data.teams || []).map(function(t){ return Object.assign({}, _oldTeams[t.id] || {}, t); });
     S.alliances = (data.alliances && data.alliances.length) ? data.alliances : (S.alliances || []);
+    if (typeof bsLegacyAllyNames !== 'undefined') {
+      if (data.garrisonAllianceName) bsLegacyAllyNames.garrison = data.garrisonAllianceName;
+      if (data.attackAllianceName)   bsLegacyAllyNames.attack   = data.attackAllianceName;
+    }
     bsEnsureAlliances();
-    const gEl = document.getElementById('garrisonAllianceName');
-    const aEl = document.getElementById('attackAllianceName');
-    if (gEl && data.garrisonAllianceName !== undefined) gEl.value = data.garrisonAllianceName;
-    if (aEl && data.attackAllianceName !== undefined) aEl.value = data.attackAllianceName;
-    if (typeof updateAllianceNames === 'function') updateAllianceNames();
     // Final Calculation: restore the land time, then recompute launch times locally.
     if (data.finalCalc) {
       const _fd = document.getElementById('landDate'), _ft = document.getElementById('landTime');
@@ -2300,7 +2361,7 @@ function fmtUTCDateTime(ms){
   return fmtUTCDate(ms)+', '+String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0')+' UTC';
 }
 
-setInterval(updateClock,1000); updateClock();
+onEachSecond(updateClock); updateClock();
 
 // ════════════ HELPERS ════════════
 function fmtSec(s){
@@ -2478,6 +2539,10 @@ function renderLeaderTable(){
   }).join('');
 }
 function tickTimers(){
+  // Cheap bail-out: nothing running and no panel on screen means no work to do.
+  // This ran twice a second over the whole roster even with zero live rallies.
+  if(document.hidden) return;
+  if(!document.getElementById('activeTimers') && !S.leaders.some(function(l){ return l.timerEnd || l.cooldownEnd; })) return;
   const now=Date.now();
   let needsRender=false;
   S.leaders.forEach(l=>{
@@ -2556,11 +2621,9 @@ function assignTeam(teamId,alliance){
   syncQueuePush();
 }
 function updateAllianceNames(){
-  const gIn=document.getElementById('garrisonAllianceName');
-  const aIn=document.getElementById('attackAllianceName');
-  if(!gIn||!aIn) return;
-  const gn=gIn.value;
-  const an=aIn.value;
+  if(typeof bsEnsureAlliances==='function') bsEnsureAlliances();
+  const gn=((S.alliances||[])[0]||{}).name||'';
+  const an=((S.alliances||[])[1]||{}).name||'';
   ['garrisonName','attackName'].forEach((id,i)=>{
     const el=document.getElementById(id); if(el) el.textContent=(i===0?gn:an)?'('+(i===0?gn:an)+')':'';
   });
@@ -2747,7 +2810,7 @@ function tickPets(){
     }
   });
 }
-setInterval(tickPets, 1000);
+onEachSecond(tickPets);
 
 // ── Pet Activation Plan (Battle Strategy) — arm a batch of leaders to auto-activate at a UTC time ──
 let bsPetPlans=[]; let bsPetSel=[];
@@ -2807,7 +2870,7 @@ function renderPetPlanList(){
   }).join('');
 }
 function renderPetPlans(){ renderPetPlanChips(); renderPetPlanList(); }
-setInterval(function(){ bsFirePetPlans(); renderPetPlanList(); },1000);
+onEachSecond(function(){ bsFirePetPlans(); renderPetPlanList(); }, 'strategy');
 renderPetGrid();
 
 // ════════════ BATTLE STRATEGY ════════════
@@ -2888,6 +2951,7 @@ function bsAddIsHere(l){
 }
 function bsRenderAddModal(){
   const ov=document.getElementById('bsAddOverlay'); if(!ov||!bsAddModalTarget) return;
+  bsSortLeaders();
   const rows=S.leaders.map(function(l){
     const onThis=bsAddIsHere(l);
     let where='';
@@ -2942,7 +3006,8 @@ function renderBsAllianceZones(){
     cards+='<div class="card bs4ally"><div class="card-title" style="color:'+a.color+'">🛡️ '+a.name+'</div>'+
       (teams.length
         ? '<div class="bs4teamgrid">'+teams.map(teamBoxHTML).join('')+'</div>'
-        : '<div style="color:var(--text3);font-size:12px">No teams yet. Add a team, then use its alliance buttons to place it here.</div>')+
+        : '<div style="color:var(--text3);font-size:12px">No teams yet — add one below.</div>')+
+      bsAddTeamRowHTML(a)+
       '</div>';
   });
   var un=S.teams.filter(function(t){return !t.alliance || !known[t.alliance];});
@@ -3072,6 +3137,7 @@ function bsAddLeaderById(){
   if(!bsPendingPlayer){ toast('Look up a Player ID first'); return; }
   if(isNaN(march)||march<0){ toast('Enter a march time'); return; }
   S.leaders.push({id:uid(),name:bsPendingPlayer.name,march:march,tier:'TG5',dur:300,teamId:null,status:'free',timerEnd:null,launchTimeStr:null,landTimeStr:null,avatar:bsPendingPlayer.avatar,playerId:bsPendingPlayer.playerId,bsSlot:{slotType:'pool',slotId:null},pet:{active:false,startMs:null}});
+  bsSortLeaders();
   bsPendingPlayer=null;
   const a=document.getElementById('bsAddPlayerId'); if(a)a.value='';
   const b=document.getElementById('bsAddMarch'); if(b)b.value='';
@@ -3092,6 +3158,7 @@ function bsRemoveLeaderOverview(leaderId){
 }
 function renderBsLeaderOverview(){
   const el=document.getElementById('bsLeaderOverview'); if(!el) return;
+  bsSortLeaders();
   if(!S.leaders.length){ el.innerHTML='<div style="color:var(--text3);font-size:12px">No rally leaders yet.</div>'; return; }
   el.innerHTML='<div style="font-size:11px;color:var(--text3);margin-bottom:5px">'+S.leaders.length+' rally leader'+(S.leaders.length===1?'':'s')+'</div>'+S.leaders.map(function(l){
     return '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;margin-bottom:5px">'+
@@ -3102,6 +3169,30 @@ function renderBsLeaderOverview(){
       '<span onclick="bsRemoveLeaderOverview('+"'"+l.id+"'"+')" style="cursor:pointer;color:var(--text3);font-size:14px" title="Remove leader">✕</span>'+
     '</div>';
   }).join('');
+}
+// Inline "add team" row rendered at the bottom of each alliance card, so a team
+// can be created straight into the alliance you are already looking at.
+function bsAddTeamRowHTML(a){
+  var id='bsQuickTeam-'+a.id;
+  return '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">'+
+    '<input type="text" id="'+id+'" placeholder="New team in '+(a.name||'').replace(/"/g,'&quot;')+'\u2026" '+
+      'style="flex:1;min-width:140px;font-size:12px" '+
+      'onkeydown="if(event.key===&quot;Enter&quot;)bsAddTeamTo(&quot;'+a.id+'&quot;)">'+
+    '<button class="btn btn-primary btn-sm" onclick="bsAddTeamTo(&quot;'+a.id+'&quot;)">+ Add Team</button>'+
+  '</div>';
+}
+function bsAddTeamTo(allianceId){
+  var el=document.getElementById('bsQuickTeam-'+allianceId); if(!el) return;
+  var name=(el.value||'').trim();
+  if(!name) name='Team '+(S.teams.length+1);
+  bsEnsureAlliances(); bsEnsureTeamColors();
+  S.teams.push({id:uid(),name:name,customName:true,alliance:allianceId,
+    color:BS_TEAM_PALETTE[S.teams.length % BS_TEAM_PALETTE.length]});
+  el.value='';
+  renderBattleStrategy();
+  if(typeof renderSetup==='function') renderSetup();
+  syncQueuePush();
+  toast('Team added to '+bsAllianceName(allianceId));
 }
 function bsAddTeam(){
   const el=document.getElementById('bsNewTeamName'); if(!el) return;
@@ -3230,15 +3321,15 @@ function bsAutoNameTeams(){
 function renderBattleStrategy(){
   // init bsSlot
   S.leaders.forEach(l=>{ if(!l.bsSlot) l.bsSlot={slotType:'pool',slotId:null}; });
+  bsSortLeaders();
   bsAutoNameTeams();
 
   // ── ALLIANCE NAMES (from Team Setup) ──
-  const gNameInput=document.getElementById('garrisonAllianceName');
-  const aNameInput=document.getElementById('attackAllianceName');
+  bsEnsureAlliances();
   const gTitle=document.getElementById('bsGarrisonTitle');
   const aTitle=document.getElementById('bsAttackTitle');
-  if(gTitle) gTitle.textContent=(gNameInput&&gNameInput.value)?gNameInput.value:'Garrison Alliance';
-  if(aTitle) aTitle.textContent=(aNameInput&&aNameInput.value)?aNameInput.value:'Attacking Alliance';
+  if(gTitle) gTitle.textContent=(S.alliances[0]||{}).name||'Garrison Alliance';
+  if(aTitle) aTitle.textContent=(S.alliances[1]||{}).name||'Attacking Alliance';
 
   // ── TURRETS ──
 const turretGrid=document.getElementById('bsTurretGrid');
@@ -3298,8 +3389,9 @@ function bsTickClock(){
     } else prev.textContent='';
   }
   if(typeof bsRenderStickyBar==='function') bsRenderStickyBar();
+  if(typeof BS_MULTI!=='undefined' && BS_MULTI.open && BS_MULTI.calc) bsMultiRender();
 }
-setInterval(bsTickClock,1000); bsTickClock();
+onEachSecond(bsTickClock, 'strategy'); bsTickClock();
 
 function nowUTCSec(){
   return Math.floor(nowSync()/1000);
@@ -3402,6 +3494,7 @@ function bsCalcTeam(teamId, offsetSec, logToast){
 
   const header=\`\${t.name}\`;
   const resultEl=document.getElementById('bsFinalResult');
+  resultEl._bsFrzSig=null;   // shell replaced — invalidate the frozen fast path
   resultEl.innerHTML=\`<div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:14px 16px">
     <div style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;color:var(--text);margin-bottom:10px">\${header}</div>
     \${results.map((r,i)=>\`
@@ -3461,35 +3554,195 @@ function bsTeamColorDot(teamId){
 }
 
 // ── Frozen (copied) schedule with live per-leader launch countdowns ──
-function bsRenderFrozen(){
-  var f=BS_CALC.frozen; if(!f) return;
-  var el=document.getElementById('bsFinalResult'); if(!el) return;
-  var t=S.teams.find(function(x){return x.id===f.teamId;});
-  var now=nowUTCSec();
-  var rows=f.results.map(function(r){
-    var rem=r.launchSec-now;
-    var st, cls='';
-    if(rem>10){ st='<span class="mono" style="color:var(--text2);font-size:13px">in '+rem+'s</span>'; }
-    else if(rem>0){ cls=' bs-launch-soon'; st='<span class="mono" style="color:#ff7070;font-size:14px;font-weight:700">in '+rem+'s</span>'; }
-    else {
-      cls=' bs-launch-go'; st='<span style="color:var(--green);font-size:13px;font-weight:700">GO!</span>';
-      if(!r._fired){ r._fired=true; if(navigator.vibrate){ try{ navigator.vibrate([200,100,200]); }catch(e){} } }
-    }
-    return '<div class="copy-line'+cls+'" style="margin-bottom:5px;display:flex;justify-content:space-between;align-items:center">'+
-      '<span><strong style="color:var(--text)">'+r.name+'</strong>'+
-      '<span style="color:var(--text3);margin:0 8px">|</span>'+
-      '<span class="mono" style="color:var(--gold);font-size:16px">'+s2hms(r.launchSec)+'</span>'+
-      '<span style="color:var(--text3);font-size:11px;margin-left:8px">(march '+r.march+'s)</span></span>'+st+'</div>';
-  }).join('');
-  el.innerHTML='<div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:14px 16px">'+
-    '<div style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;color:var(--text);margin-bottom:10px">'+(t?t.name:'')+
-    '<span style="color:var(--gold);font-size:11px;font-weight:600">● LOCKED — copied schedule</span></div>'+rows+
-    '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
-    '<button class="btn btn-gold btn-sm" onclick="bsCopyTeamResult(&quot;'+f.teamId+'&quot;)">📋 Copy again</button>'+
-    '<span id="bsCopyMsg" style="font-size:12px;font-weight:600"></span></div></div>';
+// Perf: the shell is built once per schedule. Each second only the countdown
+// cells are touched, so a live rally does ~4 text writes instead of a full
+// innerHTML teardown of the panel.
+function bsFrzState(r, now){
+  var rem = r.launchSec - now;
+  if(rem > 10) return { cls:'', html:'<span class="mono" style="color:var(--text2);font-size:13px">in ' + rem + 's</span>' };
+  if(rem > 0)  return { cls:'bs-launch-soon', html:'<span class="mono" style="color:#ff7070;font-size:14px;font-weight:700">in ' + rem + 's</span>' };
+  if(!r._fired){ r._fired = true; if(navigator.vibrate){ try{ navigator.vibrate([200,100,200]); }catch(e){} } }
+  return { cls:'bs-launch-go', html:'<span style="color:var(--green);font-size:13px;font-weight:700">GO!</span>' };
 }
+function bsRenderFrozen(){
+  var f = BS_CALC.frozen; if(!f) return;
+  var el = document.getElementById('bsFinalResult'); if(!el) return;
+  var now = nowUTCSec();
+  var sig = f.teamId + '|' + f.results.map(function(r){ return r.launchSec; }).join(',');
+
+  // Fast path — shell already on screen, just repaint the countdown cells.
+  if(el._bsFrzSig === sig){
+    for(var k = 0; k < f.results.length; k++){
+      var cell = document.getElementById('bsFrzS' + k); if(!cell) continue;
+      var st = bsFrzState(f.results[k], now);
+      if(cell._h !== st.html){ cell.innerHTML = st.html; cell._h = st.html; }
+      var row = cell.parentNode;
+      if(row && row._c !== st.cls){
+        row.className = 'copy-line' + (st.cls ? ' ' + st.cls : '');
+        row._c = st.cls;
+      }
+    }
+    return;
+  }
+
+  var t = S.teams.find(function(x){ return x.id === f.teamId; });
+  var rows = f.results.map(function(r, k){
+    var st = bsFrzState(r, now);
+    return '<div class="copy-line' + (st.cls ? ' ' + st.cls : '') + '" style="margin-bottom:5px;display:flex;justify-content:space-between;align-items:center">' +
+      '<span><strong style="color:var(--text)">' + r.name + '</strong>' +
+      '<span style="color:var(--text3);margin:0 8px">|</span>' +
+      '<span class="mono" style="color:var(--gold);font-size:16px">' + s2hms(r.launchSec) + '</span>' +
+      '<span style="color:var(--text3);font-size:11px;margin-left:8px">(march ' + r.march + 's)</span></span>' +
+      '<span id="bsFrzS' + k + '">' + st.html + '</span></div>';
+  }).join('');
+
+  el.innerHTML = '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:14px 16px">' +
+    '<div style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;color:var(--text);margin-bottom:10px">' + (t ? t.name : '') +
+    '<span style="color:var(--gold);font-size:11px;font-weight:600">● LOCKED — copied schedule</span></div>' + rows +
+    '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+    '<button class="btn btn-gold btn-sm" onclick="bsCopyTeamResult(&quot;' + f.teamId + '&quot;)">📋 Copy again</button>' +
+    '<span id="bsCopyMsg" style="font-size:12px;font-weight:600"></span></div></div>';
+  el._bsFrzSig = sig;
+}
+// ═══════════════ MULTI-TEAM RALLY (in-page pop-up card) ═══════════════
+// Rare case: 2+ teams must land together. Rendered as an overlay card so the
+// normal Final Calculation card keeps its size — it is NOT a browser popup.
+const BS_MULTI = { open:false, teamIds:[], calc:null };
+
+function bsMultiOpen(){
+  BS_MULTI.open = true;
+  if(!BS_MULTI.teamIds.length && BS_CALC.selectedTeamId) BS_MULTI.teamIds = [BS_CALC.selectedTeamId];
+  var ov = document.getElementById('bsMultiOverlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'bsMultiOverlay';
+    ov.className = 'bs-modal-overlay';
+    ov.onclick = function(e){ if(e.target === ov) bsMultiClose(); };
+    document.body.appendChild(ov);
+  }
+  ov.style.display = 'flex';
+  bsMultiRender();
+}
+function bsMultiClose(){
+  BS_MULTI.open = false;
+  var ov = document.getElementById('bsMultiOverlay');
+  if(ov) ov.style.display = 'none';
+}
+function bsMultiToggle(teamId){
+  var i = BS_MULTI.teamIds.indexOf(teamId);
+  if(i >= 0) BS_MULTI.teamIds.splice(i,1); else BS_MULTI.teamIds.push(teamId);
+  BS_MULTI.calc = null;
+  bsMultiRender();
+}
+
+// One shared landing time across every selected team: the single longest march
+// in the whole selection sets the convergence point, everyone else waits.
+function bsMultiCalc(){
+  var offset = BS_CALC.offsetSec;
+  if(offset === null){ toast('Pick a launch offset first.'); return; }
+  var picked = S.teams.filter(function(t){ return BS_MULTI.teamIds.indexOf(t.id) >= 0; });
+  if(picked.length < 2){ toast('Select at least two teams.'); return; }
+
+  var all = [];
+  picked.forEach(function(t){
+    S.leaders.forEach(function(l){
+      if(l.bsSlot && l.bsSlot.slotType === 'team' && l.bsSlot.slotId === t.id) all.push(l);
+    });
+  });
+  if(!all.length){ toast('None of those teams have leaders assigned.'); return; }
+
+  var baseLaunch = nowUTCSec() + offset;
+  var maxMarch = Math.max.apply(null, all.map(function(l){ return l.march; }));
+  var landSec = baseLaunch + maxMarch;
+
+  BS_MULTI.calc = {
+    landSec: landSec,
+    teams: picked.map(function(t){
+      var rows = S.leaders
+        .filter(function(l){ return l.bsSlot && l.bsSlot.slotType === 'team' && l.bsSlot.slotId === t.id; })
+        .map(function(l){ return { name:l.name, march:l.march, launchSec: landSec - l.march }; })
+        .sort(function(a,b){ return a.launchSec - b.launchSec; });
+      return { id:t.id, name:t.name, color:t.color || 'var(--gold)', rows:rows };
+    }).filter(function(t){ return t.rows.length; })
+  };
+  bsMultiRender();
+}
+
+function bsMultiCopy(teamId){
+  var c = BS_MULTI.calc; if(!c) return;
+  var lines = [];
+  c.teams.forEach(function(t){
+    if(teamId && t.id !== teamId) return;
+    lines.push(t.name);
+    t.rows.forEach(function(r){ lines.push(r.name + ' | Time: ' + s2hms(r.launchSec)); });
+    lines.push('');
+  });
+  copyText(lines.join('\\n').trim(), true)
+    .then(function(){ toast('Copied'); })
+    .catch(function(){ toast('Copy failed'); });
+}
+
+function bsMultiRender(){
+  var ov = document.getElementById('bsMultiOverlay');
+  if(!ov || !BS_MULTI.open) return;
+  var now = nowUTCSec();
+
+  var chips = S.teams.map(function(t){
+    var on = BS_MULTI.teamIds.indexOf(t.id) >= 0;
+    var n = S.leaders.filter(function(l){ return l.bsSlot && l.bsSlot.slotType === 'team' && l.bsSlot.slotId === t.id; }).length;
+    return '<div class="bsMultiChip' + (on ? ' on' : '') + '" onclick="bsMultiToggle(&quot;' + t.id + '&quot;)">' +
+      '<span style="width:9px;height:9px;border-radius:50%;background:' + (t.color || 'var(--text3)') + '"></span>' +
+      t.name + ' <span style="opacity:.6;font-size:11px">(' + n + ')</span></div>';
+  }).join('') || '<div style="color:var(--text3);font-size:12px">No teams yet.</div>';
+
+  var body = '';
+  var c = BS_MULTI.calc;
+  if(c){
+    var landIn = c.landSec - now;
+    body += '<div class="bsMultiLand"><strong style="color:var(--gold)">All rallies land ' + s2hms(c.landSec) + ' UTC</strong>' +
+      '<span style="color:var(--text3);margin-left:10px">' + (landIn > 0 ? 'in ' + bsFmtLand(landIn) : 'landed') + '</span></div>';
+    body += '<div class="bsMultiGrid">' + c.teams.map(function(t){
+      var rows = t.rows.map(function(r){
+        var rem = r.launchSec - now, st;
+        if(rem > 10) st = '<span class="mono" style="color:var(--text2);font-size:12px">in ' + rem + 's</span>';
+        else if(rem > 0) st = '<span class="mono" style="color:#ff7070;font-size:13px;font-weight:700">in ' + rem + 's</span>';
+        else st = '<span style="color:var(--green);font-size:12px;font-weight:700">GO!</span>';
+        return '<div class="bsMultiRow"><span><strong style="color:var(--text)">' + r.name + '</strong>' +
+          '<span class="mono" style="color:var(--gold);margin-left:8px">' + s2hms(r.launchSec) + '</span>' +
+          '<span style="color:var(--text3);font-size:11px;margin-left:6px">(' + r.march + 's)</span></span>' + st + '</div>';
+      }).join('');
+      return '<div class="bsMultiTeam"><div class="bsMultiTeamH">' +
+        '<span style="width:10px;height:10px;border-radius:50%;background:' + t.color + '"></span>' + t.name +
+        '<button class="btn btn-ghost btn-sm" style="margin-left:auto;font-size:11px" onclick="bsMultiCopy(&quot;' + t.id + '&quot;)">Copy</button>' +
+        '</div>' + rows + '</div>';
+    }).join('') + '</div>';
+    body += '<div style="margin-top:14px"><button class="btn btn-gold" onclick="bsMultiCopy(null)">&#128203; Copy all teams</button></div>';
+  } else {
+    body += '<div style="color:var(--text3);font-size:13px">Pick two or more teams, then calculate. Every selected leader gets a launch time that converges on one shared landing moment.</div>';
+  }
+
+  var offLbl = BS_CALC.offsetSec === null ? 'no offset set' :
+    ('+' + (BS_CALC.offsetSec < 60 ? BS_CALC.offsetSec + 's' : Math.floor(BS_CALC.offsetSec / 60) + 'm'));
+
+  ov.innerHTML =
+    '<div class="bs-modal wide">' +
+      '<div class="bs-modal-head">' +
+        '<span style="font-family:var(--head);font-weight:700;letter-spacing:.04em;color:var(--gold);flex:1">&#9889; Multi-team rally ' +
+        '<span style="color:var(--text3);font-size:11px;font-weight:400">&#183; offset ' + offLbl + '</span></span>' +
+        '<span onclick="bsMultiClose()" style="cursor:pointer;color:var(--text3);font-size:18px">&#10005;</span>' +
+      '</div>' +
+      '<div class="bsMultiBody">' +
+        '<div class="bs4lbl">Teams launching together</div>' +
+        '<div class="bsMultiPick">' + chips + '</div>' +
+        '<button class="btn btn-primary btn-sm" style="margin-bottom:14px" onclick="bsMultiCalc()">Calculate combined schedule</button>' +
+        body +
+      '</div>' +
+    '</div>';
+}
+
 function bsUnfreezeSchedule(){
   BS_CALC.frozen=null;
+  var _r=document.getElementById('bsFinalResult'); if(_r) _r._bsFrzSig=null;
   if(BS_CALC.selectedTeamId!==null && BS_CALC.offsetSec!==null) bsCalcTeam(BS_CALC.selectedTeamId, BS_CALC.offsetSec, false);
 }
 
@@ -3569,7 +3822,7 @@ function bsTickRally(){
   Object.keys(bsTeamRally).forEach(function(id){ if(bsTeamRally[id]&&bsTeamRally[id].landEnd&&bsTeamRally[id].landEnd<=now){ delete bsTeamRally[id]; changed=true; } });
   if(changed || Object.keys(bsTeamRally).length){ if(typeof bsRenderTeamButtons==='function') bsRenderTeamButtons(); }
 }
-setInterval(bsTickRally,1000);
+onEachSecond(bsTickRally, 'strategy');
 
 // ════════════ MINISTER SPOTS ════════════
 const MS_CATEGORIES = ['general','training','construction','research'];
@@ -4670,7 +4923,7 @@ function ms2SyncHeader(){
     val.textContent = (d ? d + 'd ' : '') + p(h) + ':' + p(m) + ':' + p(sec);
   } catch(e) {}
 }
-setInterval(ms2SyncHeader, 1000);
+onEachSecond(ms2SyncHeader, 'minister');
 
 // ── Deadline management ──
 function msGetDeadline() {
@@ -5709,6 +5962,9 @@ function msClearAllSubs(){
 // AUTH SYSTEM v2 — 3 roles: member, rallyleader, r4r5, admin
 // ════════════════════════════════════════════════════════
 
+// Admin is bound to this one Player ID. Server /auth enforces the same rule.
+const ADMIN_PLAYER_ID = '158134757';
+
 const AUTH = {
   pid: null,         // the player id the server issued this token for
   verified: false,   // did the KingShot lookup actually confirm it?
@@ -5855,6 +6111,7 @@ async function msUnlockAdmin() {
   if (!input) return;
   const _apid = (typeof verifiedPlayer !== 'undefined' && verifiedPlayer) ? String(verifiedPlayer.id) : '';
   if (!_apid) { if (err) { err.style.display='block'; err.textContent='Verify your Player ID first.'; } return; }
+  if (_apid !== ADMIN_PLAYER_ID) { if (err) { err.style.display='block'; err.textContent='This Player ID is not an admin account.'; } return; }
   const role = await msAuthLogin('admin', { password: input.value, playerId: _apid });
   if (role === 'admin') {
     AUTH.role = 'admin';
@@ -6083,7 +6340,8 @@ async function bypassCheckPassword() {
 
   const pw = input.value;
   let role = null;
-  if (await msAuthLogin('admin', {password: pw, playerId: pid})) role = 'admin';
+  // Admin only offered to the bound Player ID (server enforces this too).
+  if (pid === ADMIN_PLAYER_ID && await msAuthLogin('admin', {password: pw, playerId: pid})) role = 'admin';
   else if (await msAuthLogin('r4r5', {password: pw, playerId: pid})) role = 'r4r5';
   else if (await msAuthLogin('rallyleader', {password: pw, playerId: pid})) role = 'rallyleader';
 
@@ -6154,7 +6412,6 @@ async function lookupPlayer() {
 }
 
 // ── Navigation between landing steps ──
-const ADMIN_PLAYER_ID = '158134757';
 
 function landingBack(to) {
   ['Entry','Alliance','Password'].forEach(s => {
@@ -6249,9 +6506,9 @@ function enterApp(role) {
     if(el) el.style.display = (isRally || isR4 || isAdm) ? '' : 'none';
   });
 
-  // Enemy Scout — R4/R5, Admin, Rally Leaders
+  // Enemy Scout — ADMIN ONLY
   const scoutTab = document.getElementById('tabScout');
-  if(scoutTab) scoutTab.style.display = (isRally || isR4 || isAdm) ? '' : 'none';
+  if(scoutTab) scoutTab.style.display = isAdm ? '' : 'none';
 
   // Admin tab
   const adminTab = document.getElementById('tabAdmin');
@@ -6277,7 +6534,14 @@ if(isMemberOnly) showPageDirect('minister');
 
 function showPage(p) { showPageDirect(p); }
 
+// Pages that only admin may open, whatever the tab state says.
+const ADMIN_ONLY_PAGES = ['admin','scout','battlesim','battlestats'];
+
 function showPageDirect(p) {
+  if (ADMIN_ONLY_PAGES.indexOf(p) >= 0 && !isAdmin()) {
+    if (typeof toast === 'function') toast('That section is admin-only.');
+    return;
+  }
   document.querySelectorAll('.page').forEach(e => e.classList.remove('active'));
   const pg = document.getElementById('page-' + p);
   if (pg) pg.classList.add('active');
@@ -10898,9 +11162,10 @@ export default {
     }
 
     if (url.pathname.startsWith('/scout/')) {
-      // auth: any signed-in role may read; brief limited to rally/r4r5/admin
+      // Enemy Scout is admin-only (UI tab is hidden for everyone else).
       const _role = await verifyToken(env, bearer(request));
       if (!_role) return json({ok:false,error:'unauthorized'},401);
+      if (_role !== 'admin') return json({ok:false,error:'admin-required'},403);
 
       const QUEUE_KEY = 'scout:queue';
       // Oracle relay populates KV (jeabslist blocks Worker IPs). Serve from KV;
@@ -11274,6 +11539,12 @@ Reply with ONLY one line of raw JSON, no explanation, no markdown. Format exactl
       if (!playerId) return json({ok:false, error:'missing-id'}, 400);
       const pid = String(playerId).trim();
       if (!/^[0-9]{4,20}$/.test(pid)) return json({ok:false, error:'bad-id'}, 400);
+
+      // Admin is bound to ONE Player ID. Knowing the password is not enough.
+      // Server-side gate — the client check is convenience only.
+      if (role === 'admin' && pid !== ADMIN_PID_SRV) {
+        return json({ok:false, error:'bad-password'}, 401);
+      }
 
       // Try the lookup. Three outcomes:
       //   answered + Kingdom 1057  -> verified
