@@ -3366,6 +3366,11 @@ renderBattleStrategy();
 
 // ════════════ BATTLE STRATEGY — SHARED SETUP & FINAL CALCULATION ════════════
 const BS_CALC = { offsetSec: null, selectedTeamId: null, frozen: null };
+// Multi-team rally pop-up state. Declared here, next to BS_CALC, because
+// bsTickClock() runs immediately below and reads it. A const declared further
+// down would still be in its temporal dead zone, and typeof on it throws
+// rather than reading as undefined.
+const BS_MULTI = { open:false, teamIds:[], calc:null };
 let _bsFrozenSig = null; // guards against rebuilding the frozen panel on every patch
 
 function bsTickClock(){
@@ -3389,7 +3394,7 @@ function bsTickClock(){
     } else prev.textContent='';
   }
   if(typeof bsRenderStickyBar==='function') bsRenderStickyBar();
-  if(typeof BS_MULTI!=='undefined' && BS_MULTI.open && BS_MULTI.calc) bsMultiRender();
+  if(BS_MULTI.open && BS_MULTI.calc) bsMultiRender();
 }
 onEachSecond(bsTickClock, 'strategy'); bsTickClock();
 
@@ -3607,8 +3612,6 @@ function bsRenderFrozen(){
 // ═══════════════ MULTI-TEAM RALLY (in-page pop-up card) ═══════════════
 // Rare case: 2+ teams must land together. Rendered as an overlay card so the
 // normal Final Calculation card keeps its size — it is NOT a browser popup.
-const BS_MULTI = { open:false, teamIds:[], calc:null };
-
 function bsMultiOpen(){
   BS_MULTI.open = true;
   if(!BS_MULTI.teamIds.length && BS_CALC.selectedTeamId) BS_MULTI.teamIds = [BS_CALC.selectedTeamId];
