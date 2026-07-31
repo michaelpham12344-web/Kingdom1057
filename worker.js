@@ -369,6 +369,39 @@ function msAuditPushSrv(state, who, action){
   if(state.msAuditLog.length > 30) state.msAuditLog = state.msAuditLog.slice(0, 30);
 }
 
+// The next instant Minister automation has real work to do: the cycle's clear-out,
+// or a board's assignment time (admin override wins). Returns null if nothing is
+// pending. This is what the Durable Object sets its alarm to, so allocation fires
+// at the exact time shown in the UI rather than whenever a poll happened to land.
+function msNextAutomationAtSrv(state){
+  const now = Date.now();
+  let sched;
+  try {
+    const override = Number(state.kvkDay1Override);
+    sched = msScheduleSrv(now, (override && !isNaN(override)) ? override : null);
+  } catch(e){ return null; }
+
+  const auto = state.msAuto;
+  const cycleId = sched.day1;
+  let next = null;
+  const consider = function(t){
+    if(typeof t !== 'number' || !isFinite(t) || t <= now) return;
+    if(next === null || t < next) next = t;
+  };
+
+  // A cycle we have not adopted yet: everything in it is still pending.
+  const sameCycle = auto && auto.cycleId === cycleId;
+  if(!sameCycle || !auto.clearedAt) consider(sched.openAt);
+  MS_BOARDS_SRV.forEach(function(b){
+    if(sameCycle && auto.allocDone && auto.allocDone[b]) return;
+    consider(msBoardAllocAtSrv(state, sched, b));
+  });
+
+  // Nothing left this cycle -> wake for the next one.
+  if(next === null) consider(sched.day1 + KVK.CYCLE_MS - KVK.OPEN_LEAD_MS);
+  return next;
+}
+
 // Runs on every cron tick. Clears old submissions once per KvK cycle at Day1-7d,
 // and runs each board's allocation once at its own Day1-36h mark. Idempotent via
 // state.msAuto, keyed to the cycle's Day-1 timestamp so a 30-min tick cadence
@@ -5504,8 +5537,8 @@ function msRenderOverview(entry) {
     myBoards.forEach(function(b){
       const alloc = byBoard[b]; const m = MS_BOARD_META[b];
       if(!alloc){
-        var _sb = (function(){ try { return msSchedule(Date.now()).boards[b]; } catch(e){ return null; } })();
-        var _runInfo = _sb ? '<div style="font-size:12px;color:var(--text3);margin-top:3px">Allocation runs: <strong class="mono" style="color:#ff9d4d">'+fmtUTCDateTime(_sb.allocAt)+'</strong></div>' : '';
+        var _ra = msBoardAllocAt(b);
+        var _runInfo = (_ra != null) ? '<div style="font-size:12px;color:var(--text3);margin-top:3px">Allocation runs: <strong class="mono" style="color:#ff9d4d">'+fmtUTCDateTime(_ra)+'</strong></div>' : '';
         statusHtml += '<div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px 14px">'+
       '<div style="font-size:13px;color:var(--text2)">⏳ '+m.icon+' '+m.label+' — Allocation pending.</div>'+_runInfo+'</div>';
         return;
@@ -5630,7 +5663,9 @@ function msAllocIsCurrent(b, sched){
   if(!a) return false;
   try{ sched = sched || msSchedule(Date.now()); }catch(e){ return true; }
   if(a.runAt !== undefined) return a.runAt >= sched.clearAt;
-  return Date.now() >= (sched.boards[b] ? sched.boards[b].allocAt : 0);
+  var at = msBoardAllocAt(b);
+  if(at == null) at = sched.boards[b] ? sched.boards[b].allocAt : 0;
+  return Date.now() >= at;
 }
 function msBoardTimerBlocksHTML(){
   var now = Date.now();
@@ -5644,12 +5679,15 @@ function msBoardTimerBlocksHTML(){
     var dl = msBoardDeadline(b);
     if(dl == null) dl = bs.deadline;
     var dlMs = dl - now;
-    var overridden = msBoardIsOverridden(b);
+    var allocOv = !!(MS.boardAllocAt && MS.boardAllocAt[b]);
+    var overridden = msBoardIsOverridden(b) || allocOv;
 
     // Allocation status comes from whether a result actually exists, never the clock.
     var res = (MS._allocByBoard || {})[b] || null;
     var ranThisCycle = msAllocIsCurrent(b, sched);
-    var allocMs = bs.allocAt - now;
+    var allocAt = msBoardAllocAt(b);
+    if(allocAt == null) allocAt = bs.allocAt;
+    var allocMs = allocAt - now;
     var allocStr, allocCol;
     if(ranThisCycle && res){
       var placed = (res.winners && res.winners.length) || 0;
@@ -10918,6 +10956,9 @@ export class KingdomState {
   // firing. If nobody had a visible tab, the plan didn't fire at all — and then fired
   // LATE when someone next opened the app, burning the buff at the wrong moment.
   // The object now wakes itself at the planned instant, whether or not anyone is looking.
+  // A Durable Object has exactly ONE alarm. Two unrelated features need exact-time
+  // wake-ups — pet plans and Minister allocation — so the alarm is set to whichever
+  // comes first, and alarm() runs whatever is actually due.
   async scheduleAlarm(){
     const plans = Array.isArray(this.st.petPlans) ? this.st.petPlans : [];
     let next = null;
@@ -10925,6 +10966,10 @@ export class KingdomState {
       if (!p || p.fired || typeof p.targetMs !== 'number') return;
       if (next === null || p.targetMs < next) next = p.targetMs;
     });
+    try {
+      const msAt = msNextAutomationAtSrv(this.st);
+      if (msAt !== null && (next === null || msAt < next)) next = msAt;
+    } catch(e){}
     const cur = await this.ctx.storage.getAlarm();
     if (next === null){ if (cur !== null) await this.ctx.storage.deleteAlarm(); return; }
     if (cur !== next) await this.ctx.storage.setAlarm(next);
@@ -10968,7 +11013,24 @@ export class KingdomState {
         patch: { leaders: this.st.leaders, petPlans: this.st.petPlans }
       });
     }
+    // Minister clear-out / allocation, at the exact time the UI advertises.
+    try {
+      if (msAutomationTick(this.st)){
+        await this.persist();
+        await this.mirrorToKV();
+        this.broadcast({ type:'hello', rev:this.rev, now:Date.now(), state:this.snapshot() });
+      }
+    } catch(e){ console.error('ms automation (alarm) failed:', e && e.message); }
     await this.scheduleAlarm();
+  }
+
+  // Rollback insurance. Throttled to at most hourly so it cannot approach the
+  // free-tier KV write cap however busy the kingdom gets.
+  async mirrorToKV(){
+    const now = Date.now();
+    if (this._lastKv && (now - this._lastKv) < 3600000) return;
+    this._lastKv = now;
+    try { await this.env.SVS_KV.put(STATE_KEY, JSON.stringify(this.st)); } catch(e){}
   }
 
   // Push a change to every connected client. Outgoing WebSocket messages are free,
@@ -11236,7 +11298,9 @@ export class KingdomState {
       const touched = this.applyPatch(patch, replaceKeys, role);
       if (touched) await this.persist();
       // A plan may have been added or removed — make sure the alarm matches.
-      if (patch.petPlans !== undefined) await this.scheduleAlarm();
+      // Re-arm on every patch: an admin editing msBoardAllocAt / msBoardDeadlines /
+      // kvkDay1Override moves the next wake-up just as much as a pet plan does.
+      await this.scheduleAlarm();
 
       // Push the change to everyone else, right now. This is what replaces polling.
       if (touched){
@@ -11296,9 +11360,8 @@ export class KingdomState {
         await this.persist();
         this.broadcast({ type:'hello', rev:this.rev, now:Date.now(), state:this.snapshot() });
       }
-      // Mirror to KV (~48 writes/day, far under the 1,000/day free-tier cap).
-      // Pure insurance: a <=30-min-old rollback target if we ever need to revert.
-      try { await this.env.SVS_KV.put(STATE_KEY, JSON.stringify(this.st)); } catch(e){}
+      await this.mirrorToKV();
+      await this.scheduleAlarm();
       return json({ ok:true, rev:this.rev, changed:changed });
     }
 
