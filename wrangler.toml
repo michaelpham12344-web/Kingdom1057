@@ -13,8 +13,9 @@ binding = "AI"
 binding = "IMG"
 bucket_name = "kingdom1057-img"
 
-[triggers]
-crons = ["*/30 * * * *"]
+# No [triggers] block. Minister automation used to run on a */30 cron, which meant
+# an assignment time could fire up to 30 minutes late. It now runs on a Durable
+# Object alarm set to the exact time shown in the admin table.
 
 # ── Durable Object: single source of truth for shared state ──
 # SQLite-backed is required on the Workers Free plan (and is the recommended
@@ -25,4 +26,4 @@ class_name = "KingdomState"
 
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["KingdomState"] 
+new_sqlite_classes = ["KingdomState"]
