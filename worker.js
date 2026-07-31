@@ -1888,6 +1888,7 @@ let syncApplyRemote = function(data) {
       if (_msig !== _bsMultiSig) {
         _bsMultiSig = _msig;
         BS_MULTI.calc = _ms;
+        BS_MULTI.preview = _ms;
         BS_MULTI.fired = {};
         if (_ms && _ms.teams && _ms.teams.length) {
           BS_MULTI.teamIds = _ms.teams.map(function(t){ return t.id; });
@@ -3440,7 +3441,7 @@ const BS_CALC = { offsetSec: null, selectedTeamId: null, frozen: null };
 // bsTickClock() runs immediately below and reads it. A const declared further
 // down would still be in its temporal dead zone, and typeof on it throws
 // rather than reading as undefined.
-const BS_MULTI = { open:false, teamIds:[], calc:null, fired:{} };
+const BS_MULTI = { open:false, teamIds:[], calc:null, preview:null, fired:{} };
 let _bsFrozenSig = null; // guards against rebuilding the frozen panel on every patch
 let _bsMultiSig = null;  // same guard for the multi-team schedule
 
@@ -3703,6 +3704,7 @@ function bsMultiShow(on){
 function bsMultiOpen(){
   if(!BS_MULTI.teamIds.length && BS_CALC.selectedTeamId) BS_MULTI.teamIds = [BS_CALC.selectedTeamId];
   bsMultiShow(true);
+  bsMultiRefresh();
   bsMultiRender();
 }
 function bsMultiClose(){ bsMultiShow(false); }
@@ -3716,17 +3718,24 @@ function bsMultiToggle(teamId){
   if(!bsMultiCanEdit()) return;
   var i = BS_MULTI.teamIds.indexOf(teamId);
   if(i >= 0) BS_MULTI.teamIds.splice(i,1); else BS_MULTI.teamIds.push(teamId);
+  // Selection changed, so any schedule already sent is stale. Same rule the
+  // single-team flow uses when you pick a different team or offset.
+  if(BS_MULTI.calc){ BS_MULTI.calc = null; syncQueuePush(); }
+  bsMultiRefresh();
   bsMultiRender();
 }
 
-// One shared landing time across every selected team: the single longest march in
-// the whole selection sets the convergence point, everyone else waits. The result
-// is pushed to shared state, so each leader counts down on their own device.
-function bsMultiCalc(){
-  if(!bsMultiCanEdit()) return;
-  if(BS_CALC.offsetSec === null){ toast('Pick a launch offset first.'); return; }
+// The live, local-only preview. Never synced — only Copy shares a schedule.
+function bsMultiRefresh(){ BS_MULTI.preview = bsMultiCompute(true); }
+function bsMultiCurrent(){ return BS_MULTI.calc || BS_MULTI.preview; }
+
+// One shared landing time across every selected team: the single longest march
+// in the whole selection sets the convergence point, everyone else waits.
+function bsMultiCompute(silent){
+  function fail(m){ if(!silent) toast(m); return null; }
+  if(BS_CALC.offsetSec === null) return fail('Pick a launch offset first.');
   var picked = S.teams.filter(function(t){ return BS_MULTI.teamIds.indexOf(t.id) >= 0; });
-  if(picked.length < 2){ toast('Select at least two teams.'); return; }
+  if(picked.length < 2) return fail('Select at least two teams.');
 
   var all = [];
   picked.forEach(function(t){
@@ -3734,64 +3743,96 @@ function bsMultiCalc(){
       if(l.bsSlot && l.bsSlot.slotType === 'team' && l.bsSlot.slotId === t.id) all.push(l);
     });
   });
-  if(!all.length){ toast('None of those teams have leaders assigned.'); return; }
+  if(!all.length) return fail('None of those teams have leaders assigned.');
 
+  var prev = BS_MULTI.calc || BS_MULTI.preview;   // keep delays across a recompute
   var landSec = nowUTCSec() + BS_CALC.offsetSec + Math.max.apply(null, all.map(function(l){ return l.march; }));
 
-  BS_MULTI.calc = {
+  return {
     landSec: landSec,
     teams: picked.map(function(t){
-      var rows = S.leaders
-        .filter(function(l){ return l.bsSlot && l.bsSlot.slotType === 'team' && l.bsSlot.slotId === t.id; })
-        .map(function(l){ return { name:l.name, march:l.march, launchSec: landSec - l.march, playerId: l.playerId || null }; })
-        .sort(function(a,b){ return a.launchSec - b.launchSec; });
-      return { id:t.id, name:t.name, color:t.color || '#d9a648', delay:0, rows:rows };
+      var old = prev && prev.teams ? prev.teams.find(function(x){ return x.id === t.id; }) : null;
+      var delay = old ? (old.delay || 0) : 0;
+      var mem = S.leaders.filter(function(l){ return l.bsSlot && l.bsSlot.slotType === 'team' && l.bsSlot.slotId === t.id; });
+      var rows = mem.map(function(l){
+          return { name:l.name, march:l.march, launchSec: landSec - l.march + delay, playerId: l.playerId || null };
+        }).sort(function(a,b){ return a.launchSec - b.launchSec; });
+      return { id:t.id, name:t.name, color:t.color || '#d9a648', delay:delay,
+               dur: Math.max.apply(null, mem.map(function(l){ return l.dur || 300; })), rows:rows };
     }).filter(function(t){ return t.rows.length; })
   };
-  BS_MULTI.fired = {};
-  syncQueuePush();          // share it — every leader gets their own countdown
-  bsMultiRender();
-  toast('Multi-team schedule sent to everyone');
 }
 
 // Stagger one team behind the others. Its launch times shift later by the delay
-// in seconds, so it arrives that many seconds after the rest. Re-shared immediately
-// so every leader in that team sees their new time.
+// in seconds, so it arrives that many seconds after the rest.
 function bsMultiSetDelay(teamId, delta){
   if(!bsMultiCanEdit()) return;
-  var c = BS_MULTI.calc; if(!c) return;
+  var c = bsMultiCurrent(); if(!c) return;
   var t = c.teams.find(function(x){ return x.id === teamId; }); if(!t) return;
   var d = Math.max(0, Math.min(60, (t.delay || 0) + delta));
   if(d === (t.delay || 0)) return;
   t.delay = d;
   t.rows.forEach(function(r){ r.launchSec = c.landSec - r.march + d; });
   t.rows.sort(function(a,b){ return a.launchSec - b.launchSec; });
-  BS_MULTI.fired = {};
-  syncQueuePush();
+  if(BS_MULTI.calc === c){        // already live — re-share and re-arm the timers
+    BS_MULTI.fired = {};
+    bsMultiArmTeamTimers(c);
+    syncQueuePush();
+    if(typeof bsRenderTeamButtons === 'function') bsRenderTeamButtons();
+  }
   bsMultiRender();
+}
+
+// Light the same green/red team dot the single-team flow uses, so a multi rally
+// is visible on the normal Final Calculation buttons too.
+function bsMultiArmTeamTimers(c){
+  c.teams.forEach(function(t){
+    bsTeamRally[t.id] = { landEnd: (c.landSec + (t.delay || 0) + (t.dur || 300)) * 1000 };
+  });
 }
 
 function bsMultiClear(){
   if(!bsMultiCanEdit()) return;
+  var c = BS_MULTI.calc;
+  if(c) c.teams.forEach(function(t){ delete bsTeamRally[t.id]; });
   BS_MULTI.calc = null;
+  BS_MULTI.preview = null;
   BS_MULTI.fired = {};
   syncQueuePush();
+  bsMultiRefresh();
   bsMultiRender();
+  if(typeof bsRenderTeamButtons === 'function') bsRenderTeamButtons();
 }
 
-function bsMultiCopy(teamId){
-  var c = BS_MULTI.calc; if(!c) return;
-  var lines = [];
+// Copy = activate, mirroring the single-team "Copy Launch Times" button:
+// calculate, freeze, share to every device, start the team land timers, copy.
+function bsMultiCopyAll(){
+  if(!bsMultiCanEdit()){ bsMultiCopyText(BS_MULTI.calc); return; }
+  var c = bsMultiCompute(false);
+  if(!c) return;
+  BS_MULTI.calc = c;
+  BS_MULTI.preview = c;
+  BS_MULTI.fired = {};
+  bsMultiArmTeamTimers(c);
+  _bsMultiSig = null;          // ours is authoritative for the next inbound patch
+  syncQueuePush();
+  bsMultiCopyText(c);
+  bsMultiRender();
+  if(typeof bsRenderTeamButtons === 'function') bsRenderTeamButtons();
+}
+
+function bsMultiCopyText(c, teamId){
+  if(!c) return;
+  var lines = ['Multi Rally.', ''];
   c.teams.forEach(function(t){
     if(teamId && t.id !== teamId) return;
-    lines.push(t.name);
     t.rows.forEach(function(r){ lines.push(r.name + ' | Time: ' + s2hms(r.launchSec)); });
-    lines.push('');
   });
-  copyText(lines.join('\\n').trim(), true)
+  copyText(lines.join('\\n'), true)
     .then(function(){ toast('Copied'); })
     .catch(function(){ toast('Copy failed'); });
 }
+function bsMultiCopy(teamId){ bsMultiCopyText(bsMultiCurrent(), teamId); }
 
 function bsMultiRender(){
   var el = document.getElementById('bsMultiView');
@@ -3799,7 +3840,7 @@ function bsMultiRender(){
   var now = nowUTCSec();
   var me = (typeof bstatPid === 'function') ? bstatPid() : null;
   var canEdit = bsMultiCanEdit();
-  var c = BS_MULTI.calc;
+  var c = bsMultiCurrent();
 
   var head = '<div class="bsMultiHead">' +
     '<button class="btn btn-ghost btn-sm" onclick="bsMultiClose()">&#8592; Back</button>' +
@@ -3812,6 +3853,8 @@ function bsMultiRender(){
     var chips = S.teams.map(function(t){
       var on = BS_MULTI.teamIds.indexOf(t.id) >= 0;
       var n = S.leaders.filter(function(l){ return l.bsSlot && l.bsSlot.slotType === 'team' && l.bsSlot.slotId === t.id; }).length;
+      if(!n) return '<div class="bsMultiChip" style="opacity:.35;cursor:not-allowed" title="No rally leaders in this team yet">' +
+        '<span style="width:9px;height:9px;border-radius:50%;background:var(--text3)"></span>' + t.name + ' <span style="opacity:.6;font-size:11px">(0)</span></div>';
       return '<div class="bsMultiChip' + (on ? ' on' : '') + '" onclick="bsMultiToggle(&quot;' + t.id + '&quot;)">' +
         '<span style="width:9px;height:9px;border-radius:50%;background:' + (t.color || 'var(--text3)') + '"></span>' +
         t.name + ' <span style="opacity:.6;font-size:11px">(' + n + ')</span></div>';
@@ -3819,9 +3862,7 @@ function bsMultiRender(){
     var offLbl = BS_CALC.offsetSec === null ? 'no offset set'
       : ('offset +' + (BS_CALC.offsetSec < 60 ? BS_CALC.offsetSec + 's' : Math.floor(BS_CALC.offsetSec / 60) + 'm'));
     picker = '<div class="bs4lbl">Teams launching together <span style="color:var(--text3);font-weight:400">&#183; ' + offLbl + '</span></div>' +
-      '<div class="bsMultiPick">' + chips + '</div>' +
-      '<button class="btn btn-primary btn-sm" onclick="bsMultiCalc()">Calculate &amp; send to all</button>' +
-      (c ? ' <button class="btn btn-ghost btn-sm" onclick="bsMultiClear()">Clear</button>' : '');
+      '<div class="bsMultiPick">' + chips + '</div>';
   }
 
   var body = '';
@@ -3856,7 +3897,16 @@ function bsMultiRender(){
         '<button class="btn btn-ghost btn-sm" style="margin-left:auto;font-size:11px" onclick="bsMultiCopy(&quot;' + t.id + '&quot;)">Copy</button>' +
         '</div>' + rows + '</div>';
     }).join('') + '</div>';
-    body += '<div style="margin-top:12px"><button class="btn btn-gold btn-sm" onclick="bsMultiCopy(null)">&#128203; Copy all teams</button></div>';
+    if(canEdit){
+      body += '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+        '<button class="btn btn-gold btn-sm" onclick="bsMultiCopyAll()">&#128203; Copy all teams</button>' +
+        '<button class="btn btn-ghost btn-sm" onclick="bsMultiClear()">Clear</button>' +
+        (BS_MULTI.calc ? '<span style="font-size:11px;color:var(--green);font-weight:600">&#9679; sent to all</span>'
+                       : '<span style="font-size:11px;color:var(--text3)">Copy sends it to everyone</span>') +
+        '</div>';
+    } else {
+      body += '<div style="margin-top:12px"><button class="btn btn-gold btn-sm" onclick="bsMultiCopy(null)">&#128203; Copy</button></div>';
+    }
   } else {
     body += '<div style="color:var(--text3);font-size:13px;margin-top:12px">' +
       (canEdit
