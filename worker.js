@@ -5184,6 +5184,42 @@ function _msDTout(v){
   return m ? Date.UTC(+m[1], +m[2]-1, +m[3], +m[4], +m[5], 0) : null;
 }
 
+// A spot's timing is only sane if allocation lands AFTER submissions close.
+// Otherwise a late entry - the whale submitting two minutes before the deadline -
+// is ranked before it ever arrived. Returns the gap and whether it is valid.
+function msSpotOrder(board){
+  var dl = msBoardDeadline(board), al = msBoardAllocAt(board);
+  if(dl == null || al == null) return { known:false };
+  var gap = al - dl;
+  return { known:true, deadline:dl, alloc:al, gap:gap, ok:(gap > 0) };
+}
+function msFmtGap(ms){
+  var sec = Math.round(Math.abs(ms) / 1000);
+  if(sec < 60)    return sec + ' sec';
+  if(sec < 3600)  return Math.round(sec / 60) + ' min';
+  if(sec < 86400) return (sec / 3600).toFixed(1).replace(/[.]0$/, '') + ' hr';
+  return (sec / 86400).toFixed(1).replace(/[.]0$/, '') + ' days';
+}
+function msHM(ms){
+  var d = new Date(ms);
+  return String(d.getUTCHours()).padStart(2,'0') + ':' + String(d.getUTCMinutes()).padStart(2,'0');
+}
+// The one sentence an officer needs: what happens, in the order it happens.
+function msOrderLineHTML(board, size){
+  var o = msSpotOrder(board);
+  if(!o.known) return '';
+  size = size || '11px';
+  if(o.ok){
+    return '<div style="font-size:' + size + ';color:var(--text3);margin-top:3px;line-height:1.5">' +
+      'Submissions close <strong class="mono" style="color:var(--text2)">' + msHM(o.deadline) + '</strong>' +
+      ', allocation runs <strong class="mono" style="color:var(--text2)">' + msHM(o.alloc) + '</strong>' +
+      ' &mdash; ' + msFmtGap(o.gap) + ' later</div>';
+  }
+  return '<div style="font-size:' + size + ';color:#ff7070;font-weight:600;margin-top:3px;line-height:1.5">' +
+    '&#9888; Allocation runs ' + msFmtGap(o.gap) + ' BEFORE submissions close &mdash; ' +
+    'anyone submitting near the deadline would not be counted.</div>';
+}
+
 function msRenderSpotSchedule(){
   var el = document.getElementById('msSpotSchedule'); if(!el) return;
   var rows = MS_BOARDS.map(function(b){
@@ -5200,13 +5236,15 @@ function msRenderSpotSchedule(){
     return '<tr><td class="msSpotName">' + (meta.icon || '') + ' ' + (meta.label || b) + '</td>' +
       cell('alloc', msBoardAllocAt(b), aOv) +
       cell('deadline', msBoardDeadline(b), dOv) +
+      '<td style="min-width:240px">' + msOrderLineHTML(b) + '</td>' +
       '<td><button class="btn btn-ghost btn-sm" ' + ((aOv || dOv) ? '' : 'disabled style="opacity:.4;cursor:not-allowed" ') +
         'onclick="msResetSpot(&quot;' + b + '&quot;)">Default</button></td></tr>';
   }).join('');
 
   el.innerHTML =
     '<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">&#128337; Spot timings (UTC)</div>' +
-    '<table class="msSpotTbl"><tr><th>Spot</th><th>Automatic assignment</th><th>Submission deadline</th><th></th></tr>' +
+    '<table class="msSpotTbl"><tr><th>Spot</th><th>Automatic assignment</th><th>Submission deadline</th>' +
+    '<th>What happens, in order</th><th></th></tr>' +
     rows + '</table>' +
     '<div style="font-size:11px;color:var(--text3);margin-top:8px">Admin only. Blank a field to fall back to the KvK schedule. ' +
     'Setting a deadline in the future is what <em>reopens</em> a closed spot. Moving an assignment time forward lets that spot allocate again.</div>' +
@@ -5227,9 +5265,14 @@ function msSetSpotTime(board, which, value){
   if(typeof msRenderScheduleStrip === 'function') msRenderScheduleStrip();
   if(typeof msRenderBoardTimers === 'function') msRenderBoardTimers();
   var label = (MS_BOARD_META[board] || {}).label || board;
-  toast(ms == null
-    ? (label + ' ' + (which === 'alloc' ? 'assignment' : 'deadline') + ' back on the KvK schedule')
-    : (label + ' ' + (which === 'alloc' ? 'assignment' : 'deadline') + ': ' + fmtUTCDateTime(ms)));
+  var ord = msSpotOrder(board);
+  if(ord.known && !ord.ok){
+    toast(label + ': allocation now runs BEFORE submissions close. Late entries will not count.');
+  } else {
+    toast(ms == null
+      ? (label + ' ' + (which === 'alloc' ? 'assignment' : 'deadline') + ' back on the KvK schedule')
+      : (label + ' ' + (which === 'alloc' ? 'assignment' : 'deadline') + ': ' + fmtUTCDateTime(ms)));
+  }
 }
 
 function msResetSpot(board){
@@ -5690,6 +5733,11 @@ function msBoardTimerBlocksHTML(){
     var tag = overridden
       ? '<div style="font-size:10.5px;color:var(--gold);margin-top:3px">✎ Admin override — not the KvK schedule</div>'
       : '';
+    var ord = msSpotOrder(b);
+    if(ord.known && !ord.ok){
+      tag += '<div style="font-size:10.5px;color:#ff7070;font-weight:700;margin-top:3px">' +
+        '&#9888; Allocation runs BEFORE submissions close</div>';
+    }
 
     return '<div style="flex:1;min-width:220px;background:var(--bg4);border:1px solid '+(overridden?'rgba(217,166,72,.45)':'var(--border)')+';border-radius:8px;padding:10px 12px">'+
       '<div style="font-weight:700;color:'+m.color+';font-size:13px;margin-bottom:4px">'+m.icon+' '+m.label+' Minister Spot</div>'+
