@@ -377,8 +377,7 @@ function msNextAutomationAtSrv(state){
   const now = Date.now();
   let sched;
   try {
-    const override = Number(state.kvkDay1Override);
-    sched = msScheduleSrv(now, (override && !isNaN(override)) ? override : null);
+    sched = msScheduleSrv(now, null);
   } catch(e){ return null; }
 
   const auto = state.msAuto;
@@ -408,8 +407,10 @@ function msNextAutomationAtSrv(state){
 // can never double-fire either action.
 function msAutomationTick(state){
   const now = Date.now();
-  const override = state.kvkDay1Override ? new Date(state.kvkDay1Override).getTime() : null;
-  const sched = msScheduleSrv(now, (override && !isNaN(override)) ? override : null);
+  // Force-KvK-Day-1 was removed: per-spot timing overrides cover the same ground
+  // without silently shifting all three spots at once. Any value left in old
+  // state is deliberately ignored.
+  const sched = msScheduleSrv(now, null);
   const cycleId = sched.day1;
 
   let auto = state.msAuto;
@@ -1576,17 +1577,6 @@ document.addEventListener('touchend',function(e){
         <div id="msSpotSchedule" style="margin-bottom:14px"></div>
         <button class="btn btn-gold" onclick="msRunAllocation()">⚙️ Run Allocation (rank + assign slots)</button>
         <button class="btn btn-ghost btn-sm" onclick="msClearAllSubs()" style="margin-left:8px">🗑 Clear all submissions</button>
-        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
-          <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px">🗓️ Force KvK Day 1 (overrides the computed schedule)</div>
-          <div id="msDay1OverrideCurrent" style="font-size:11.5px;color:var(--text3);margin-bottom:8px"></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-            <div class="field"><label style="font-size:11px">New Day 1 (00:00 UTC recommended)</label>
-              <input type="datetime-local" id="msDay1OverrideInput" style="width:200px">
-            </div>
-            <button class="btn btn-primary btn-sm" onclick="msSetDay1Override()">Force Override</button>
-            <button class="btn btn-ghost btn-sm" onclick="msClearDay1Override()">Clear Override</button>
-          </div>
-        </div>
         <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
           <div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">My alliance (to submit as a player)</div>
           <select id="msMyAllianceSelect" style="width:130px">
@@ -1728,7 +1718,7 @@ const CLIENT_KEY_MIN_ROLE = {
   bsSetup: 'rallyleader', bsFrozen: 'rallyleader', finalCalc: 'rallyleader',
   msAllocByBoard: 'r4r5', msLastAllocation: 'r4r5', msAuditLog: 'r4r5',
   msSubmissionsByPlayer: 'member',
-  msDeadline: 'admin', msBoardDeadlines: 'admin', msBoardAllocAt: 'admin', kvkDay1Override: 'admin',
+  msDeadline: 'admin', msBoardDeadlines: 'admin', msBoardAllocAt: 'admin',
   // Battle Stats (bstat*) — a rally leader's own combat stats from their Battle Report,
   // scored into an attack/defense number for battle-assignment ranking. Owner-keyed by
   // player id. Admin-only for now; to open it to rally leaders later, change
@@ -1824,7 +1814,6 @@ let syncSerialize = function() {
     msDeadline: (typeof MS!=='undefined') ? MS.deadline : null,
     msBoardDeadlines: (typeof MS!=='undefined') ? (MS.boardDeadlines||{}) : {},
     msBoardAllocAt: (typeof MS!=='undefined') ? (MS.boardAllocAt||{}) : {},
-    kvkDay1Override: (typeof MS!=='undefined') ? (MS.kvkDay1Override||null) : null,
     msActionHint: (typeof MS!=='undefined') ? (MS._pendingAction||null) : null,
     msSubmissionsByPlayer: (typeof MS!=='undefined') ? (MS.submissionsByPlayer||{}) : {},
     msAuditLog: (typeof MS!=='undefined') ? (MS.auditLog||[]) : [],
@@ -1972,7 +1961,6 @@ let syncApplyRemote = function(data) {
       MS.deadline = data.msDeadline || null;
       MS.boardDeadlines = data.msBoardDeadlines || {};
       MS.boardAllocAt = data.msBoardAllocAt || {};
-      MS.kvkDay1Override = data.kvkDay1Override || null;
       if(data.msSubmissionsByPlayer) { MS.submissionsByPlayer = data.msSubmissionsByPlayer; MS.submissions = Object.values(MS.submissionsByPlayer); }
       if(data.msAuditLog) { MS.auditLog = data.msAuditLog; }
       if (typeof msRenderResultsSummary==='function') msRenderResultsSummary();
@@ -2419,14 +2407,10 @@ function updateKvK(){
 const MS_BOARD_DAY_OFFSET = KVK.BOARD_DAY;
 const _MS_DAY = 86400000, _MS_H = 3600000;
 // Admin override for the next KvK Day-1 start (setter arrives in a later phase). Read-only here.
-function msDay1Override(){
-  try { return (typeof MS!=='undefined' && MS.kvkDay1Override) ? new Date(MS.kvkDay1Override).getTime() : null; } catch(e){ return null; }
-}
 // Day-1 start (00:00 UTC) of the currently-active or next KvK. Unlike nextKvKStart, this stays
 // anchored to the CURRENT KvK during the event window, so mid-event allocation (e.g. Troops on
 // Day 4) computes against the right cycle instead of rolling forward to the next one.
 function currentKvKDay1(now){
-  var o = msDay1Override(); if(o) return o;
   var k = Math.floor((now - KVK.ANCHOR) / KVK.CYCLE_MS);
   for(var i=k-1; i<=k+1; i++){
     var day1 = KVK.ANCHOR + i*KVK.CYCLE_MS;
@@ -6379,7 +6363,6 @@ function msShowAdminActions() {
   if (isAdmin()) {
     if (actions) actions.style.display = 'block';
     if (r4Notice) r4Notice.style.display = 'none';
-    msRenderDay1OverrideCurrent();
   } else {
     // R4/R5 (non-admin): can still manage/assign players, but not run the
     // destructive/global controls — those are Admin-only.
@@ -6387,42 +6370,6 @@ function msShowAdminActions() {
     if (r4Notice) r4Notice.style.display = 'block';
   }
   msUpdateDeadlineBanners();
-}
-function msRenderDay1OverrideCurrent(){
-  var el = document.getElementById('msDay1OverrideCurrent'); if(!el) return;
-  if (MS.kvkDay1Override) {
-    el.innerHTML = '⚠️ Override active — Day 1 forced to <strong style="color:#ff9d4d">'+fmtUTCDateTime(new Date(MS.kvkDay1Override).getTime())+'</strong>. All deadlines/allocations are computed from this instead of the normal 28-day cycle.';
-  } else {
-    el.textContent = 'No override set — using the normal computed schedule.';
-  }
-}
-// ── Force KvK Day-1 override (Admin only, server-enforced) ──
-function msSetDay1Override(){
-  const input = document.getElementById('msDay1OverrideInput');
-  if (!input || !input.value) { toast('Pick a date and time first.'); return; }
-  const iso = new Date(input.value).toISOString();
-  const willBeInPast = new Date(iso).getTime() < Date.now();
-  const warn = '⚠️ This forces KvK Day 1 to '+new Date(iso).toUTCString()+'.\\n\\n'+
-    'Every deadline and allocation time for all 3 boards recalculates from this instant.\\n'+
-    (willBeInPast ? 'This date is in the PAST relative to now — if the 7-day clear point has already passed for it, ALL current submissions will be auto-cleared on the next scheduled check (within ~30 minutes).\\n\\n' : '') +
-    'This cannot be undone automatically — you would need to clear the override manually. Continue?';
-  if (!confirm(warn)) return;
-  MS.kvkDay1Override = iso;
-  syncQueuePush();
-  msRenderDay1OverrideCurrent();
-  if (typeof msRenderScheduleStrip==='function') msRenderScheduleStrip();
-  msUpdateDeadlineBanners();
-  toast('KvK Day 1 override set.');
-}
-function msClearDay1Override(){
-  if (!MS.kvkDay1Override) { toast('No override is set.'); return; }
-  if (!confirm('Clear the Day-1 override and return to the normal computed 28-day schedule?')) return;
-  MS.kvkDay1Override = null;
-  syncQueuePush();
-  msRenderDay1OverrideCurrent();
-  if (typeof msRenderScheduleStrip==='function') msRenderScheduleStrip();
-  msUpdateDeadlineBanners();
-  toast('Override cleared — back to the normal schedule.');
 }
 
 function msInitResultsTab() {
@@ -10886,7 +10833,7 @@ const KEY_MIN_ROLE = {
   msAllocByBoard: 'r4r5', msLastAllocation: 'r4r5', msAuditLog: 'r4r5',
   // Submissions are owner-scoped; the per-entry rules in /put do the real work.
   msSubmissionsByPlayer: 'member',
-  // msDeadline, kvkDay1Override, msAuto, pw_* : absent => admin only
+  // msDeadline, msAuto, pw_* : absent => admin only
 
   // Battle Stats (bstat*) — rally leaders' own combat stats, scored for battle ranking.
   // bstatByPlayer is owner-keyed (like msSubmissionsByPlayer): the per-entry check in the
@@ -11162,8 +11109,7 @@ export class KingdomState {
         && (patch.msSubmissionsByPlayer ? Object.keys(patch.msSubmissionsByPlayer).length : 0) < oldSubs;
       const deadlineChanged = ('msDeadline' in patch)
         && (patch.msDeadline||null) !== (this.st.msDeadline||null);
-      const overrideChanged = ('kvkDay1Override' in patch)
-        && (patch.kvkDay1Override||null) !== (this.st.kvkDay1Override||null);
+      const overrideChanged = false;   // Force-KvK-Day-1 removed
       if ((bulkAllocation || subsReduced || deadlineChanged || overrideChanged) && role !== 'admin'){
         return json({ ok:false, error:'admin-required' }, 403);
       }
@@ -11252,7 +11198,7 @@ export class KingdomState {
         // the "my progress" trail is trustworthy and capped.
         const bw = (this.st.bstatWeights && this.st.bstatWeights.ver) ? this.st.bstatWeights : BSTAT_WEIGHTS_DEFAULT;
         const nowMs = Date.now();
-        const cycle = currentKvKDay1Srv(nowMs, this.st.kvkDay1Override ? new Date(this.st.kvkDay1Override).getTime() : null);
+        const cycle = currentKvKDay1Srv(nowMs, null);
         for (const key of Object.keys(bstat)) {
           const v = bstat[key];
           if (v === null) continue;
@@ -11299,7 +11245,7 @@ export class KingdomState {
       if (touched) await this.persist();
       // A plan may have been added or removed — make sure the alarm matches.
       // Re-arm on every patch: an admin editing msBoardAllocAt / msBoardDeadlines /
-      // kvkDay1Override moves the next wake-up just as much as a pet plan does.
+      // msBoardDeadlines moves the next wake-up just as much as a pet plan does.
       await this.scheduleAlarm();
 
       // Push the change to everyone else, right now. This is what replaces polling.
