@@ -292,6 +292,15 @@ function msScheduleSrv(now, override){
   });
   return sched;
 }
+// Automatic-assignment time for a board: the admin's per-spot override if set,
+// otherwise the computed KvK schedule (24h before that board's day).
+function msBoardAllocAtSrv(state, sched, b){
+  try {
+    var o = state.msBoardAllocAt && state.msBoardAllocAt[b];
+    if(o){ var t = new Date(o).getTime(); if(!isNaN(t)) return t; }
+  } catch(e){}
+  return sched.boards[b] ? sched.boards[b].allocAt : Infinity;
+}
 function msBoardScoreSrv(board, c){
   c = c || {};
   if(board==='buildings') return (c.construction||0)*MS_PTS_SRV.perMin + (c.general||0)*MS_PTS_SRV.perMin + (c.truegold||0)*MS_PTS_SRV.truegold;
@@ -379,7 +388,7 @@ function msAutomationTick(state){
   // Automation takes full effect starting with the next detected cycle.
   if(!auto){
     auto = { cycleId: cycleId, clearedAt: (now >= sched.openAt) ? now : null, allocDone: {} };
-    MS_BOARDS_SRV.forEach(function(b){ if(now >= sched.boards[b].allocAt) auto.allocDone[b] = true; });
+    MS_BOARDS_SRV.forEach(function(b){ if(now >= msBoardAllocAtSrv(state, sched, b)) auto.allocDone[b] = true; });
     state.msAuto = auto;
     msAuditPushSrv(state, 'system(cron)', 'Automation initialised for current cycle (no retroactive clear/allocate).');
     changed = true;
@@ -407,7 +416,13 @@ function msAutomationTick(state){
   state.msAllocByBoard = state.msAllocByBoard || {};
   let lastRunBoard = null;
   MS_BOARDS_SRV.forEach(function(b){
-    if(now >= sched.boards[b].allocAt && !auto.allocDone[b]){
+    const allocAt = msBoardAllocAtSrv(state, sched, b);
+    // Admin pushed this spot's assignment time into the future — let it run again.
+    if(now < allocAt){
+      if(auto.allocDone[b]){ delete auto.allocDone[b]; changed = true; }
+      return;
+    }
+    if(!auto.allocDone[b]){
       const prev = state.msAllocByBoard[b] || null;
       state.msAllocByBoard[b] = msRunAllocationForBoardSrv(b, submissions, prev);
       state.msAllocByBoard[b].runAt = now;
@@ -763,6 +778,14 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .bsMultiDelay button:hover{border-color:var(--gold);color:var(--gold);}
 .bsMultiDelay > span{font-family:var(--mono);font-size:11px;color:var(--text3);min-width:48px;text-align:center;}
 .bsMultiDelay > span.on{color:var(--gold);font-weight:600;}
+/* Minister Spots - per-spot timing overrides */
+.msSpotTbl{width:100%;border-collapse:collapse;font-size:12.5px;}
+.msSpotTbl th{text-align:left;font-size:11px;color:var(--text3);font-weight:600;padding:0 8px 6px 0;white-space:nowrap;}
+.msSpotTbl td{padding:7px 8px 7px 0;vertical-align:top;border-top:1px solid var(--border);}
+.msSpotTbl input[type=datetime-local]{width:195px;font-size:12px;}
+.msSpotName{font-weight:600;color:var(--text);white-space:nowrap;}
+.msSpotDef{font-size:10.5px;color:var(--text3);margin-top:3px;}
+.msSpotOv{font-size:10.5px;color:#ff9d4d;margin-top:3px;font-weight:600;}
 .bsMultiPick{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
 .bsMultiChip{display:flex;align-items:center;gap:7px;background:var(--bg3);border:1.5px solid var(--border2);border-radius:20px;padding:6px 13px;cursor:pointer;font-size:13px;color:var(--text2);user-select:none;transition:.12s;}
 .bsMultiChip:hover{border-color:var(--gold);}
@@ -1517,22 +1540,7 @@ document.addEventListener('touchend',function(e){
       </div>
       <div id="msAdminActions" style="display:none">
         <div id="msDeadlineAdminBanner" style="display:none;background:rgba(255,157,77,.1);border:1px solid rgba(255,157,77,.4);border-radius:7px;padding:10px 14px;margin-bottom:12px"></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
-          <div class="field"><label style="font-size:11px">Apply to</label>
-            <select id="msDeadlineBoard" style="width:170px">
-              <option value="all">All boards at once</option>
-              <option value="buildings">🏛️ Construction only</option>
-              <option value="research">🔬 Research only</option>
-              <option value="troops">⚔️ Troops only</option>
-            </select>
-          </div>
-          <div class="field"><label style="font-size:11px">Deadline override (UTC)</label>
-            <input type="datetime-local" id="msDeadlineInput" style="width:200px">
-          </div>
-          <button class="btn btn-primary btn-sm" onclick="msSetDeadline()">Set Deadline</button>
-          <button class="btn btn-ghost btn-sm" onclick="msReopenSubmissions()" title="Removes the admin override and returns the board to the KvK schedule. If that deadline has passed, the board closes again.">↩ Clear override</button>
-        </div>
-        <div style="font-size:11px;color:var(--text3);margin:-6px 0 12px">Admin only. <b>Set Deadline</b> with a future time is what <em>opens</em> a closed board (use this to test). <b>Clear override</b> just hands the board back to the KvK schedule — if that deadline has already passed, the board closes again.</div>
+        <div id="msSpotSchedule" style="margin-bottom:14px"></div>
         <button class="btn btn-gold" onclick="msRunAllocation()">⚙️ Run Allocation (rank + assign slots)</button>
         <button class="btn btn-ghost btn-sm" onclick="msClearAllSubs()" style="margin-left:8px">🗑 Clear all submissions</button>
         <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
@@ -1638,6 +1646,7 @@ const MS = {
   _lastAllocation: null,
   _allocByBoard: {},
   boardDeadlines: {},   // admin per-board overrides: { buildings:ISO|null, research:..., troops:... }
+  boardAllocAt: {},     // admin per-spot automatic-assignment overrides, same shape
   _manageBoard: null,
   auditLog: [], // {who, action, when} — last ~25 manual leader changes, shared across leaders
   _currentStep: 1
@@ -1686,7 +1695,7 @@ const CLIENT_KEY_MIN_ROLE = {
   bsSetup: 'rallyleader', bsFrozen: 'rallyleader', finalCalc: 'rallyleader',
   msAllocByBoard: 'r4r5', msLastAllocation: 'r4r5', msAuditLog: 'r4r5',
   msSubmissionsByPlayer: 'member',
-  msDeadline: 'admin', msBoardDeadlines: 'admin', kvkDay1Override: 'admin',
+  msDeadline: 'admin', msBoardDeadlines: 'admin', msBoardAllocAt: 'admin', kvkDay1Override: 'admin',
   // Battle Stats (bstat*) — a rally leader's own combat stats from their Battle Report,
   // scored into an attack/defense number for battle-assignment ranking. Owner-keyed by
   // player id. Admin-only for now; to open it to rally leaders later, change
@@ -1781,6 +1790,7 @@ let syncSerialize = function() {
     msAllocByBoard: (typeof MS!=='undefined') ? MS._allocByBoard : null,
     msDeadline: (typeof MS!=='undefined') ? MS.deadline : null,
     msBoardDeadlines: (typeof MS!=='undefined') ? (MS.boardDeadlines||{}) : {},
+    msBoardAllocAt: (typeof MS!=='undefined') ? (MS.boardAllocAt||{}) : {},
     kvkDay1Override: (typeof MS!=='undefined') ? (MS.kvkDay1Override||null) : null,
     msActionHint: (typeof MS!=='undefined') ? (MS._pendingAction||null) : null,
     msSubmissionsByPlayer: (typeof MS!=='undefined') ? (MS.submissionsByPlayer||{}) : {},
@@ -1928,6 +1938,7 @@ let syncApplyRemote = function(data) {
       MS._allocByBoard = data.msAllocByBoard || MS._allocByBoard || {};
       MS.deadline = data.msDeadline || null;
       MS.boardDeadlines = data.msBoardDeadlines || {};
+      MS.boardAllocAt = data.msBoardAllocAt || {};
       MS.kvkDay1Override = data.kvkDay1Override || null;
       if(data.msSubmissionsByPlayer) { MS.submissionsByPlayer = data.msSubmissionsByPlayer; MS.submissions = Object.values(MS.submissionsByPlayer); }
       if(data.msAuditLog) { MS.auditLog = data.msAuditLog; }
@@ -5127,6 +5138,116 @@ function msBoardDeadline(board){
   if(man!=null && !isNaN(man)) return man;
   try { var bs = msSchedule(Date.now()).boards[board]; return bs ? bs.deadline : null; } catch(e){ return null; }
 }
+// Automatic-assignment time for a spot: admin override, else the computed schedule.
+// The server resolves this the same way in msBoardAllocAtSrv - keep them in step.
+function msBoardAllocAt(board){
+  try {
+    var per = MS.boardAllocAt && MS.boardAllocAt[board];
+    if(per){ var t = new Date(per).getTime(); if(!isNaN(t)) return t; }
+  } catch(e){}
+  try { var bs = msSchedule(Date.now()).boards[board]; return bs ? bs.allocAt : null; } catch(e){ return null; }
+}
+// Computed (non-overridden) values, used for the "default" hints and the reset.
+function msBoardDefault(board, which){
+  try {
+    var bs = msSchedule(Date.now()).boards[board];
+    return bs ? (which === 'alloc' ? bs.allocAt : bs.deadline) : null;
+  } catch(e){ return null; }
+}
+
+// datetime-local <-> UTC. The fields are labelled UTC, so they are read and
+// written as UTC rather than the browser's local zone.
+function _msDTin(ms){
+  if(ms == null || isNaN(ms)) return '';
+  var d = new Date(ms), p = function(n){ return String(n).padStart(2,'0'); };
+  return d.getUTCFullYear()+'-'+p(d.getUTCMonth()+1)+'-'+p(d.getUTCDate())+'T'+p(d.getUTCHours())+':'+p(d.getUTCMinutes());
+}
+function _msDTout(v){
+  var m = /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})/.exec(v || '');
+  return m ? Date.UTC(+m[1], +m[2]-1, +m[3], +m[4], +m[5], 0) : null;
+}
+
+function msRenderSpotSchedule(){
+  var el = document.getElementById('msSpotSchedule'); if(!el) return;
+  var rows = MS_BOARDS.map(function(b){
+    var meta = MS_BOARD_META[b] || {};
+    var aOv = !!(MS.boardAllocAt && MS.boardAllocAt[b]);
+    var dOv = msBoardIsOverridden(b);
+    function cell(which, cur, isOv){
+      var def = msBoardDefault(b, which);
+      return '<td><input type="datetime-local" value="' + _msDTin(cur) + '" ' +
+        'onchange="msSetSpotTime(&quot;' + b + '&quot;,&quot;' + which + '&quot;,this.value)">' +
+        (isOv ? '<div class="msSpotOv">overridden - default was ' + (def ? fmtUTCDateTime(def) : 'n/a') + '</div>'
+              : '<div class="msSpotDef">on the KvK schedule</div>') + '</td>';
+    }
+    return '<tr><td class="msSpotName">' + (meta.icon || '') + ' ' + (meta.label || b) + '</td>' +
+      cell('alloc', msBoardAllocAt(b), aOv) +
+      cell('deadline', msBoardDeadline(b), dOv) +
+      '<td><button class="btn btn-ghost btn-sm" ' + ((aOv || dOv) ? '' : 'disabled style="opacity:.4;cursor:not-allowed" ') +
+        'onclick="msResetSpot(&quot;' + b + '&quot;)">Default</button></td></tr>';
+  }).join('');
+
+  el.innerHTML =
+    '<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">&#128337; Spot timings (UTC)</div>' +
+    '<table class="msSpotTbl"><tr><th>Spot</th><th>Automatic assignment</th><th>Submission deadline</th><th></th></tr>' +
+    rows + '</table>' +
+    '<div style="font-size:11px;color:var(--text3);margin-top:8px">Admin only. Blank a field to fall back to the KvK schedule. ' +
+    'Setting a deadline in the future is what <em>reopens</em> a closed spot. Moving an assignment time forward lets that spot allocate again.</div>' +
+    '<div style="margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="msResetAllSpots()">&#8617; Reset all spots to default</button></div>';
+}
+
+function msSetSpotTime(board, which, value){
+  var ms = _msDTout(value);
+  if(value && ms == null){ toast('Could not read that date/time.'); return; }
+  var store = (which === 'alloc') ? 'boardAllocAt' : 'boardDeadlines';
+  MS[store] = MS[store] || {};
+  if(ms == null) delete MS[store][board];
+  else MS[store][board] = new Date(ms).toISOString();
+  if(which === 'deadline') MS.deadline = null;   // per-spot is the source of truth
+  syncQueuePush();
+  msRenderSpotSchedule();
+  if(typeof msUpdateDeadlineBanners === 'function') msUpdateDeadlineBanners();
+  if(typeof msRenderScheduleStrip === 'function') msRenderScheduleStrip();
+  if(typeof msRenderBoardTimers === 'function') msRenderBoardTimers();
+  var label = (MS_BOARD_META[board] || {}).label || board;
+  toast(ms == null
+    ? (label + ' ' + (which === 'alloc' ? 'assignment' : 'deadline') + ' back on the KvK schedule')
+    : (label + ' ' + (which === 'alloc' ? 'assignment' : 'deadline') + ': ' + fmtUTCDateTime(ms)));
+}
+
+function msResetSpot(board){
+  var label = (MS_BOARD_META[board] || {}).label || board;
+  var dDef = msBoardDefault(board, 'deadline');
+  var willClose = (dDef != null) && (Date.now() >= dDef);
+  if(!confirm('Reset ' + label + ' to the computed KvK schedule?' +
+    (willClose ? '\\n\\nHeads up: that deadline has already passed, so this spot will CLOSE again.' : ''))) return;
+  if(MS.boardAllocAt) delete MS.boardAllocAt[board];
+  if(MS.boardDeadlines) delete MS.boardDeadlines[board];
+  syncQueuePush();
+  msRenderSpotSchedule();
+  if(typeof msUpdateDeadlineBanners === 'function') msUpdateDeadlineBanners();
+  if(typeof msRenderScheduleStrip === 'function') msRenderScheduleStrip();
+  if(typeof msRenderBoardTimers === 'function') msRenderBoardTimers();
+  toast(label + ' reset to default');
+}
+
+function msResetAllSpots(){
+  var closing = MS_BOARDS.filter(function(b){
+    var d = msBoardDefault(b, 'deadline'); return d != null && Date.now() >= d;
+  }).map(function(b){ return (MS_BOARD_META[b] || {}).label || b; });
+  if(!confirm('Reset all spots to the computed KvK schedule?' +
+    (closing.length ? '\\n\\nHeads up: the deadline has already passed for ' + closing.join(', ') + ' - those will CLOSE again.' : ''))) return;
+  MS.boardAllocAt = {};
+  MS.boardDeadlines = {};
+  MS.deadline = null;
+  syncQueuePush();
+  msRenderSpotSchedule();
+  if(typeof msUpdateDeadlineBanners === 'function') msUpdateDeadlineBanners();
+  if(typeof msRenderScheduleStrip === 'function') msRenderScheduleStrip();
+  if(typeof msRenderBoardTimers === 'function') msRenderBoardTimers();
+  toast('All spots reset to default');
+}
+
 // True if this board's deadline is an admin override rather than the computed one.
 function msBoardIsOverridden(board){
   try { if(MS.boardDeadlines && MS.boardDeadlines[board]) return true; } catch(e){}
@@ -5242,6 +5363,7 @@ function msUpdateDeadlineBanners() {
       adminBanner.style.display = 'none';
     }
   }
+  if (typeof msRenderSpotSchedule === 'function') msRenderSpotSchedule();
   // Pre-fill the manual (global override) deadline input if one is set
   var dlInput = document.getElementById('msDeadlineInput');
   var man = null; try { man = MS.deadline ? new Date(MS.deadline) : null; } catch(e){ man = null; }
