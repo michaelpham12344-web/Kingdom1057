@@ -758,6 +758,11 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .bsMultiBody{max-height:430px;overflow-y:auto;}
 .bsMultiHead{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
 .bsMultiRow.me{background:rgba(217,166,72,.12);border-radius:5px;padding:4px 7px;margin:2px -7px;}
+.bsMultiDelay{display:inline-flex;align-items:center;gap:2px;margin-left:8px;font-weight:400;}
+.bsMultiDelay button{background:var(--bg3);border:1px solid var(--border2);color:var(--text2);border-radius:4px;width:20px;height:20px;line-height:1;cursor:pointer;font-size:13px;padding:0;}
+.bsMultiDelay button:hover{border-color:var(--gold);color:var(--gold);}
+.bsMultiDelay > span{font-family:var(--mono);font-size:11px;color:var(--text3);min-width:48px;text-align:center;}
+.bsMultiDelay > span.on{color:var(--gold);font-weight:600;}
 .bsMultiPick{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
 .bsMultiChip{display:flex;align-items:center;gap:7px;background:var(--bg3);border:1.5px solid var(--border2);border-radius:20px;padding:6px 13px;cursor:pointer;font-size:13px;color:var(--text2);user-select:none;transition:.12s;}
 .bsMultiChip:hover{border-color:var(--gold);}
@@ -3235,12 +3240,23 @@ function bsAddTeamRowHTML(a){
     '<button class="btn btn-primary btn-sm" onclick="bsAddTeamTo(&quot;'+a.id+'&quot;)">+ Add Team</button>'+
   '</div>';
 }
+// Lowest unused "Team N", so deleting Team 2 lets the next one reuse the number.
+function bsNextTeamNumber(){
+  var used={};
+  (S.teams||[]).forEach(function(t){
+    var m=/^Team\s+(\d+)$/.exec(t.name||''); if(m) used[parseInt(m[1],10)]=true;
+  });
+  var n=1; while(used[n]) n++;
+  return n;
+}
 function bsAddTeamTo(allianceId){
   var el=document.getElementById('bsQuickTeam-'+allianceId); if(!el) return;
   var name=(el.value||'').trim();
-  if(!name) name='Team '+(S.teams.length+1);
+  if(!name) name='Team '+bsNextTeamNumber();
   bsEnsureAlliances(); bsEnsureTeamColors();
-  S.teams.push({id:uid(),name:name,customName:true,alliance:allianceId,
+  // No customName flag: once leaders are placed, bsAutoNameTeams() renames the
+  // team after them, exactly like a team created from the Teams field above.
+  S.teams.push({id:uid(),name:name,alliance:allianceId,
     color:BS_TEAM_PALETTE[S.teams.length % BS_TEAM_PALETTE.length]});
   el.value='';
   renderBattleStrategy();
@@ -3250,7 +3266,7 @@ function bsAddTeamTo(allianceId){
 }
 function bsAddTeam(){
   const el=document.getElementById('bsNewTeamName'); if(!el) return;
-  const name=(el.value||'').trim(); if(!name){ toast('Enter a team name'); return; }
+  const name=(el.value||'').trim() || ('Team '+bsNextTeamNumber());
   bsEnsureAlliances();
   bsEnsureTeamColors();
   S.teams.push({id:uid(),name:name,alliance:(S.alliances[0]?S.alliances[0].id:null),color:BS_TEAM_PALETTE[S.teams.length % BS_TEAM_PALETTE.length]});
@@ -3517,6 +3533,11 @@ el.innerHTML=S.teams.map(t=>{
     const dot='<span class="team-dot '+(rallying?'rallying':'free')+'"></span>';
     let meta='<span style="opacity:.6;font-size:11px">('+leaderCount+')</span>';
     if(rallying){ const rem=(bsTeamRally[t.id].landEnd-nowSync())/1000; meta='<span class="mono" style="color:#ff7070;font-size:12px;margin-left:2px">lands '+bsFmtLand(rem)+'</span>'; }
+    // An empty team has nothing to schedule, so it is not selectable.
+    if(!leaderCount){
+      return '<button class="btn btn-ghost" disabled title="No rally leaders in this team yet" '+
+        'style="opacity:.4;cursor:not-allowed">'+dot+t.name+' <span style="opacity:.6;font-size:11px">(0)</span></button>';
+    }
     return \`<button class="btn \${allianceColor}" style="\${selected}" onclick="bsSelectTeam('\${t.id}')">\${dot}\${t.name} \${meta}</button>\`;
   }).join('');
 }
@@ -3724,13 +3745,30 @@ function bsMultiCalc(){
         .filter(function(l){ return l.bsSlot && l.bsSlot.slotType === 'team' && l.bsSlot.slotId === t.id; })
         .map(function(l){ return { name:l.name, march:l.march, launchSec: landSec - l.march, playerId: l.playerId || null }; })
         .sort(function(a,b){ return a.launchSec - b.launchSec; });
-      return { id:t.id, name:t.name, color:t.color || '#d9a648', rows:rows };
+      return { id:t.id, name:t.name, color:t.color || '#d9a648', delay:0, rows:rows };
     }).filter(function(t){ return t.rows.length; })
   };
   BS_MULTI.fired = {};
   syncQueuePush();          // share it — every leader gets their own countdown
   bsMultiRender();
   toast('Multi-team schedule sent to everyone');
+}
+
+// Stagger one team behind the others. Its launch times shift later by the delay
+// in seconds, so it arrives that many seconds after the rest. Re-shared immediately
+// so every leader in that team sees their new time.
+function bsMultiSetDelay(teamId, delta){
+  if(!bsMultiCanEdit()) return;
+  var c = BS_MULTI.calc; if(!c) return;
+  var t = c.teams.find(function(x){ return x.id === teamId; }); if(!t) return;
+  var d = Math.max(0, Math.min(60, (t.delay || 0) + delta));
+  if(d === (t.delay || 0)) return;
+  t.delay = d;
+  t.rows.forEach(function(r){ r.launchSec = c.landSec - r.march + d; });
+  t.rows.sort(function(a,b){ return a.launchSec - b.launchSec; });
+  BS_MULTI.fired = {};
+  syncQueuePush();
+  bsMultiRender();
 }
 
 function bsMultiClear(){
@@ -3788,10 +3826,7 @@ function bsMultiRender(){
 
   var body = '';
   if(c){
-    var landIn = c.landSec - now;
-    body += '<div class="bsMultiLand" style="margin-top:12px"><strong style="color:var(--gold)">All rallies land ' + s2hms(c.landSec) + ' UTC</strong>' +
-      '<span style="color:var(--text3);margin-left:10px">' + (landIn > 0 ? 'in ' + bsFmtLand(landIn) : 'landed') + '</span></div>';
-    body += '<div class="bsMultiGrid">' + c.teams.map(function(t){
+    body += '<div class="bsMultiGrid" style="margin-top:12px">' + c.teams.map(function(t){
       var rows = t.rows.map(function(r){
         var rem = r.launchSec - now, st;
         if(rem > 10) st = '<span class="mono" style="color:var(--text2);font-size:12px">in ' + rem + 's</span>';
@@ -3808,8 +3843,16 @@ function bsMultiRender(){
           '<span class="mono" style="color:var(--gold);margin-left:8px">' + s2hms(r.launchSec) + '</span>' +
           '<span style="color:var(--text3);font-size:11px;margin-left:6px">(' + r.march + 's)</span></span>' + st + '</div>';
       }).join('');
+      var dly = t.delay || 0;
+      var dlyUI = canEdit
+        ? '<span class="bsMultiDelay">' +
+            '<button onclick="bsMultiSetDelay(&quot;' + t.id + '&quot;,-1)" title="1s earlier">&#8722;</button>' +
+            '<span class="' + (dly ? 'on' : '') + '">' + (dly ? '+' + dly + 's' : 'on time') + '</span>' +
+            '<button onclick="bsMultiSetDelay(&quot;' + t.id + '&quot;,1)" title="1s later">+</button>' +
+          '</span>'
+        : (dly ? '<span class="bsMultiDelay"><span class="on">+' + dly + 's</span></span>' : '');
       return '<div class="bsMultiTeam"><div class="bsMultiTeamH">' +
-        '<span style="width:10px;height:10px;border-radius:50%;background:' + t.color + '"></span>' + t.name +
+        '<span style="width:10px;height:10px;border-radius:50%;background:' + t.color + '"></span>' + t.name + dlyUI +
         '<button class="btn btn-ghost btn-sm" style="margin-left:auto;font-size:11px" onclick="bsMultiCopy(&quot;' + t.id + '&quot;)">Copy</button>' +
         '</div>' + rows + '</div>';
     }).join('') + '</div>';
